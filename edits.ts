@@ -1,7 +1,5 @@
-// Editing model shared by the grid and the save call: ranges, typed input,
-// pending-edit display, formulas made stale by edits, and chat quotes.
-import * as XLSX from "xlsx";
-import { cellAddress, columnName, textCell, type Cell, type Sheet } from "./sheet.ts";
+// Selection ranges, typed-input interpretation, copying and chat quotes.
+import { cellAddress, columnName, type Cell } from "./sheet.ts";
 import type { CellEdit } from "./xlsx-patch.ts";
 
 export type Position = { row: number; col: number };
@@ -54,107 +52,42 @@ export function parseInput(input: string, cell: Cell | null, mode: "xlsx" | "csv
   return { kind: "string", text: input };
 }
 
-/** Text shown in the cell editor: the formula, the date as displayed, or the raw number. */
+/** Text shown in the cell editor: the formula or the value as entered. */
 export function editorText(cell: Cell | null): string {
   if (!cell) return "";
   if (cell.formula) return cell.formula;
-  if (typeof cell.value === "number" && !cell.isDate) return String(cell.value);
-  return cell.text;
+  return typeof cell.value === "string" ? cell.value.replace(/^'/, "") : cell.text;
 }
 
-function formatNumber(value: number, format: string | null): string {
-  if (!format || format === "General") return String(value);
-  try {
-    return XLSX.SSF.format(format, value);
-  } catch {
-    try {
-      return XLSX.SSF.format(format.replace(/\./g, "/"), value).replace(/\//g, ".");
-    } catch {
-      return String(value);
-    }
+/** Tab-separated text from the clipboard as rows of cells (quoted fields may contain tabs and line breaks). */
+export function parseTsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+  const body = text.replace(/\r\n?/g, "\n").replace(/\n$/, "");
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (quoted) {
+      if (ch === '"' && body[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else if (ch === '"') quoted = false;
+      else field += ch;
+    } else if (ch === '"' && field === "") quoted = true;
+    else if (ch === "\t") {
+      row.push(field);
+      field = "";
+    } else if (ch === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else field += ch;
   }
-}
-
-/** How a cell looks with a pending edit applied, keeping its number format. */
-export function displayEdit(edit: Edit, original: Cell | null): Cell | null {
-  const format = original?.format ?? null;
-  switch (edit.kind) {
-    case "clear":
-      return null;
-    case "string":
-      return { ...textCell(edit.text), numeric: false, format };
-    case "boolean":
-      return { ...textCell(edit.value ? "TRUE" : "FALSE"), numeric: false, format, value: edit.value };
-    case "number":
-      return { ...textCell(formatNumber(edit.value, format)), numeric: true, format, isDate: original?.isDate ?? false, value: edit.value };
-    case "formula":
-      return { ...textCell(""), formula: `=${edit.formula}`, format };
-  }
-}
-
-export function toCellEdit(position: Position, edit: Edit): CellEdit {
-  return { ...position, ...edit } as CellEdit;
-}
-
-type Ref = { sheet: string; range: Range };
-
-const REF_RE =
-  /(?:(?:'((?:[^']|'')+)'|([\p{L}\p{N}_.]+))!)?(?:\$?([A-Z]{1,3})\$?(\d+)(?::\$?([A-Z]{1,3})\$?(\d+))?|\$?([A-Z]{1,3}):\$?([A-Z]{1,3})|\$?(\d+):\$?(\d+))(?![\p{L}\p{N}_(])/gu;
-
-function colIndex(letters: string) {
-  let n = 0;
-  for (const ch of letters) n = n * 26 + ch.charCodeAt(0) - 64;
-  return n - 1;
-}
-
-/** Cell and range references in a formula; string literals are ignored. Over-matching only marks more cells stale. */
-export function formulaRefs(formula: string, sheet: string): Ref[] {
-  const code = formula.replace(/"(?:[^"]|"")*"/g, '""');
-  const refs: Ref[] = [];
-  for (const m of code.matchAll(REF_RE)) {
-    const target = m[1]?.replace(/''/g, "'") ?? m[2] ?? sheet;
-    if (m[3]) {
-      const r1 = Number(m[4]) - 1;
-      const c1 = colIndex(m[3]);
-      const r2 = m[6] ? Number(m[6]) - 1 : r1;
-      const c2 = m[5] ? colIndex(m[5]) : c1;
-      refs.push({ sheet: target, range: { r1: Math.min(r1, r2), c1: Math.min(c1, c2), r2: Math.max(r1, r2), c2: Math.max(c1, c2) } });
-    } else if (m[7]) {
-      const a = colIndex(m[7]);
-      const b = colIndex(m[8]);
-      refs.push({ sheet: target, range: { r1: 0, c1: Math.min(a, b), r2: Number.MAX_SAFE_INTEGER, c2: Math.max(a, b) } });
-    } else if (m[9]) {
-      const a = Number(m[9]) - 1;
-      const b = Number(m[10]) - 1;
-      refs.push({ sheet: target, range: { r1: Math.min(a, b), c1: 0, r2: Math.max(a, b), c2: Number.MAX_SAFE_INTEGER } });
-    }
-  }
-  return refs;
-}
-
-/**
- * Formula cells whose value depends, directly or through other formulas, on
- * the changed cells. Keys are `${sheetName}!${row}:${col}`.
- */
-export function staleFormulas(sheets: Sheet[], changed: { sheet: string; row: number; col: number }[]): Set<string> {
-  const formulas = sheets.flatMap((sheet) =>
-    sheet.formulas.map((f) => ({ key: `${sheet.name}!${f.row}:${f.col}`, sheet: sheet.name, row: f.row, col: f.col, refs: formulaRefs(f.formula, sheet.name) })),
-  );
-  const stale = new Set<string>();
-  let frontier = changed;
-  while (frontier.length) {
-    const next: typeof frontier = [];
-    for (const formula of formulas) {
-      if (stale.has(formula.key)) continue;
-      const hit = formula.refs.some((ref) => frontier.some((c) => c.sheet === ref.sheet && inRange(ref.range, c.row, c.col)));
-      if (hit) {
-        stale.add(formula.key);
-        next.push(formula);
-      }
-    }
-    frontier = next;
-  }
-  return stale;
+  row.push(field);
+  rows.push(row);
+  return rows;
 }
 
 const MAX_QUOTE_ROWS = 100;

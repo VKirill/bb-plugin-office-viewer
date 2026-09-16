@@ -116,3 +116,26 @@ test("prefixed SpreadsheetML and an empty sheet", () => {
   const out = patchXlsx(zipSync(files), { index: 0, name: "S" }, [{ row: 1, col: 1, kind: "string", text: "ok" }]);
   assert.match(part(out, "xl/worksheets/sheet1.xml"), /<x:sheetData><x:row r="2"><x:c r="B2" t="inlineStr"><x:is><x:t xml:space="preserve">ok<\/x:t><\/x:is><\/x:c><\/x:row><\/x:sheetData>/);
 });
+
+test("a number format adds or reuses a cell style without touching other styles", () => {
+  const out = patchXlsx(styled, budget, [
+    { row: 9, col: 0, kind: "number", value: 46282, format: "dd.mm.yyyy" },
+    { row: 10, col: 0, kind: "number", value: 46283, format: "dd.mm.yyyy" },
+    { row: 2, col: 1, kind: "number", value: 0.5, format: "0%" },
+  ]);
+  const [sheet] = parseWorkbook(out, "xlsx");
+  assert.equal(sheet.cell(9, 0)?.text, "17.09.2026");
+  assert.equal(sheet.cell(10, 0)?.text, "18.09.2026");
+  assert.equal(sheet.cell(2, 1)?.text, "50%");
+  const before = part(styled, "xl/styles.xml");
+  const after = part(out, "xl/styles.xml");
+  const xfCount = (xml: string) => Number(/<cellXfs count="(\d+)"/.exec(xml)![1]);
+  assert.equal(xfCount(after), xfCount(before) + 2);
+  assert.match(after, /formatCode="dd\.mm\.yyyy"/);
+  const cellXfs = (xml: string) => /<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/.exec(xml)![1];
+  assert.ok(cellXfs(after).startsWith(cellXfs(before)));
+  const b3 = /<c r="B3" s="(\d+)"/.exec(part(out, "xl/worksheets/sheet1.xml"))![1];
+  const xf = [...cellXfs(after).matchAll(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g)][Number(b3)][0];
+  assert.match(xf, /numFmtId="9"/);
+  assert.match(xf, /fillId="[1-9]/);
+});

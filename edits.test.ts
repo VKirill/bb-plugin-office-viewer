@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { displayEdit, editorText, formatQuote, formulaRefs, parseInput, rangeLabel, rangeTsv, staleFormulas, toRange } from "./edits.ts";
-import { textCell, type Cell, type Sheet } from "./sheet.ts";
+import { editorText, formatQuote, parseInput, parseTsv, rangeLabel, rangeTsv, toRange } from "./edits.ts";
+import { textCell, type Cell } from "./sheet.ts";
 
 const dateCell: Cell = { ...textCell("01.09.2026"), numeric: true, format: "dd.mm.yyyy", isDate: true, value: 46266 };
 const moneyCell: Cell = { ...textCell("45,000 ₽"), numeric: true, format: '#,##0 "₽"', value: 45000 };
@@ -19,33 +19,16 @@ test("typed input becomes numbers, dates, booleans, formulas or text", () => {
   assert.deepEqual(parseInput("=A1", null, "csv"), { kind: "string", text: "=A1" });
 });
 
-test("editor text and pending display keep the cell's number format", () => {
-  assert.equal(editorText(moneyCell), "45000");
-  assert.equal(editorText(dateCell), "01.09.2026");
-  assert.equal(displayEdit({ kind: "number", value: 51000 }, moneyCell)?.text, "51,000 ₽");
-  assert.equal(displayEdit({ kind: "number", value: 46281 }, dateCell)?.text, "16.09.2026");
-  assert.equal(displayEdit({ kind: "formula", formula: "B2*2" }, null)?.formula, "=B2*2");
-  assert.equal(displayEdit({ kind: "clear" }, moneyCell), null);
+test("editor text shows formulas and entered values without the text prefix", () => {
+  assert.equal(editorText({ ...moneyCell, value: "45000" }), "45000");
+  assert.equal(editorText({ ...textCell("0042"), value: "'0042" }), "0042");
+  assert.equal(editorText({ ...textCell("7"), formula: "=A1+1" }), "=A1+1");
+  assert.equal(editorText(null), "");
 });
 
-test("formula references: cells, ranges, columns, rows, other sheets; strings and functions ignored", () => {
-  const refs = formulaRefs(`SUM($B$3:B5)+'Второй лист'!A1+LOG10(2)+COUNTIF(C:C,"A1")+Данные!2:3`, "Бюджет");
-  assert.deepEqual(refs.map((r) => [r.sheet, r.range.r1, r.range.c1, r.range.r2 === Number.MAX_SAFE_INTEGER ? "∞" : r.range.r2, r.range.c2 === Number.MAX_SAFE_INTEGER ? "∞" : r.range.c2]), [
-    ["Бюджет", 2, 1, 4, 1],
-    ["Второй лист", 0, 0, 0, 0],
-    ["Бюджет", 0, 2, "∞", 2],
-    ["Данные", 1, 0, 2, "∞"],
-  ]);
-});
-
-test("stale formulas follow dependencies across formulas and sheets", () => {
-  const sheet = (name: string, formulas: Sheet["formulas"]): Sheet => ({ name, hidden: false, rows: 10, cols: 5, widths: [], merges: [], formulas, cell: () => null });
-  const sheets = [
-    sheet("A", [{ row: 5, col: 1, formula: "SUM(B1:B5)" }, { row: 6, col: 1, formula: "B6*2" }, { row: 7, col: 1, formula: "C1" }]),
-    sheet("B", [{ row: 0, col: 0, formula: "A!B7+1" }]),
-  ];
-  assert.deepEqual([...staleFormulas(sheets, [{ sheet: "A", row: 2, col: 1 }])].sort(), ["A!5:1", "A!6:1", "B!0:0"]);
-  assert.deepEqual([...staleFormulas(sheets, [{ sheet: "B", row: 2, col: 1 }])], []);
+test("clipboard TSV with quoted tabs and line breaks", () => {
+  assert.deepEqual(parseTsv('a\t"b\tc"\r\n"line 1\nline 2"\t""""\n'), [["a", "b\tc"], ["line 1\nline 2", '"']]);
+  assert.deepEqual(parseTsv("42"), [["42"]]);
 });
 
 test("ranges, TSV copy and chat quote", () => {

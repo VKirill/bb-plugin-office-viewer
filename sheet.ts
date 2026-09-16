@@ -22,6 +22,8 @@ export type Cell = {
   isDate: boolean;
   /** Raw value: the number behind a formatted number or date. */
   value: string | number | boolean | null;
+  /** A formula the engine can't compute; `text` is the value cached in the file. */
+  unsupported?: boolean;
 };
 
 export type Merge = { r1: number; c1: number; r2: number; c2: number };

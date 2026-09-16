@@ -3,6 +3,8 @@
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import * as XLSX from "xlsx";
+import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { locate, LocateError, type Lang, type LocateSdk } from "./locate.ts";
 import { applyCsvEdits, parseCsv, serializeCsv } from "./csv.ts";
 import { editMode, extensionOf } from "./sheet.ts";
@@ -46,6 +48,8 @@ export const rpcContract = defineRpcContract({
       })
       .strict(),
   },
+  /** The IronCalc WebAssembly module the viewer computes formulas with. */
+  engine: { input: z.object({}).strict(), output: z.object({ base64: z.string() }).strict() },
   save: {
     input: fileSchema
       .extend({
@@ -96,8 +100,18 @@ function describe(error: unknown, hostName: string, absPath: string, lang: Lang)
 
 export default function plugin(bb: BbPluginApi) {
   const sdk = bb.sdk as unknown as LocateSdk;
+  let engine: Promise<string> | null = null;
 
   bb.rpc.register(rpcContract, {
+    engine: async () => {
+      engine ??= readFile(createRequire(import.meta.url).resolve("@ironcalc/wasm/wasm_bg.wasm")).then((bytes) => bytes.toString("base64"));
+      try {
+        return { base64: await engine };
+      } catch (error) {
+        engine = null;
+        throw error;
+      }
+    },
     open: async ({ source, path, locale = "en" }) => {
       const where = await locate(sdk, source, path, locale);
       const hostName = (await bb.sdk.hosts.get({ hostId: where.hostId }).catch(() => null))?.name || where.hostId;

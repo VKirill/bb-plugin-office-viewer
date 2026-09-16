@@ -35,7 +35,6 @@ const en = {
   save: "Save",
   saving: "Saving…",
   saved: "Saved",
-  unsaved: "Unsaved: {n}",
   undo: "Undo",
   discard: "Discard changes",
   conflict: "The file changed on disk since you opened it.",
@@ -44,8 +43,22 @@ const en = {
   saveFailed: "Couldn't save",
   readOnlyBadge: "read-only",
   readOnly: "Read-only format: editing works for .xlsx, .xlsm, .csv and .tsv.",
-  staleHint: "Excel recalculates this formula when it opens the file",
   more: "Not included: {rows} more rows, {cols} more columns.",
+  cut: "Cut",
+  paste: "Paste",
+  redo: "Redo",
+  pasteDenied: "The browser didn't allow reading the clipboard; press {mod}V instead.",
+  pasteTooLarge: "Too much to paste at once (over {n} cells).",
+  sum: "Sum",
+  average: "Average",
+  count: "Count",
+  formulaBar: "Formula bar",
+  nameBox: "Cell",
+  unsupportedHint: "BB can't compute this formula; the value saved in the file is shown and Excel recalculates it",
+  engineFailed: "Couldn't start the formula engine",
+  inputRejected: "Couldn't enter this value",
+  unsavedChanges: "Unsaved changes",
+  nothingToSave: "No changes to save",
 };
 
 export type I18nKey = keyof typeof en;
@@ -85,7 +98,6 @@ const ru: Record<I18nKey, string> = {
   save: "Сохранить",
   saving: "Сохранение…",
   saved: "Сохранено",
-  unsaved: "Не сохранено: {n}",
   undo: "Отменить",
   discard: "Отменить все правки",
   conflict: "Файл изменился на диске, пока был открыт.",
@@ -94,8 +106,22 @@ const ru: Record<I18nKey, string> = {
   saveFailed: "Не удалось сохранить",
   readOnlyBadge: "только просмотр",
   readOnly: "Формат только для просмотра: править можно .xlsx, .xlsm, .csv и .tsv.",
-  staleHint: "Excel пересчитает эту формулу при открытии файла",
   more: "Не вошло: ещё строк — {rows}, столбцов — {cols}.",
+  cut: "Вырезать",
+  paste: "Вставить",
+  redo: "Повторить",
+  pasteDenied: "Браузер не дал прочитать буфер обмена — нажмите {mod}V.",
+  pasteTooLarge: "Слишком много для вставки за раз (больше {n} ячеек).",
+  sum: "Сумма",
+  average: "Среднее",
+  count: "Количество",
+  formulaBar: "Строка формул",
+  nameBox: "Ячейка",
+  unsupportedHint: "BB не умеет вычислять эту формулу: показано значение из файла, Excel пересчитает его сам",
+  engineFailed: "Не удалось запустить вычисление формул",
+  inputRejected: "Не удалось ввести значение",
+  unsavedChanges: "Есть несохранённые изменения",
+  nothingToSave: "Нет изменений для сохранения",
 };
 
 export type Locale = "en" | "ru";
@@ -108,5 +134,5 @@ export function detectLocale(): Locale {
 const MOD = /Mac|iPhone|iPad/i.test(globalThis.navigator?.platform ?? globalThis.navigator?.userAgent ?? "") ? "⌘" : "Ctrl";
 
 export function t(key: I18nKey, vars: Record<string, string | number> = {}, locale: Locale = detectLocale()): string {
-  return (locale === "ru" ? ru : en)[key].replace("{mod}", MOD).replace(/\{(\w+)\}/g, (match, name: string) => (name in vars ? String(vars[name]) : match));
+  return (locale === "ru" ? ru : en)[key].replace(/\{mod\}/g, MOD).replace(/\{(\w+)\}/g, (match, name: string) => (name in vars ? String(vars[name]) : match));
 }

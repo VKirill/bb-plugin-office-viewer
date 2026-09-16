@@ -1,19 +1,19 @@
 // Virtualized sheet grid: column letters and row numbers stay pinned, an
-// optional frozen first row, merged cells, range selection, in-cell editing
-// and search highlights. Only the cells inside the viewport are rendered.
+// optional frozen first row, merged cells, range selection, the fill handle,
+// reference highlights and Point mode while a formula is being typed.
+// Only the cells inside the viewport are rendered.
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import type { KeyboardEvent, MouseEvent } from "react";
+import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { columnName, type Merge, type Sheet } from "./sheet";
 import { cellKey, inRange, toRange, type Position, type Range } from "./edits";
+import { MAX_COL, MAX_ROW } from "./formula";
 
 export const ROW_HEIGHT = 24;
 const HEADER_HEIGHT = 24;
 const OVERSCAN = 4;
 
 export type GridHandle = { reveal(position: Position): void; focus(): void };
-
-export type Editing = { row: number; col: number; draft: string };
 
 type Props = {
   sheet: Sheet;
@@ -23,19 +23,24 @@ type Props = {
   onSelect(anchor: Position, focus: Position): void;
   matches: Set<number>;
   current: Position | null;
-  isStale(row: number, col: number): boolean;
-  isEdited(row: number, col: number): boolean;
+  highlights: { range: Range; color: string }[];
   editable: boolean;
-  editing: Editing | null;
+  /** Cell showing the in-place editor on this sheet, and the editor itself. */
+  editing: Position | null;
+  editor: ReactNode;
+  /** A formula is being typed and the caret accepts a reference. */
+  pointing: boolean;
+  onPoint(anchor: Position, focus: Position): void;
   onStartEdit(position: Position, initial?: string): void;
-  onDraft(text: string): void;
-  onCommitEdit(move: [number, number] | null): void;
-  onCancelEdit(): void;
+  onCommitEdit(): void;
   onClear(): void;
-  onCopy(): void;
   onUndo(): void;
+  onRedo(): void;
+  onCopy(cut: boolean): string | null;
+  onPaste(text: string): void;
+  onFill(source: Range, target: Range): void;
   onOpenLink(url: string): void;
-  hints: { link: string; stale: string };
+  hints: { link: string; unsupported: string };
 };
 
 /** Index of the last offset <= x. */
@@ -51,9 +56,12 @@ function locateIndex(offsets: number[], x: number) {
 }
 
 export const Grid = forwardRef<GridHandle, Props>(function Grid(props, ref) {
-  const { sheet, freeze, anchor, focus, onSelect, matches, current, editing, editable } = props;
+  const { sheet, freeze, anchor, focus, onSelect, matches, current, editing, editable, pointing } = props;
   const body = useRef<HTMLDivElement>(null);
-  const dragging = useRef(false);
+  const drag = useRef<"select" | "point" | "fill" | null>(null);
+  const pointAnchor = useRef<Position | null>(null);
+  const [fillTarget, setFillTarget] = useState<Range | null>(null);
+  const fillRef = useRef<{ source: Range; target: Range } | null>(null);
   const [scroll, setScroll] = useState({ top: 0, left: 0, width: 0, height: 0 });
   const frozen = freeze && sheet.rows > 1 ? 1 : 0;
   const gutter = Math.max(40, String(sheet.rows).length * 8 + 16);
@@ -101,11 +109,20 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(props, ref) {
     measure();
   }, [sheet.name, measure]);
 
+  const onFill = props.onFill;
   useEffect(() => {
-    const stop = () => { dragging.current = false; };
+    const stop = () => {
+      if (drag.current === "fill" && fillRef.current) {
+        const { source, target } = fillRef.current;
+        if (target.r1 !== source.r1 || target.r2 !== source.r2 || target.c1 !== source.c1 || target.c2 !== source.c2) onFill(source, target);
+      }
+      drag.current = null;
+      fillRef.current = null;
+      setFillTarget(null);
+    };
     window.addEventListener("mouseup", stop);
     return () => window.removeEventListener("mouseup", stop);
-  }, []);
+  }, [onFill]);
 
   const frame = useRef(0);
   const onScroll = () => {
@@ -140,46 +157,67 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(props, ref) {
   const firstCol = sheet.cols ? Math.max(0, locateIndex(offsets, scroll.left) - 1) : 0;
   const lastCol = sheet.cols ? Math.min(sheet.cols - 1, locateIndex(offsets, scroll.left + scroll.width) + 1) : -1;
 
-  const pointAt = (event: MouseEvent, position: Position) => {
+  const pressCell = (event: MouseEvent, position: Position) => {
+    if (editing && editing.row === position.row && editing.col === position.col) return;
+    if (pointing && event.button === 0) {
+      event.preventDefault();
+      drag.current = "point";
+      pointAnchor.current = event.shiftKey && pointAnchor.current ? pointAnchor.current : position;
+      props.onPoint(pointAnchor.current, position);
+      return;
+    }
     if (event.button === 2) {
       if (!range || !inRange(range, position.row, position.col)) onSelect(position, position);
       return;
     }
     if (event.button !== 0) return;
-    if (editing) props.onCommitEdit(null);
-    dragging.current = true;
+    if (editing) props.onCommitEdit();
+    drag.current = "select";
     if (event.shiftKey && anchor) onSelect(anchor, position);
     else onSelect(position, position);
+  };
+
+  const enterCell = (position: Position) => {
+    if (drag.current === "select" && anchor) onSelect(anchor, position);
+    else if (drag.current === "point" && pointAnchor.current) props.onPoint(pointAnchor.current, position);
+    else if (drag.current === "fill" && fillRef.current) {
+      const { source } = fillRef.current;
+      const dr = position.row < source.r1 ? position.row - source.r1 : position.row > source.r2 ? position.row - source.r2 : 0;
+      const dc = position.col < source.c1 ? position.col - source.c1 : position.col > source.c2 ? position.col - source.c2 : 0;
+      const target =
+        Math.abs(dr) >= Math.abs(dc)
+          ? { ...source, r1: Math.min(source.r1, position.row), r2: Math.max(source.r2, position.row) }
+          : { ...source, c1: Math.min(source.c1, position.col), c2: Math.max(source.c2, position.col) };
+      fillRef.current = { source, target };
+      setFillTarget(target);
+    }
   };
 
   const renderCell = (row: number, col: number, top: number, width: number, height: number) => {
     const cell = sheet.cell(row, col);
     const key = cellKey(sheet.cols, row, col);
-    const stale = cell?.formula ? props.isStale(row, col) : false;
     const bareFormula = Boolean(cell?.formula) && cell?.text === "";
     return (
       <div
         key={key}
         role="gridcell"
+        data-cell={`${columnName(col)}${row + 1}`}
         aria-selected={range ? inRange(range, row, col) : false}
-        title={stale || bareFormula ? props.hints.stale : cell?.link ? props.hints.link : undefined}
+        title={cell?.unsupported ? props.hints.unsupported : cell?.link ? props.hints.link : undefined}
         onMouseDown={(event) => {
-          if (event.button === 0 && cell?.link && (event.metaKey || event.ctrlKey)) {
+          if (!pointing && event.button === 0 && cell?.link && (event.metaKey || event.ctrlKey)) {
             event.preventDefault();
             props.onOpenLink(cell.link);
           }
-          pointAt(event, { row, col });
+          pressCell(event, { row, col });
         }}
-        onMouseEnter={() => {
-          if (dragging.current && anchor) onSelect(anchor, { row, col });
-        }}
-        onDoubleClick={() => editable && props.onStartEdit({ row, col })}
+        onMouseEnter={() => enterCell({ row, col })}
+        onDoubleClick={() => editable && !pointing && props.onStartEdit({ row, col })}
         className={cn(
           "absolute select-none truncate border-b border-r border-border bg-background px-1.5 text-xs leading-6 text-foreground",
           cell?.numeric && "text-right tabular-nums",
           cell?.link && "cursor-pointer text-sky-600 underline decoration-sky-600/40 dark:text-sky-400",
-          (stale || bareFormula) && "italic text-muted-foreground",
-          props.isEdited(row, col) && "shadow-[inset_3px_0_0_0_rgb(16_185_129)]",
+          (cell?.unsupported || bareFormula) && "italic text-muted-foreground",
           matches.has(key) && "bg-amber-500/15",
           current?.row === row && current.col === col && "bg-amber-500/40",
         )}
@@ -211,81 +249,99 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(props, ref) {
         return renderCell(m.r1, m.c1, (m.r1 - (layer === "frozen" ? 0 : frozen)) * ROW_HEIGHT, offsets[m.c2 + 1] - offsets[m.c1], (lastSpanRow - m.r1 + 1) * ROW_HEIGHT);
       });
 
-  /** Selection rectangle and active cell for the sheet rows [from, to] of one layer. */
-  const renderSelection = (from: number, to: number, rowOffset: number) => {
-    if (!range || !anchor) return null;
-    const r1 = Math.max(range.r1, from);
-    const r2 = Math.min(range.r2, to);
-    const parts = [];
-    if (r1 <= r2 && (range.r1 !== range.r2 || range.c1 !== range.c2)) {
-      parts.push(
-        <div
-          key="range"
-          className="pointer-events-none absolute z-[2] border border-sky-500 bg-sky-500/10"
-          style={{ top: (r1 - rowOffset) * ROW_HEIGHT, left: offsets[range.c1], width: offsets[range.c2 + 1] - offsets[range.c1], height: (r2 - r1 + 1) * ROW_HEIGHT }}
-        />,
-      );
-    }
-    if (anchor.row >= from && anchor.row <= to && !editing) {
-      parts.push(
-        <div
-          key="active"
-          className="pointer-events-none absolute z-[3] border-2 border-sky-500"
-          style={{ top: (anchor.row - rowOffset) * ROW_HEIGHT, left: offsets[anchor.col], width: sheet.widths[anchor.col], height: ROW_HEIGHT }}
-        />,
-      );
-    }
-    return parts;
+  /** A rectangle over sheet rows [from, to] of one layer, clipped to the sheet. */
+  const box = (r: Range, from: number, to: number, rowOffset: number) => {
+    const r1 = Math.max(r.r1, from);
+    const r2 = Math.min(r.r2, to, sheet.rows - 1);
+    const c2 = Math.min(r.c2, sheet.cols - 1);
+    if (r1 > r2 || r.c1 > c2) return null;
+    return { top: (r1 - rowOffset) * ROW_HEIGHT, left: offsets[r.c1], width: offsets[c2 + 1] - offsets[r.c1], height: (r2 - r1 + 1) * ROW_HEIGHT };
   };
 
-  const renderEditor = (from: number, to: number, rowOffset: number) => {
-    if (!editing || editing.row < from || editing.row > to) return null;
-    return (
-      <input
-        autoFocus
-        value={editing.draft}
-        onChange={(event) => props.onDraft(event.target.value)}
-        onKeyDown={(event) => {
-          event.stopPropagation();
-          if (event.key === "Enter") {
-            event.preventDefault();
-            props.onCommitEdit([event.shiftKey ? -1 : 1, 0]);
-          } else if (event.key === "Tab") {
-            event.preventDefault();
-            props.onCommitEdit([0, event.shiftKey ? -1 : 1]);
-          } else if (event.key === "Escape") {
-            event.preventDefault();
-            props.onCancelEdit();
-          }
-        }}
-        onBlur={() => props.onCommitEdit(null)}
-        spellCheck={false}
-        className="absolute z-[4] border-2 border-sky-500 bg-background px-1 text-xs text-foreground shadow-md outline-none"
-        style={{ top: (editing.row - rowOffset) * ROW_HEIGHT, left: offsets[editing.col], minWidth: Math.max(sheet.widths[editing.col], 160), height: ROW_HEIGHT }}
-      />
-    );
+  const renderOverlays = (from: number, to: number, rowOffset: number) => {
+    const parts: ReactNode[] = [];
+    props.highlights.forEach((highlight, i) => {
+      const rect = box(highlight.range, from, to, rowOffset);
+      if (rect) parts.push(<div key={`hl${i}`} className="pointer-events-none absolute z-[2] border-2" style={{ ...rect, borderColor: highlight.color, backgroundColor: `${highlight.color}14` }} />);
+    });
+    if (range && anchor) {
+      const rect = box(range, from, to, rowOffset);
+      if (rect && (range.r1 !== range.r2 || range.c1 !== range.c2)) parts.push(<div key="range" className="pointer-events-none absolute z-[2] border border-sky-500 bg-sky-500/10" style={rect} />);
+      const active = box({ r1: anchor.row, c1: anchor.col, r2: anchor.row, c2: anchor.col }, from, to, rowOffset);
+      if (active && !editing) parts.push(<div key="active" className="pointer-events-none absolute z-[3] border-2 border-sky-500" style={active} />);
+      const corner = box({ r1: range.r2, c1: range.c2, r2: range.r2, c2: range.c2 }, from, to, rowOffset);
+      if (corner && editable && !editing && range.r2 < sheet.rows && range.c2 < sheet.cols) {
+        parts.push(
+          <div
+            key="fill"
+            role="presentation"
+            onMouseDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              drag.current = "fill";
+              fillRef.current = { source: range, target: range };
+              setFillTarget(range);
+            }}
+            className="absolute z-[4] size-[7px] cursor-crosshair border border-background bg-sky-500"
+            style={{ top: corner.top + corner.height - 4, left: corner.left + corner.width - 4 }}
+          />,
+        );
+      }
+    }
+    if (fillTarget) {
+      const rect = box(fillTarget, from, to, rowOffset);
+      if (rect) parts.push(<div key="fillTarget" className="pointer-events-none absolute z-[3] border border-dashed border-foreground/70" style={rect} />);
+    }
+    if (editing && editing.row >= from && editing.row <= to) {
+      const rect = box({ r1: editing.row, c1: editing.col, r2: editing.row, c2: editing.col }, from, to, rowOffset);
+      if (rect) {
+        parts.push(
+          <div key="editor" className="absolute z-[5] border-2 border-sky-500 bg-background shadow-md" style={{ top: rect.top, left: rect.left, minWidth: Math.max(rect.width, 200), height: ROW_HEIGHT }}>
+            {props.editor}
+          </div>,
+        );
+      }
+    }
+    return parts;
   };
 
   const bodyCells = [];
   for (let r = firstRow; r <= lastRow; r++) bodyCells.push(...renderRow(r + frozen, r * ROW_HEIGHT));
 
-  const move = (position: Position, dr: number, dc: number): Position => ({
-    row: Math.min(sheet.rows - 1, Math.max(0, position.row + dr)),
-    col: Math.min(sheet.cols - 1, Math.max(0, position.col + dc)),
+  const clamp = (position: Position): Position => ({
+    row: Math.min(sheet.rows - 1, Math.max(0, position.row)),
+    col: Math.min(sheet.cols - 1, Math.max(0, position.col)),
   });
+
+  /** Ctrl/⌘+arrow: to the edge of the current block of data, or the next block. */
+  const edge = (from: Position, dr: number, dc: number): Position => {
+    const filled = (p: Position) => sheet.cell(p.row, p.col) !== null;
+    let position = from;
+    const next = () => clamp({ row: position.row + dr, col: position.col + dc });
+    const atLimit = () => { const n = next(); return n.row === position.row && n.col === position.col; };
+    if (atLimit()) return position;
+    const startFilled = filled(position) && filled(next());
+    if (startFilled) {
+      while (!atLimit() && filled(next())) position = next();
+    } else {
+      position = next();
+      while (!atLimit() && !filled(position)) position = next();
+    }
+    return position;
+  };
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (editing || !sheet.cols) return;
     const mod = event.metaKey || event.ctrlKey;
     const key = event.key.toLowerCase();
-    if (mod && key === "c" && anchor) {
-      event.preventDefault();
-      props.onCopy();
-      return;
-    }
     if (mod && key === "a") {
       event.preventDefault();
       onSelect({ row: 0, col: 0 }, { row: sheet.rows - 1, col: sheet.cols - 1 });
+      return;
+    }
+    if (mod && (key === "y" || (key === "z" && event.shiftKey))) {
+      event.preventDefault();
+      props.onRedo();
       return;
     }
     if (mod && key === "z") {
@@ -293,13 +349,25 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(props, ref) {
       props.onUndo();
       return;
     }
-    if (!anchor || mod) return;
+    if (!anchor) return;
+    const arrows: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+    if (arrows[event.key]) {
+      event.preventDefault();
+      const [dr, dc] = arrows[event.key];
+      const from = event.shiftKey ? (focus ?? anchor) : anchor;
+      const next = mod ? edge(from, dr, dc) : clamp({ row: from.row + dr, col: from.col + dc });
+      if (event.shiftKey) onSelect(anchor, next);
+      else onSelect(next, next);
+      reveal(next);
+      return;
+    }
+    if (mod) return;
     if (editable && (event.key === "Delete" || event.key === "Backspace")) {
       event.preventDefault();
       props.onClear();
       return;
     }
-    if (editable && event.key === "F2") {
+    if (editable && (event.key === "F2" || (event.key === "Enter" && event.altKey))) {
       event.preventDefault();
       props.onStartEdit(anchor);
       return;
@@ -309,38 +377,43 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(props, ref) {
       props.onStartEdit(anchor, event.key);
       return;
     }
-    const arrows: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
     const steps: Record<string, [number, number]> = { Tab: [0, event.shiftKey ? -1 : 1], Enter: [event.shiftKey ? -1 : 1, 0] };
-    const delta = arrows[event.key] ?? steps[event.key];
-    if (!delta) return;
+    const step = steps[event.key];
+    if (!step) return;
     event.preventDefault();
-    if (arrows[event.key] && event.shiftKey) {
-      const next = move(focus ?? anchor, ...delta);
-      onSelect(anchor, next);
-      reveal(next);
-    } else {
-      const next = move(anchor, ...delta);
-      onSelect(next, next);
-      reveal(next);
-    }
+    const next = clamp({ row: anchor.row + step[0], col: anchor.col + step[1] });
+    onSelect(next, next);
+    reveal(next);
   };
 
-  const selectColumns = (event: MouseEvent, col: number) => {
+  const pressColumn = (event: MouseEvent, col: number) => {
+    if (pointing && event.button === 0) {
+      event.preventDefault();
+      props.onPoint({ row: 0, col }, { row: MAX_ROW, col });
+      return;
+    }
     const whole = range !== null && col >= range.c1 && col <= range.c2 && range.r1 === 0 && range.r2 === sheet.rows - 1;
     if (event.button === 2) {
       if (!whole) onSelect({ row: 0, col }, { row: sheet.rows - 1, col });
       return;
     }
+    if (editing) props.onCommitEdit();
     const from = event.shiftKey && anchor ? anchor.col : col;
     onSelect({ row: 0, col: from }, { row: sheet.rows - 1, col });
   };
 
-  const selectRows = (event: MouseEvent, row: number) => {
+  const pressRow = (event: MouseEvent, row: number) => {
+    if (pointing && event.button === 0) {
+      event.preventDefault();
+      props.onPoint({ row, col: 0 }, { row, col: MAX_COL });
+      return;
+    }
     const whole = range !== null && row >= range.r1 && row <= range.r2 && range.c1 === 0 && range.c2 === sheet.cols - 1;
     if (event.button === 2) {
       if (!whole) onSelect({ row, col: 0 }, { row, col: sheet.cols - 1 });
       return;
     }
+    if (editing) props.onCommitEdit();
     const from = event.shiftKey && anchor ? anchor.row : row;
     onSelect({ row: from, col: 0 }, { row, col: sheet.cols - 1 });
   };
@@ -362,7 +435,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(props, ref) {
           {Array.from({ length: Math.max(0, lastCol - firstCol + 1) }, (_, i) => firstCol + i).map((col) => (
             <div
               key={col}
-              onMouseDown={(event) => selectColumns(event, col)}
+              onMouseDown={(event) => pressColumn(event, col)}
               className={cn(
                 "absolute top-0 flex h-full cursor-default select-none items-center justify-center border-b border-r border-border bg-muted text-[11px] text-muted-foreground",
                 colSelected(col) && "bg-accent text-foreground",
@@ -377,13 +450,12 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(props, ref) {
 
       {frozen ? (
         <>
-          <div className={cn(gutterCell, rowSelected(0) && "bg-accent text-foreground")} style={{ left: 0, top: HEADER_HEIGHT, width: gutter, height: ROW_HEIGHT }} onMouseDown={(event) => selectRows(event, 0)}>1</div>
-          <div className="absolute right-0 overflow-hidden border-b border-border shadow-sm" style={{ left: gutter, top: HEADER_HEIGHT, height: ROW_HEIGHT }}>
+          <div className={cn(gutterCell, rowSelected(0) && "bg-accent text-foreground")} style={{ left: 0, top: HEADER_HEIGHT, width: gutter, height: ROW_HEIGHT }} onMouseDown={(event) => pressRow(event, 0)}>1</div>
+          <div className="absolute right-0 z-[6] overflow-visible border-b border-border shadow-sm" style={{ left: gutter, top: HEADER_HEIGHT, height: ROW_HEIGHT, clipPath: "inset(0 0 -400px 0)" }}>
             <div className="relative h-full font-medium" style={{ transform: `translateX(${-scroll.left}px)` }}>
               {renderRow(0, 0)}
               {renderMerges("frozen")}
-              {renderSelection(0, frozen - 1, 0)}
-              {renderEditor(0, frozen - 1, 0)}
+              {renderOverlays(0, frozen - 1, 0)}
             </div>
           </div>
         </>
@@ -394,7 +466,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(props, ref) {
           {Array.from({ length: Math.max(0, lastRow - firstRow + 1) }, (_, i) => firstRow + i).map((r) => (
             <div
               key={r}
-              onMouseDown={(event) => selectRows(event, r + frozen)}
+              onMouseDown={(event) => pressRow(event, r + frozen)}
               className={cn(gutterCell, rowSelected(r + frozen) && "bg-accent text-foreground")}
               style={{ top: r * ROW_HEIGHT, width: gutter, height: ROW_HEIGHT }}
             >
@@ -409,14 +481,32 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(props, ref) {
         tabIndex={0}
         onScroll={onScroll}
         onKeyDown={onKeyDown}
+        onCopy={(event) => {
+          if (editing) return;
+          const text = props.onCopy(false);
+          if (text === null) return;
+          event.preventDefault();
+          event.clipboardData.setData("text/plain", text);
+        }}
+        onCut={(event) => {
+          if (editing || !editable) return;
+          const text = props.onCopy(true);
+          if (text === null) return;
+          event.preventDefault();
+          event.clipboardData.setData("text/plain", text);
+        }}
+        onPaste={(event) => {
+          if (editing || !editable) return;
+          event.preventDefault();
+          props.onPaste(event.clipboardData.getData("text/plain"));
+        }}
         className="absolute bottom-0 right-0 overflow-auto outline-none"
         style={{ top: headerTop, left: gutter }}
       >
         <div className="relative" style={{ width: offsets[offsets.length - 1], height: bodyRows * ROW_HEIGHT }}>
           {bodyCells}
           {renderMerges("body")}
-          {renderSelection(frozen, sheet.rows - 1, frozen)}
-          {renderEditor(frozen, sheet.rows - 1, frozen)}
+          {renderOverlays(frozen, sheet.rows - 1, frozen)}
         </div>
       </div>
     </div>
