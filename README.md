@@ -1,6 +1,6 @@
 # Office Viewer for BB
 
-View and edit spreadsheets inside [BB](https://getbb.app): open `.xlsx`, `.xlsm`, `.xlsb`, `.xls`, `.ods`, `.csv` and `.tsv` files from chat links, the file picker and `bb thread open`, select cells and quote them into the chat.
+Work with spreadsheets inside [BB](https://getbb.app) the way you do in Excel: open `.xlsx`, `.xlsm`, `.xlsb`, `.xls`, `.ods`, `.csv` and `.tsv` files from chat links, the file picker and `bb thread open`, edit them with live formulas, and quote cells into the chat.
 
 ## Features
 
@@ -12,10 +12,16 @@ View and edit spreadsheets inside [BB](https://getbb.app): open `.xlsx`, `.xlsm`
 - **Cell bar**: address, full value, formula, Copy, and Open for links (`https://…` text or cell hyperlinks).
 - **Selection**: click and drag, Shift+click, Shift+arrows, click a column letter or row number, ⌘A.
 - **Quote in chat**: right-click a selection → *Quote in chat* or *Comment in chat…* puts the file, sheet, range and the cells as a Markdown table into the thread composer, optionally with your note.
-- **Editing** (`.xlsx`, `.xlsm`, `.csv`, `.tsv`): double-click, F2 or start typing; Enter / Tab commit, Esc cancels, Delete clears the selection, ⌘Z undoes, ⌘S saves. Numbers, percentages, day-first dates, TRUE/FALSE and `=formulas` are recognised.
-- **Formatting is preserved**: an `.xlsx` save rewrites only the edited cells inside the worksheet XML. Cell styles, conditional formatting, data validation, comments, charts, pivot tables and macros stay untouched; Excel recalculates formulas when it opens the file, and formulas that depend on edited cells are shown in italics until then. CSV keeps its delimiter, quoting, line endings, BOM and encoding (UTF-8 or Windows-1251).
+- **Live formulas**: the workbook runs in the [IronCalc](https://github.com/ironcalc/IronCalc) engine, so every edit recalculates dependent cells, including other sheets. SUM, AVERAGE, COUNTA, SUMIFS, COUNTIFS, VLOOKUP, XLOOKUP, INDEX/MATCH, IF/IFS, IFERROR, TEXT, dates, PMT and hundreds more are computed.
+- **Formula entry like Excel**: type `=` and click or drag cells (or use the arrows) to insert references, click column letters or row numbers for whole columns/rows, switch sheets to reference them. References are colored in the editor and outlined on the grid. Function names complete as you type (English or Russian: `=впр` → `ВПР(`), and the signature of the function under the caret is shown. Russian names and `;` separators are converted automatically.
+- **Formula bar** with the cell address; edit there or in the cell.
+- **Editing** (`.xlsx`, `.xlsm`, `.csv`, `.tsv`): double-click, F2 or start typing; Enter / Tab commit, Esc cancels, Delete clears, ⌘Z / ⌘⇧Z undo and redo, ⌘S saves. Numbers, percentages, day-first dates and TRUE/FALSE are recognised.
+- **Copy, cut and paste**: within the sheet references shift like Excel's; tab-separated text from other apps pastes into cells.
+- **Fill handle**: drag the corner of a selection to continue series and copy formulas.
+- **Status bar**: sum, average and count of the selection.
+- **Formatting is preserved**: an `.xlsx` save rewrites only the edited cells inside the worksheet XML. Cell styles, conditional formatting, data validation, comments, charts, pivot tables and macros stay untouched; new number formats (a typed date, a percentage, a format inherited by a formula) are added as cell styles. Newer functions are written with Excel's `_xlfn.` prefix. CSV keeps its delimiter, quoting, line endings, BOM and encoding (UTF-8 or Windows-1251); formulas in CSV are saved as their values.
 - **Safe saving**: a save is refused if the file changed on disk since it was opened; you choose to reload or apply your edits to the new version.
-- **Keyboard**: arrows, Tab and Enter move the selection; ⌘C / Ctrl+C copies the selection as tab-separated text.
+- **Keyboard**: arrows, Tab and Enter move the selection; Shift extends it; ⌘ + arrows jump to the edge of the data.
 - **CSV and TSV**: separator detection (`,` `;` tab), UTF-8 or Windows-1251 text.
 - **Machine-aware**: the file is read on the machine of the thread, environment or project it belongs to, so it works from any device you browse BB on.
 - **Download** the original file.
@@ -35,8 +41,11 @@ Requires BB 0.43 or later. No account, API key or external service. Files up to 
 ## Limits
 
 - `.xls`, `.xlsb` and `.ods` are read-only.
-- Formulas are not recalculated in BB; the value saved in the file is shown, and edited dependencies are marked until Excel recalculates.
+- Functions IronCalc doesn't know show the value saved in the file (in italics) and aren't recalculated in BB; Excel recalculates everything when it opens a saved file.
+- Saved files keep the cached results of untouched formulas; readers that don't recalculate (e.g. scripts) may see old values until the file is opened in Excel.
+- Numbers are displayed in English format (1,234.5): the engine has no Russian locale yet.
 - Array formulas can't be edited; cells of a shared formula are rewritten as individual formulas when their source cell is replaced.
+- Inserting or deleting rows and columns, sorting, filtering, cell formatting and Excel styles on screen are not available yet.
 - Cell colors, fonts and borders from Excel are not rendered.
 - Legacy `.xls` files in non-Unicode code pages may show garbled text.
 
@@ -44,13 +53,13 @@ Requires BB 0.43 or later. No account, API key or external service. Files up to 
 
 ```sh
 npm install
-npm test          # parsing, CSV round-trip, xlsx patching, editing model, file location
+npm test          # parsing, CSV round-trip, xlsx patching, formula helpers, engine, file location
 npm run typecheck
 bb plugin build .
 bb plugin reload office-viewer
 ```
 
-Spreadsheet parsing uses [SheetJS Community Edition](https://sheetjs.com) (Apache-2.0); `.xlsx` packages are rewritten with [fflate](https://github.com/101arrowz/fflate) (MIT). `fixtures/styled.xlsx` is a formatted workbook used to check that saves keep styles, validation, comments and charts.
+Spreadsheet parsing uses [SheetJS Community Edition](https://sheetjs.com) (Apache-2.0); formulas are computed by [IronCalc](https://github.com/ironcalc/IronCalc) (MIT/Apache-2.0); `.xlsx` packages are rewritten with [fflate](https://github.com/101arrowz/fflate) (MIT). `fixtures/styled.xlsx` is a formatted workbook used to check that saves keep styles, validation, comments and charts.
 
 ## License
 
