@@ -59,6 +59,8 @@ const en = {
   inputRejected: "Couldn't enter this value",
   unsavedChanges: "Unsaved changes",
   nothingToSave: "No changes to save",
+  fileMissing: "File not found: {path}",
+  tooLarge: "The file is larger than 30 MB.",
 };
 
 export type I18nKey = keyof typeof en;
@@ -122,6 +124,8 @@ const ru: Record<I18nKey, string> = {
   inputRejected: "Не удалось ввести значение",
   unsavedChanges: "Есть несохранённые изменения",
   nothingToSave: "Нет изменений для сохранения",
+  fileMissing: "Файл не найден: {path}",
+  tooLarge: "Файл больше 30 МБ.",
 };
 
 export type Locale = "en" | "ru";

@@ -62,13 +62,15 @@ test("save edits: only changed cells, file formula prefixes, number formats", ()
   applyInput(wb, 0, 1, 1, "50000");
   applyInput(wb, 0, 2, 1, "38500");
   applyInput(wb, 0, 6, 0, "=XLOOKUP(\"Бизнес\",A2:A4,B2:B4)");
+  applyInput(wb, 0, 6, 1, "=B2*2");
   applyInput(wb, 0, 7, 0, "17.09.2026");
   applyInput(wb, 0, 8, 0, "текст");
   applyInput(wb, 0, 3, 0, "");
-  const touched = [[0, 1, 1], [0, 2, 1], [0, 6, 0], [0, 7, 0], [0, 8, 0], [0, 3, 0], [0, 4, 1]].map(([sheet, row, col]) => ({ sheet, row, col }));
+  const touched = [[0, 1, 1], [0, 2, 1], [0, 6, 0], [0, 6, 1], [0, 7, 0], [0, 8, 0], [0, 3, 0], [0, 4, 1]].map(([sheet, row, col]) => ({ sheet, row, col }));
   assert.deepEqual(editsForSave(wb, touched).get(0), [
     { row: 1, col: 1, kind: "number", value: 50000 },
     { row: 6, col: 0, kind: "formula", formula: '_xlfn.XLOOKUP("Бизнес",A2:A4,B2:B4)' },
+    { row: 6, col: 1, kind: "formula", formula: "B2*2", format: '#,##0 "₽"' },
     { row: 7, col: 0, kind: "number", value: 46282, format: "dd.mm.yyyy" },
     { row: 8, col: 0, kind: "string", text: "текст" },
     { row: 3, col: 0, kind: "clear" },
@@ -97,4 +99,17 @@ test("the demo workbook and the styled fixture load", () => {
     assert.equal(wb.model.getWorksheetsProperties().length, sheets);
     assert.ok(performance.now() - started < 5000);
   }
+});
+
+test("save edits pass the server's input schema", async () => {
+  const { rpcContract } = await import("./server.ts");
+  const wb = buildWorkbook(parseWorkbook(book(rows), "xlsx"), "xlsx");
+  applyInput(wb, 0, 7, 0, "17.09.2026");
+  applyInput(wb, 0, 7, 1, "15%");
+  applyInput(wb, 0, 7, 2, "=SUM(B2:B3)");
+  const edits = editsForSave(wb, [0, 1, 2].map((col) => ({ sheet: 0, row: 7, col }))).get(0)!;
+  const input = { source: { kind: "host", threadId: null, environmentId: null, projectId: null, hostId: "h" }, path: "/x.xlsx", expectedSha256: "0", sheet: { index: 0, name: "Данные" }, edits };
+  const schema = rpcContract.save.input as { safeParse(value: unknown): { success: boolean; error?: unknown } };
+  const parsed = schema.safeParse(input);
+  assert.equal(parsed.success, true, JSON.stringify(parsed.error));
 });

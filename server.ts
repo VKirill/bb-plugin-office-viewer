@@ -29,24 +29,17 @@ const fileSchema = z.object({ source: sourceSchema, path: z.string().min(1).max(
 const position = { row: z.number().int().min(0).max(1_048_575), col: z.number().int().min(0).max(16_383) };
 const editSchema = z.discriminatedUnion("kind", [
   z.object({ ...position, kind: z.literal("string"), text: z.string().max(32_767) }).strict(),
-  z.object({ ...position, kind: z.literal("number"), value: z.number().finite() }).strict(),
+  z.object({ ...position, kind: z.literal("number"), value: z.number().finite(), format: z.string().min(1).max(255).optional() }).strict(),
   z.object({ ...position, kind: z.literal("boolean"), value: z.boolean() }).strict(),
-  z.object({ ...position, kind: z.literal("formula"), formula: z.string().min(1).max(8192) }).strict(),
+  z.object({ ...position, kind: z.literal("formula"), formula: z.string().min(1).max(8192), format: z.string().min(1).max(255).optional() }).strict(),
   z.object({ ...position, kind: z.literal("clear") }).strict(),
 ]);
 
 export const rpcContract = defineRpcContract({
+  /** A short-lived URL the browser downloads the file from, so large files don't travel as JSON. */
   open: {
     input: fileSchema,
-    output: z
-      .object({
-        base64: z.string(),
-        sizeBytes: z.number(),
-        sha256: z.string(),
-        hostName: z.string(),
-        absPath: z.string(),
-      })
-      .strict(),
+    output: z.object({ url: z.string(), hostName: z.string(), absPath: z.string() }).strict(),
   },
   /** The IronCalc WebAssembly module the viewer computes formulas with. */
   engine: { input: z.object({}).strict(), output: z.object({ base64: z.string() }).strict() },
@@ -115,13 +108,14 @@ export default function plugin(bb: BbPluginApi) {
     open: async ({ source, path, locale = "en" }) => {
       const where = await locate(sdk, source, path, locale);
       const hostName = (await bb.sdk.hosts.get({ hostId: where.hostId }).catch(() => null))?.name || where.hostId;
-      const file = await bb.sdk.files
-        .read({ hostId: where.hostId, path: where.absPath })
+      const exists = await bb.sdk.hosts.pathsExist({ hostId: where.hostId, paths: [where.absPath] }).catch(() => null);
+      if (exists && exists.existence[where.absPath] === false) throw describe(new Error("ENOENT"), hostName, where.absPath, locale);
+      const slash = where.absPath.lastIndexOf("/");
+      const preview = await bb.sdk.files
+        .createPreview({ hostId: where.hostId, rootPath: where.absPath.slice(0, slash) || "/", ttlMs: 10 * 60 * 1000 })
         .catch((error: unknown) => { throw describe(error, hostName, where.absPath, locale); });
-      if (!("content" in file)) throw new Error(say(locale, "The server returned no file content.", "Сервер не вернул содержимое файла."));
-      if (file.sizeBytes > MAX_BYTES) throw new Error(say(locale, "The file is larger than 30 MB.", "Файл больше 30 МБ."));
-      const base64 = file.contentEncoding === "base64" ? file.content : Buffer.from(file.content, "utf8").toString("base64");
-      return { base64, sizeBytes: file.sizeBytes, sha256: file.sha256, hostName, absPath: where.absPath };
+      const url = `${preview.baseUrl.replace(/\/?$/, "/")}${encodeURIComponent(where.absPath.slice(slash + 1))}`;
+      return { url, hostName, absPath: where.absPath };
     },
     save: async ({ source, path, locale = "en", expectedSha256, sheet, edits }) => {
       const where = await locate(sdk, source, path, locale);

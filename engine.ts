@@ -212,9 +212,11 @@ export function editsForSave(workbook: Workbook, touched: Iterable<{ sheet: numb
       if (base) push(sheet, { row, col, kind: "clear" });
       continue;
     }
+    const format = model.getCellStyle(sheet, row + 1, col + 1).style.num_fmt;
+    const formatChanged = format !== "general" && format !== (base?.format ?? "General");
     if (content.startsWith("=")) {
       const formula = content.slice(1);
-      if (!base?.formula || engineFormula(base.formula.slice(1)) !== formula) push(sheet, { row, col, kind: "formula", formula: fileFormula(formula) });
+      if (!base?.formula || engineFormula(base.formula.slice(1)) !== formula || formatChanged) push(sheet, { row, col, kind: "formula", formula: fileFormula(formula), ...(formatChanged ? { format } : {}) });
       continue;
     }
     const type = model.getCellType(sheet, row + 1, col + 1);
@@ -225,8 +227,6 @@ export function editsForSave(workbook: Workbook, touched: Iterable<{ sheet: numb
     }
     const number = type === 1 ? rawNumber(workbook, sheet, row, col, content) : NaN;
     if (Number.isFinite(number)) {
-      const format = model.getCellStyle(sheet, row + 1, col + 1).style.num_fmt;
-      const formatChanged = format !== "general" && format !== (base?.format ?? "General");
       if (base?.formula || base?.value !== number || formatChanged) push(sheet, { row, col, kind: "number", value: number, ...(formatChanged ? { format } : {}) });
       continue;
     }

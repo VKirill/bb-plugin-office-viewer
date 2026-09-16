@@ -74,6 +74,11 @@ export const FormulaInput = forwardRef<FormulaInputHandle, Props>(function Formu
     const next = applyCompletion(value, showCompletion, showCompletion.items[itemIndex]);
     props.onChange(next.text, next.caret);
     setIndex(0);
+    // The browser keeps the old caret index when the value is replaced; move it after "(".
+    requestAnimationFrame(() => {
+      input.current?.setSelectionRange(next.caret, next.caret);
+      props.onCaret(next.caret);
+    });
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
