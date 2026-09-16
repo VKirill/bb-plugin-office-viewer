@@ -17,6 +17,7 @@ const en = {
   copy: "Copy value",
   copied: "Copied",
   openLink: "Open link",
+  linkHint: "{mod}+click to open the link",
   hidden: "hidden",
   emptySheet: "This sheet is empty.",
   size: "{rows} rows × {cols} columns",
@@ -42,6 +43,7 @@ const ru: Record<I18nKey, string> = {
   copy: "Скопировать значение",
   copied: "Скопировано",
   openLink: "Открыть ссылку",
+  linkHint: "{mod}+клик — открыть ссылку",
   hidden: "скрыт",
   emptySheet: "Лист пустой.",
   size: "Строк: {rows}, столбцов: {cols}",
@@ -55,6 +57,8 @@ export function detectLocale(): Locale {
   return lang.toLowerCase().startsWith("ru") ? "ru" : "en";
 }
 
+const MOD = /Mac|iPhone|iPad/i.test(globalThis.navigator?.platform ?? globalThis.navigator?.userAgent ?? "") ? "⌘" : "Ctrl";
+
 export function t(key: I18nKey, vars: Record<string, string | number> = {}, locale: Locale = detectLocale()): string {
-  return (locale === "ru" ? ru : en)[key].replace(/\{(\w+)\}/g, (match, name: string) => (name in vars ? String(vars[name]) : match));
+  return (locale === "ru" ? ru : en)[key].replace("{mod}", MOD).replace(/\{(\w+)\}/g, (match, name: string) => (name in vars ? String(vars[name]) : match));
 }

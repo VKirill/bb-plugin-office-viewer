@@ -237,7 +237,7 @@ function SpreadsheetOpener({ path, source }: PluginFileOpenerProps) {
         ) : !sheet || sheet.rows === 0 || sheet.cols === 0 ? (
           <Status>{t("emptySheet")}</Status>
         ) : (
-          <Grid ref={grid} sheet={sheet} freeze={freeze} selected={selected} onSelect={select} matches={matchSet} current={currentMatch} onCopy={copy} />
+          <Grid ref={grid} sheet={sheet} freeze={freeze} selected={selected} onSelect={setSelected} matches={matchSet} current={currentMatch} onCopy={copy} onOpenLink={(url) => navigate.openUrl(url)} linkHint={t("linkHint")} />
         )}
       </div>
 

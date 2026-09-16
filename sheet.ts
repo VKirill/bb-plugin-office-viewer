@@ -60,11 +60,26 @@ export function decodeText(bytes: Uint8Array): string {
   return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
 
-type RawCell = XLSX.CellObject & { w?: string; f?: string; l?: { Target?: string } };
+type RawCell = XLSX.CellObject & { w?: string; f?: string; z?: string | number; l?: { Target?: string } };
+
+/**
+ * SheetJS throws on dotted date formats such as `dd.mm.yyyy` (common in
+ * Russian Excel) and leaves the raw serial number. Format with slashes and
+ * put the dots back.
+ */
+function dottedDate(raw: RawCell): string | undefined {
+  if (raw.t !== "n" || typeof raw.v !== "number" || typeof raw.z !== "string") return undefined;
+  if (!raw.z.includes(".") || raw.z.includes("/") || !XLSX.SSF.is_date(raw.z)) return undefined;
+  try {
+    return XLSX.SSF.format(raw.z.replace(/\./g, "/"), raw.v).replace(/\//g, ".");
+  } catch {
+    return undefined;
+  }
+}
 
 function toCell(raw: RawCell | undefined): Cell | null {
   if (!raw) return null;
-  const text = raw.w ?? (raw.v == null ? "" : String(raw.v));
+  const text = raw.w ?? dottedDate(raw) ?? (raw.v == null ? "" : String(raw.v));
   const target = raw.l?.Target ?? (URL_RE.test(text.trim()) ? text.trim() : null);
   return {
     text,
@@ -118,7 +133,7 @@ function buildSheet(name: string, hidden: boolean, ws: XLSX.WorkSheet): Sheet {
 export function parseWorkbook(bytes: Uint8Array, extension: string): Sheet[] {
   const book = TEXT_EXTENSIONS.includes(extension)
     ? XLSX.read(decodeText(bytes), { type: "string", dense: true, raw: true, ...(extension === "tsv" ? { FS: "\t" } : {}) })
-    : XLSX.read(bytes, { type: "array", dense: true, cellNF: false, cellStyles: false });
+    : XLSX.read(bytes, { type: "array", dense: true, cellNF: true, cellStyles: false });
   const meta = book.Workbook?.Sheets ?? [];
   return book.SheetNames.map((name, index) => buildSheet(name, Boolean(meta[index]?.Hidden), book.Sheets[name]));
 }

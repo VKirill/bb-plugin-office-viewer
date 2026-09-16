@@ -53,6 +53,16 @@ test("xlsx: sheets, hidden flag, formatted numbers, formulas, links, merges", ()
   assert.ok(main.widths.every((w) => w >= 48 && w <= 320));
 });
 
+test("xlsx: dotted date formats are shown as dates, not serial numbers", () => {
+  const bytes = xlsxBytes((book) => {
+    const serial = (Date.UTC(2026, 8, 1, 12) - Date.UTC(1899, 11, 30)) / 86400000;
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([[{ t: "n", v: serial, z: "dd.mm.yyyy" }, { t: "n", v: serial, z: "dd.mm.yyyy hh:mm" }]]), "Даты");
+  });
+  const [sheet] = parseWorkbook(bytes, "xlsx");
+  assert.equal(sheet.cell(0, 0)?.text, "01.09.2026");
+  assert.equal(sheet.cell(0, 1)?.text, "01.09.2026 12:00");
+});
+
 test("csv: semicolons, Russian text and number-like strings", () => {
   const [sheet] = parseWorkbook(encode("﻿Имя;Сумма\nАнна;1 250,50\n"), "csv");
   assert.equal(sheet.cols, 2);

@@ -22,6 +22,8 @@ type Props = {
   matches: Set<number>;
   current: Position | null;
   onCopy(): void;
+  onOpenLink(url: string): void;
+  linkHint: string;
 };
 
 /** Index of the last offset <= x. */
@@ -38,7 +40,7 @@ function locateIndex(offsets: number[], x: number) {
 
 export const cellKey = (sheet: Sheet, row: number, col: number) => row * sheet.cols + col;
 
-export const Grid = forwardRef<GridHandle, Props>(function Grid({ sheet, freeze, selected, onSelect, matches, current, onCopy }, ref) {
+export const Grid = forwardRef<GridHandle, Props>(function Grid({ sheet, freeze, selected, onSelect, matches, current, onCopy, onOpenLink, linkHint }, ref) {
   const body = useRef<HTMLDivElement>(null);
   const [scroll, setScroll] = useState({ top: 0, left: 0, width: 0, height: 0 });
   const frozen = freeze && sheet.rows > 1 ? 1 : 0;
@@ -86,22 +88,21 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid({ sheet, freeze,
     frame.current = requestAnimationFrame(measure);
   };
 
-  useImperativeHandle(ref, () => ({
-    focus: () => body.current?.focus({ preventScroll: true }),
-    reveal: ({ row, col }) => {
-      const el = body.current;
-      if (!el) return;
-      if (row >= frozen) {
-        const top = (row - frozen) * ROW_HEIGHT;
-        if (top < el.scrollTop) el.scrollTop = top;
-        else if (top + ROW_HEIGHT > el.scrollTop + el.clientHeight) el.scrollTop = top + ROW_HEIGHT - el.clientHeight;
-      }
-      const left = offsets[col];
-      const right = offsets[col + 1];
-      if (left < el.scrollLeft) el.scrollLeft = left;
-      else if (right > el.scrollLeft + el.clientWidth) el.scrollLeft = Math.min(left, right - el.clientWidth);
-    },
-  }), [frozen, offsets]);
+  const reveal = useCallback(({ row, col }: Position) => {
+    const el = body.current;
+    if (!el) return;
+    if (row >= frozen) {
+      const top = (row - frozen) * ROW_HEIGHT;
+      if (top < el.scrollTop) el.scrollTop = top;
+      else if (top + ROW_HEIGHT > el.scrollTop + el.clientHeight) el.scrollTop = top + ROW_HEIGHT - el.clientHeight;
+    }
+    const left = offsets[col];
+    const right = offsets[col + 1];
+    if (left < el.scrollLeft) el.scrollLeft = left;
+    else if (right > el.scrollLeft + el.clientWidth) el.scrollLeft = Math.min(left, right - el.clientWidth);
+  }, [frozen, offsets]);
+
+  useImperativeHandle(ref, () => ({ focus: () => body.current?.focus({ preventScroll: true }), reveal }), [reveal]);
 
   const bodyRows = sheet.rows - frozen;
   const firstRow = Math.max(0, Math.floor(scroll.top / ROW_HEIGHT) - OVERSCAN);
@@ -119,11 +120,18 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid({ sheet, freeze,
         key={key}
         role="gridcell"
         aria-selected={isSelected}
-        onMouseDown={() => onSelect({ row, col })}
+        title={cell?.link ? linkHint : undefined}
+        onMouseDown={(event) => {
+          if (cell?.link && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault();
+            onOpenLink(cell.link);
+          }
+          onSelect({ row, col });
+        }}
         className={cn(
           "absolute truncate border-b border-r border-border bg-background px-1.5 text-xs leading-6 text-foreground",
           cell?.numeric && "text-right tabular-nums",
-          cell?.link && "text-sky-600 underline decoration-sky-600/40 dark:text-sky-400",
+          cell?.link && "cursor-pointer text-sky-600 underline decoration-sky-600/40 dark:text-sky-400",
           matches.has(key) && "bg-amber-500/15",
           isCurrent && "bg-amber-500/40",
           isSelected && "z-[1] outline outline-2 -outline-offset-2 outline-sky-500",
@@ -172,6 +180,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid({ sheet, freeze,
     const from = selected ?? { row: 0, col: 0 };
     const next = { row: Math.min(sheet.rows - 1, Math.max(0, from.row + move[0])), col: Math.min(sheet.cols - 1, Math.max(0, from.col + move[1])) };
     onSelect(next);
+    reveal(next);
   };
 
   const headerTop = HEADER_HEIGHT + frozen * ROW_HEIGHT;
