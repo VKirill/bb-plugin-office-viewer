@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as XLSX from "xlsx";
-import { cellAddress, columnName, decodeText, extensionOf, findCells, parseWorkbook } from "./sheet.ts";
+import { cellAddress, columnName, editMode, extensionOf, findCells, parseWorkbook } from "./sheet.ts";
 
 const encode = (text: string) => new TextEncoder().encode(text);
 
@@ -21,10 +21,8 @@ test("extension is taken from the file name only", () => {
   assert.equal(extensionOf("/a.b/README"), "");
 });
 
-test("text falls back to Windows-1251 and drops the BOM", () => {
-  assert.equal(decodeText(encode("﻿имя;число")), "имя;число");
-  const cp1251 = new Uint8Array([0xc8, 0xec, 0xff]); // "Имя"
-  assert.equal(decodeText(cp1251), "Имя");
+test("edit mode by extension", () => {
+  assert.deepEqual(["xlsx", "xlsm", "csv", "tsv", "xls", "ods", "xlsb"].map(editMode), ["xlsx", "xlsx", "csv", "csv", null, null, null]);
 });
 
 test("xlsx: sheets, hidden flag, formatted numbers, formulas, links, merges", () => {
@@ -45,7 +43,8 @@ test("xlsx: sheets, hidden flag, formatted numbers, formulas, links, merges", ()
   assert.equal(main.rows, 4);
   assert.equal(main.cols, 3);
   assert.deepEqual(main.merges, [{ r1: 3, c1: 0, r2: 3, c2: 2 }]);
-  assert.deepEqual(main.cell(1, 1), { text: "1500", numeric: true, formula: null, link: null });
+  assert.deepEqual(main.cell(1, 1), { text: "1500", numeric: true, formula: null, link: null, format: "General", isDate: false, value: 1500 });
+  assert.deepEqual(main.formulas, [{ row: 2, col: 1, formula: "SUM(B2:B2)" }]);
   assert.equal(main.cell(1, 2)?.link, "https://t.me/neuro");
   assert.equal(main.cell(2, 1)?.formula, "=SUM(B2:B2)");
   assert.equal(main.cell(0, 0)?.numeric, false);
