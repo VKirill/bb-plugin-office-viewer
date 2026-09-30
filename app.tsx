@@ -21,6 +21,7 @@ import { ENGINE_VERSION, applyInput, buildWorkbook, editsForSave, engineCell, in
 import { canPoint, colorKey, insertReference, isFormula, referenceColors, referenceSpans, referenceText, type PointSpan } from "./formula";
 import { FormulaInput, type FormulaInputHandle } from "./formula-input";
 import { Grid, type GridHandle } from "./grid";
+import { MEDIA_EXTENSIONS, MediaOpener } from "./media";
 
 type Loaded = { bytes: Uint8Array; hostName: string; absPath: string; sizeBytes: number; sha256: string };
 type SaveState = "idle" | "saving" | "conflict" | "error";
@@ -912,5 +913,11 @@ export default definePluginApp((app) => {
     title: "Office Viewer",
     extensions: EXTENSIONS,
     component: SpreadsheetOpener,
+  });
+  app.slots.fileOpener({
+    id: "media",
+    title: "Office Viewer — media",
+    extensions: MEDIA_EXTENSIONS,
+    component: MediaOpener,
   });
 });

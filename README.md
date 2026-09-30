@@ -26,6 +26,13 @@ Work with spreadsheets inside [BB](https://getbb.app) the way you do in Excel: o
 - **Machine-aware**: the file is read on the machine of the thread, environment or project it belongs to, so it works from any device you browse BB on.
 - **Download** the original file.
 
+### Images and videos
+
+- Opens `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.bmp`, `.ico` and `.mp4`, `.m4v`, `.webm`, `.mov`, `.ogv` from chat links, the file picker and `bb thread open`.
+- **Download** saves the file to the device you are browsing BB on (⌘S / Ctrl+S).
+- **Copy** puts an image on the system clipboard (⌘C / Ctrl+C) so you can paste it into another app.
+- Videos play with seeking in every browser, Safari on iPhone and iPad included: the file is loaded into the page, because BB's preview links don't serve byte ranges. Videos over 512 MB stream from the link instead.
+
 The interface follows BB's language (English or Russian).
 
 ## Install
@@ -40,6 +47,8 @@ Requires BB 0.43 or later. No account, API key or external service. Files up to 
 
 ## Limits
 
+- The clipboard only holds still images: copying a GIF copies its first frame (use Download for the animation), and videos can't be copied, only downloaded.
+- Whether a video plays depends on the browser's codecs (e.g. HEVC `.mov` doesn't play in Chrome); Download always works.
 - `.xls`, `.xlsb` and `.ods` are read-only.
 - Functions IronCalc doesn't know show the value saved in the file (in italics) and aren't recalculated in BB; Excel recalculates everything when it opens a saved file.
 - Saved files keep the cached results of untouched formulas; readers that don't recalculate (e.g. scripts) may see old values until the file is opened in Excel.

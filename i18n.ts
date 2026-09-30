@@ -61,6 +61,14 @@ const en = {
   nothingToSave: "No changes to save",
   fileMissing: "File not found: {path}",
   tooLarge: "The file is larger than 30 MB.",
+  copyImage: "Copy",
+  copyImageHint: "Copy image ({mod}+C)",
+  downloadHint: "Download to this device ({mod}+S)",
+  imageCopied: "Image copied",
+  copiedGifFrame: "First frame copied: the clipboard doesn't hold animated GIFs, use Download",
+  copyFailed: "Couldn't copy",
+  copyUnsupported: "This browser can't copy images; use Download",
+  cantPlay: "This browser can't play the video. Download it to watch.",
 };
 
 export type I18nKey = keyof typeof en;
@@ -126,6 +134,14 @@ const ru: Record<I18nKey, string> = {
   nothingToSave: "Нет изменений для сохранения",
   fileMissing: "Файл не найден: {path}",
   tooLarge: "Файл больше 30 МБ.",
+  copyImage: "Копировать",
+  copyImageHint: "Копировать картинку ({mod}+C)",
+  downloadHint: "Скачать на это устройство ({mod}+S)",
+  imageCopied: "Картинка скопирована",
+  copiedGifFrame: "Скопирован первый кадр: буфер обмена не хранит анимированные GIF, используйте «Скачать»",
+  copyFailed: "Не удалось скопировать",
+  copyUnsupported: "Этот браузер не умеет копировать картинки; используйте «Скачать»",
+  cantPlay: "Браузер не может воспроизвести это видео. Скачайте его, чтобы посмотреть.",
 };
 
 export type Locale = "en" | "ru";
