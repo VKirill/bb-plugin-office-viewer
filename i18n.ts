@@ -69,6 +69,8 @@ const en = {
   copyFailed: "Couldn't copy",
   copyUnsupported: "This browser can't copy images; use Download",
   cantPlay: "This browser can't play the video. Download it to watch.",
+  legacyDoc: "Old Word format (.doc): only the text is shown, without formatting, tables or pictures. Download the file to see it as it is.",
+  emptyDocument: "The document has no text.",
 };
 
 export type I18nKey = keyof typeof en;
@@ -142,6 +144,8 @@ const ru: Record<I18nKey, string> = {
   copyFailed: "Не удалось скопировать",
   copyUnsupported: "Этот браузер не умеет копировать картинки; используйте «Скачать»",
   cantPlay: "Браузер не может воспроизвести это видео. Скачайте его, чтобы посмотреть.",
+  legacyDoc: "Старый формат Word (.doc): показан только текст, без оформления, таблиц и картинок. Скачайте файл, чтобы увидеть его целиком.",
+  emptyDocument: "В документе нет текста.",
 };
 
 export type Locale = "en" | "ru";

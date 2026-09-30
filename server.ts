@@ -3,6 +3,7 @@
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import * as XLSX from "xlsx";
+import WordExtractor from "word-extractor";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { locate, LocateError, type Lang, type LocateSdk } from "./locate.ts";
@@ -40,6 +41,13 @@ export const rpcContract = defineRpcContract({
   open: {
     input: fileSchema,
     output: z.object({ url: z.string(), hostName: z.string(), absPath: z.string() }).strict(),
+  },
+  /** Text of a legacy Word .doc: browsers have no renderer for the binary format. */
+  docText: {
+    input: fileSchema,
+    output: z
+      .object({ hostName: z.string(), absPath: z.string(), sizeBytes: z.number(), body: z.string(), headers: z.string(), footnotes: z.string(), endnotes: z.string() })
+      .strict(),
   },
   /** The IronCalc WebAssembly module the viewer computes formulas with. */
   engine: { input: z.object({}).strict(), output: z.object({ base64: z.string() }).strict() },
@@ -104,6 +112,31 @@ export default function plugin(bb: BbPluginApi) {
         engine = null;
         throw error;
       }
+    },
+    docText: async ({ source, path, locale = "en" }) => {
+      const where = await locate(sdk, source, path, locale);
+      const hostName = (await bb.sdk.hosts.get({ hostId: where.hostId }).catch(() => null))?.name || where.hostId;
+      const file = await bb.sdk.files
+        .read({ hostId: where.hostId, path: where.absPath })
+        .catch((error: unknown) => { throw describe(error, hostName, where.absPath, locale); });
+      if (!("content" in file)) throw new Error(say(locale, "The server returned no file content.", "Сервер не вернул содержимое файла."));
+      const bytes = Buffer.from(file.content, file.contentEncoding === "base64" ? "base64" : "utf8");
+      if (bytes.byteLength > MAX_BYTES) throw new Error(say(locale, "The file is larger than 30 MB.", "Файл больше 30 МБ."));
+      const doc = await new WordExtractor().extract(bytes).catch((error: unknown) => {
+        throw new Error(say(locale, `Can't read the document: ${error instanceof Error ? error.message : String(error)}`, `Не удалось прочитать документ: ${error instanceof Error ? error.message : String(error)}`));
+      });
+      // The typings omit `filterUnicode`; left on, it turns dashes and typographic quotes into ASCII.
+      const text = doc as unknown as Record<"getBody" | "getHeaders" | "getFootnotes" | "getEndnotes", (options: object) => string>;
+      const raw = { filterUnicode: false };
+      return {
+        hostName,
+        absPath: where.absPath,
+        sizeBytes: bytes.byteLength,
+        body: text.getBody(raw),
+        headers: text.getHeaders({ ...raw, includeFooters: true }),
+        footnotes: text.getFootnotes(raw),
+        endnotes: text.getEndnotes(raw),
+      };
     },
     open: async ({ source, path, locale = "en" }) => {
       const where = await locate(sdk, source, path, locale);

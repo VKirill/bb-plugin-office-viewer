@@ -20,7 +20,7 @@ const MAX_BLOB_BYTES = 512 * 1024 * 1024;
 
 type Media = { src: string; blob: Blob | null; hostName: string; absPath: string; sizeBytes: number | null };
 
-function formatSize(bytes: number) {
+export function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
