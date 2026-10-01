@@ -1,6 +1,6 @@
 ## What you get
 
-Office Viewer opens spreadsheets, Word documents, images and videos in BB's side panel: `.xlsx`, `.xlsm`, `.xlsb`, `.xls`, `.ods`, `.csv` and `.tsv`, from chat links, the file picker and `bb thread open`.
+Office Viewer opens spreadsheets, Word documents, images, videos and audio in BB's side panel: `.xlsx`, `.xlsm`, `.xlsb`, `.xls`, `.ods`, `.csv` and `.tsv`, from chat links, the file picker and `bb thread open`.
 
 - **A familiar grid** — column letters, row numbers, a frozen first row, right-aligned numbers and merged cells.
 - **Big sheets stay fast** — only the visible part is drawn, so thousands of rows scroll smoothly.
@@ -15,9 +15,9 @@ Office Viewer opens spreadsheets, Word documents, images and videos in BB's side
 
 `.docx` opens as Word-like pages with styles, tables, pictures, headers and footnotes, fitted to the panel width. The legacy `.doc` shows its text. Download the original with one click.
 
-## Images and videos
+## Images, videos and audio
 
-Pictures, GIFs and videos (`.png`, `.jpg`, `.gif`, `.webp`, `.mp4`, `.mov`, `.webm` and more) open with **Download** to the device you're on and **Copy** to the clipboard for images. Videos play and seek in any browser, iPhone and iPad included.
+Pictures, GIFs and videos (`.png`, `.jpg`, `.gif`, `.webp`, `.mp4`, `.mov`, `.webm` and more) open with **Download** to the device you're on and **Copy** to the clipboard for images. Videos play and seek in any browser, iPhone and iPad included. Audio (`.mp3`, `.wav`, `.ogg` voice messages, `.m4a`, `.flac` and more) opens in a player with a waveform, stop, ±10 s, repeat, volume and speed 0.5×–2×.
 
 ## Machine-aware files
 

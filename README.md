@@ -32,9 +32,10 @@ Work with spreadsheets inside [BB](https://getbb.app) the way you do in Excel: o
 - Opens the legacy `.doc` / `.dot` as text (body, headers and footers, footnotes), extracted on the server by [word-extractor](https://github.com/morungos/node-word-extractor).
 - **Download** saves the original file (⌘S / Ctrl+S); text can be selected and copied.
 
-### Images and videos
+### Images, videos and audio
 
 - Opens `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.bmp`, `.ico` and `.mp4`, `.m4v`, `.webm`, `.mov`, `.ogv` from chat links, the file picker and `bb thread open`.
+- Audio: `.mp3`, `.wav`, `.ogg`, `.oga`, `.opus` (Telegram voice messages), `.m4a`, `.aac`, `.flac`, `.weba` open in a player: a waveform you click or drag to seek, play/pause (Space), stop, ±10 s (← → move 5 s), repeat, volume and speed 0.5×–2× (pitch kept; the speed is remembered). Recordings longer than 10 minutes get a progress bar instead of a waveform.
 - **Download** saves the file to the device you are browsing BB on (⌘S / Ctrl+S).
 - **Copy** puts an image on the system clipboard (⌘C / Ctrl+C) so you can paste it into another app.
 - Videos play with seeking in every browser, Safari on iPhone and iPad included: the file is loaded into the page, because BB's preview links don't serve byte ranges. Videos over 512 MB stream from the link instead.
@@ -55,6 +56,7 @@ Requires BB 0.43 or later. No account, API key or external service. Files up to 
 
 - Word documents are read-only. `.docx` layout is close to Word but not identical (fonts, floating shapes, charts and SmartArt may differ). Legacy `.doc` shows text only: no formatting, tables become tab-separated lines, pictures are skipped.
 - The clipboard only holds still images: copying a GIF copies its first frame (use Download for the animation), and videos can't be copied, only downloaded.
+- Safari before 18.4 doesn't play Ogg/Opus voice messages; Download always works.
 - Whether a video plays depends on the browser's codecs (e.g. HEVC `.mov` doesn't play in Chrome); Download always works.
 - `.xls`, `.xlsb` and `.ods` are read-only.
 - Functions IronCalc doesn't know show the value saved in the file (in italics) and aren't recalculated in BB; Excel recalculates everything when it opens a saved file.

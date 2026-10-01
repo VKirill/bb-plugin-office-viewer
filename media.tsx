@@ -1,5 +1,5 @@
-// Office Viewer — media opener: images, GIFs and videos with Download and
-// Copy. The file is loaded into a Blob because BB's preview links don't answer
+// Office Viewer — media opener: images, GIFs, videos and audio with Download
+// and Copy. The file is loaded into a Blob because BB's preview links don't answer
 // Range requests: Safari won't play a video from them and Chrome can't seek.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
@@ -10,12 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { detectLocale, t } from "./i18n";
 import { extensionOf } from "./sheet";
+import { AudioPlayer } from "./audio-player";
 
 export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "ico"] as const;
 export const VIDEO_EXTENSIONS = ["mp4", "m4v", "webm", "mov", "ogv"] as const;
-export const MEDIA_EXTENSIONS = [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS];
+export const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "oga", "opus", "m4a", "aac", "flac", "weba"] as const;
+export const MEDIA_EXTENSIONS = [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS, ...AUDIO_EXTENSIONS];
 
-/** Larger videos stream from the preview link instead of being held in memory. */
+/** Larger videos and recordings stream from the preview link instead of being held in memory. */
 const MAX_BLOB_BYTES = 512 * 1024 * 1024;
 
 type Media = { src: string; blob: Blob | null; hostName: string; absPath: string; sizeBytes: number | null };
@@ -56,6 +58,7 @@ export function MediaOpener({ path, source }: PluginFileOpenerProps) {
     [path, locale, source.kind, source.threadId, source.environmentId, source.projectId, source.experimental_hostId],
   );
   const isVideo = (VIDEO_EXTENSIONS as readonly string[]).includes(extensionOf(path));
+  const isAudio = (AUDIO_EXTENSIONS as readonly string[]).includes(extensionOf(path));
   const fileName = path.slice(path.lastIndexOf("/") + 1);
 
   const [media, setMedia] = useState<Media | null>(null);
@@ -75,7 +78,7 @@ export function MediaOpener({ path, source }: PluginFileOpenerProps) {
       if (!response.ok) throw new Error(response.status === 404 ? t("fileMissing", { path: opened.absPath }) : `HTTP ${response.status}`);
       const length = Number(response.headers.get("content-length")) || null;
       let next: Media;
-      if (isVideo && length !== null && length > MAX_BLOB_BYTES) {
+      if ((isVideo || isAudio) && length !== null && length > MAX_BLOB_BYTES) {
         void response.body?.cancel();
         next = { src: opened.url, blob: null, hostName: opened.hostName, absPath: opened.absPath, sizeBytes: length };
       } else {
@@ -92,7 +95,7 @@ export function MediaOpener({ path, source }: PluginFileOpenerProps) {
     } finally {
       if (current === generation.current) setLoading(false);
     }
-  }, [rpc, request, isVideo]);
+  }, [rpc, request, isVideo, isAudio]);
 
   useEffect(() => {
     void load();
@@ -139,7 +142,7 @@ export function MediaOpener({ path, source }: PluginFileOpenerProps) {
   const onKeyDown = (event: KeyboardEvent) => {
     if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
     const key = event.key.toLowerCase();
-    if (key === "c" && !isVideo) {
+    if (key === "c" && !isVideo && !isAudio) {
       event.preventDefault();
       copy();
     } else if (key === "s") {
@@ -159,7 +162,7 @@ export function MediaOpener({ path, source }: PluginFileOpenerProps) {
             </div>
           ) : null}
         </div>
-        {!isVideo ? (
+        {!isVideo && !isAudio ? (
           <span title={t("copyImageHint")} className="shrink-0"><Button variant="ghost" size="sm" className="h-8 gap-1.5" onClick={copy} disabled={!media?.blob}>
             <Icon name="Copy" className="size-4" /> {t("copyImage")}
           </Button></span>
@@ -181,6 +184,8 @@ export function MediaOpener({ path, source }: PluginFileOpenerProps) {
           </div>
         ) : !media ? (
           <div role="status" className="text-sm text-muted-foreground">{t("loading")}</div>
+        ) : isAudio ? (
+          <AudioPlayer src={media.src} blob={media.blob} />
         ) : isVideo ? (
           <div className="flex max-h-full max-w-full flex-col items-center gap-2">
             <video key={media.src} src={media.src} controls playsInline preload="metadata" className="max-h-full max-w-full" onError={() => setPlayError(true)} />

@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-office-viewer",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "type": "module",
   "engines": {
     "bb": ">=0.43",
@@ -8,7 +8,7 @@
   },
   "bb": {
     "name": "Office Viewer",
-    "description": "Excel-like spreadsheets in BB: live formulas, click-to-reference formula entry, fill, copy and paste, saving without losing formatting, quoting cells into the chat. Word documents, images, GIFs and videos open with Download (and Copy for images).",
+    "description": "Excel-like spreadsheets in BB: live formulas, click-to-reference formula entry, fill, copy and paste, saving without losing formatting, quoting cells into the chat. Word documents, images, GIFs, videos and audio (with a waveform player: speed, stop, ±10 s, loop) open with Download.",
     "branding": {
       "icon": "GridView"
     },
@@ -65,7 +65,9 @@
     "word",
     "docx",
     "image",
-    "video"
+    "video",
+    "audio",
+    "mp3"
   ],
   "scripts": {
     "test": "node --experimental-strip-types --test locate.test.ts sheet.test.ts csv.test.ts xlsx-patch.test.ts edits.test.ts formula.test.ts engine.test.ts",
