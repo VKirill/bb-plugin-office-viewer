@@ -32,6 +32,14 @@ Work with spreadsheets inside [BB](https://getbb.app) the way you do in Excel: o
 - Opens the legacy `.doc` / `.dot` as text (body, headers and footers, footnotes), extracted on the server by [word-extractor](https://github.com/morungos/node-word-extractor).
 - **Download** saves the original file (⌘S / Ctrl+S); text can be selected and copied.
 
+### PDF
+
+- Opens `.pdf` files as one continuous scroll of pages ([PDF.js](https://mozilla.github.io/pdf.js/)); only the pages near the screen are drawn, sharp on HiDPI screens.
+- **Zoom**: fit width (default), fit page, − / + buttons, ⌘/Ctrl + `+` `-` `0`; the percentage is shown. **Page** box shows the current page and jumps to the one you type.
+- **Search** (⌘/Ctrl+F): matches are highlighted, Enter / Shift+Enter step through them, "3 of 12" counter.
+- **Select and copy** text; **Quote in chat** puts the selected text into the composer as a Markdown blockquote with the file and page.
+- **Download** (⌘/Ctrl+S). Password-protected PDFs ask for the password.
+
 ### Images, videos and audio
 
 - Opens `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.bmp`, `.ico` and `.mp4`, `.m4v`, `.webm`, `.mov`, `.ogv` from chat links, the file picker and `bb thread open`.
@@ -54,6 +62,7 @@ Requires BB 0.43 or later. No account, API key or external service. Files up to 
 
 ## Limits
 
+- PDFs are read-only. Scanned pages without a text layer can be viewed but not searched or selected; JPEG 2000 images and fonts that are not embedded in the file may render with substitutes.
 - Word documents are read-only. `.docx` layout is close to Word but not identical (fonts, floating shapes, charts and SmartArt may differ). Legacy `.doc` shows text only: no formatting, tables become tab-separated lines, pictures are skipped.
 - The clipboard only holds still images: copying a GIF copies its first frame (use Download for the animation), and videos can't be copied, only downloaded.
 - Safari before 18.4 doesn't play Ogg/Opus voice messages; Download always works.
@@ -77,7 +86,7 @@ bb plugin build .
 bb plugin reload office-viewer
 ```
 
-Spreadsheet parsing uses [SheetJS Community Edition](https://sheetjs.com) (Apache-2.0); formulas are computed by [IronCalc](https://github.com/ironcalc/IronCalc) (MIT/Apache-2.0); `.xlsx` packages are rewritten with [fflate](https://github.com/101arrowz/fflate) (MIT); Word files are shown with docx-preview (Apache-2.0) and word-extractor (MIT). `fixtures/styled.xlsx` is a formatted workbook used to check that saves keep styles, validation, comments and charts.
+Spreadsheet parsing uses [SheetJS Community Edition](https://sheetjs.com) (Apache-2.0); formulas are computed by [IronCalc](https://github.com/ironcalc/IronCalc) (MIT/Apache-2.0); `.xlsx` packages are rewritten with [fflate](https://github.com/101arrowz/fflate) (MIT); Word files are shown with docx-preview (Apache-2.0) and word-extractor (MIT), PDFs with PDF.js (Apache-2.0). `fixtures/styled.xlsx` is a formatted workbook used to check that saves keep styles, validation, comments and charts.
 
 ## License
 

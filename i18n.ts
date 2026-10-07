@@ -83,6 +83,21 @@ const en = {
   cantPlayAudio: "This browser can't play this audio. Download it to listen.",
   legacyDoc: "Old Word format (.doc): only the text is shown, without formatting, tables or pictures. Download the file to see it as it is.",
   emptyDocument: "The document has no text.",
+  pageNumber: "Page number",
+  zoomIn: "Zoom in ({mod}+=)",
+  zoomOut: "Zoom out ({mod}+-)",
+  fitWidth: "Fit width ({mod}+0)",
+  fitPage: "Fit page",
+  searchPlaceholder: "Search in document",
+  searchDocument: "Search in document ({mod}+F)",
+  searching: "Searching…",
+  selectToQuote: "Select text in the document to quote it",
+  pageRef: "p. {n}",
+  pagesRef: "pp. {from}–{to}",
+  passwordRequired: "This PDF is password-protected.",
+  passwordWrong: "Wrong password, try again.",
+  password: "Password",
+  unlock: "Open",
 };
 
 export type I18nKey = keyof typeof en;
@@ -170,6 +185,21 @@ const ru: Record<I18nKey, string> = {
   cantPlayAudio: "Браузер не может воспроизвести этот звук. Скачайте файл, чтобы послушать.",
   legacyDoc: "Старый формат Word (.doc): показан только текст, без оформления, таблиц и картинок. Скачайте файл, чтобы увидеть его целиком.",
   emptyDocument: "В документе нет текста.",
+  pageNumber: "Номер страницы",
+  zoomIn: "Увеличить ({mod}+=)",
+  zoomOut: "Уменьшить ({mod}+-)",
+  fitWidth: "По ширине ({mod}+0)",
+  fitPage: "Страница целиком",
+  searchPlaceholder: "Поиск по документу",
+  searchDocument: "Поиск по документу ({mod}+F)",
+  searching: "Поиск…",
+  selectToQuote: "Выделите текст в документе, чтобы цитировать его",
+  pageRef: "стр. {n}",
+  pagesRef: "стр. {from}–{to}",
+  passwordRequired: "PDF защищён паролем.",
+  passwordWrong: "Неверный пароль, попробуйте ещё раз.",
+  password: "Пароль",
+  unlock: "Открыть",
 };
 
 export type Locale = "en" | "ru";

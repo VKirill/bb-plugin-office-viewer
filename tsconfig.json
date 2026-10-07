@@ -27,6 +27,7 @@
     "grid.tsx",
     "i18n.ts",
     "locate.ts",
+    "pdf-worker.d.ts",
     "server.ts",
     "sheet.ts",
     "components",
