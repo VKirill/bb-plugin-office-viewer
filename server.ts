@@ -51,6 +51,18 @@ export const rpcContract = defineRpcContract({
   },
   /** The IronCalc WebAssembly module the viewer computes formulas with. */
   engine: { input: z.object({}).strict(), output: z.object({ base64: z.string() }).strict() },
+  /** File names in the same folder, for stepping through images; sorted like Finder. */
+  siblings: {
+    input: fileSchema,
+    output: z.object({ names: z.array(z.string()) }).strict(),
+  },
+  /** Writes an edited image: next to the original under a free name, or over it. */
+  writeImage: {
+    input: fileSchema
+      .extend({ name: z.string().min(1).max(255), base64: z.string().max(60 * 1024 * 1024), overwrite: z.boolean() })
+      .strict(),
+    output: z.object({ name: z.string(), absPath: z.string(), sizeBytes: z.number() }).strict(),
+  },
   save: {
     input: fileSchema
       .extend({
@@ -149,6 +161,37 @@ export default function plugin(bb: BbPluginApi) {
         .catch((error: unknown) => { throw describe(error, hostName, where.absPath, locale); });
       const url = `${preview.baseUrl.replace(/\/?$/, "/")}${encodeURIComponent(where.absPath.slice(slash + 1))}`;
       return { url, hostName, absPath: where.absPath };
+    },
+    siblings: async ({ source, path, locale = "en" }) => {
+      const where = await locate(sdk, source, path, locale);
+      const dir = where.absPath.slice(0, where.absPath.lastIndexOf("/")) || "/";
+      const listed = await bb.sdk.files.list({ hostId: where.hostId, path: dir, limit: 5000, includeHidden: false });
+      const names = listed.files
+        .map((file) => (file.path.startsWith("/") ? file.path.slice(dir.length + 1) : file.path))
+        .filter((name) => name && !name.includes("/"));
+      names.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+      return { names };
+    },
+    writeImage: async ({ source, path, locale = "en", name, base64, overwrite }) => {
+      if (name.includes("/") || name.startsWith(".")) throw new Error(say(locale, "Invalid file name.", "Некорректное имя файла."));
+      const where = await locate(sdk, source, path, locale);
+      const hostName = (await bb.sdk.hosts.get({ hostId: where.hostId }).catch(() => null))?.name || where.hostId;
+      const dir = where.absPath.slice(0, where.absPath.lastIndexOf("/"));
+      let target = `${dir}/${name}`;
+      if (!overwrite) {
+        const dot = name.lastIndexOf(".");
+        const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
+        const candidates = [target, ...Array.from({ length: 98 }, (_, i) => `${dir}/${stem}-${i + 2}${ext}`)];
+        const { existence } = await bb.sdk.hosts.pathsExist({ hostId: where.hostId, paths: candidates });
+        const free = candidates.find((candidate) => existence[candidate] === false);
+        if (!free) throw new Error(say(locale, "No free file name left.", "Не нашлось свободного имени файла."));
+        target = free;
+      }
+      await bb.sdk.files
+        .write({ hostId: where.hostId, path: target, content: base64, contentEncoding: "base64" })
+        .catch((error: unknown) => { throw describe(error, hostName, target, locale); });
+      bb.log.info(`wrote image ${where.hostId}:${target}`);
+      return { name: target.slice(dir.length + 1), absPath: target, sizeBytes: Buffer.byteLength(base64, "base64") };
     },
     save: async ({ source, path, locale = "en", expectedSha256, sheet, edits }) => {
       const where = await locate(sdk, source, path, locale);
