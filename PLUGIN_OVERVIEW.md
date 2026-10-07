@@ -1,6 +1,6 @@
 ## What you get
 
-Office Viewer opens spreadsheets, Word and PowerPoint documents, images, videos and audio in BB's side panel: `.xlsx`, `.xlsm`, `.xlsb`, `.xls`, `.ods`, `.csv` and `.tsv`, from chat links, the file picker and `bb thread open`.
+Office Viewer opens spreadsheets, Word, PowerPoint and PDF documents, images, videos and audio in BB's side panel: `.xlsx`, `.xlsm`, `.xlsb`, `.xls`, `.ods`, `.csv` and `.tsv`, from chat links, the file picker and `bb thread open`.
 
 - **A familiar grid** — column letters, row numbers, a frozen first row, right-aligned numbers and merged cells.
 - **Big sheets stay fast** — only the visible part is drawn, so thousands of rows scroll smoothly.
