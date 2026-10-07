@@ -36,7 +36,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { t } from "./i18n";
+import { t } from "../shared/i18n";
 
 type Tool = "select" | "rect" | "ellipse" | "arrow" | "line" | "pen" | "marker" | "text" | "step" | "blur" | "crop";
 type Box = { x: number; y: number; w: number; h: number };

@@ -4,7 +4,7 @@
 // attachment or attaching it to the thread's draft.
 import { useEffect, useState } from "react";
 import { canvasFromBlob, ImageEditor } from "./image-editor";
-import { t } from "./i18n";
+import { t } from "../shared/i18n";
 
 export type VkImageEditorProps = {
   src: string;

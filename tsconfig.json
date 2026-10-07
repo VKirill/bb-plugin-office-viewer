@@ -22,13 +22,9 @@
     "allowImportingTsExtensions": true
   },
   "include": [
-    "*.test.ts",
     "app.tsx",
-    "grid.tsx",
-    "i18n.ts",
-    "locate.ts",
     "server.ts",
-    "sheet.ts",
+    "src",
     "components",
     "lib",
     "hooks"

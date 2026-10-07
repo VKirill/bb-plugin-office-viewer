@@ -6,13 +6,13 @@ import type { KeyboardEvent, ReactNode, RefObject } from "react";
 import { useComposer, useRpc, type PluginFileOpenerProps } from "@get-bb/plugin-sdk/app";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask, TextLayer } from "pdfjs-dist";
 import { toast } from "sonner";
-import type { rpcContract } from "./server";
+import type { rpcContract } from "../../server";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { detectLocale, t } from "./i18n";
-import { formatSize } from "./media";
+import { detectLocale, t } from "../shared/i18n";
+import { formatSize } from "../shared/format";
 
 export const PDF_EXTENSIONS = ["pdf"];
 

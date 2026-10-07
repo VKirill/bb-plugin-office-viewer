@@ -6,10 +6,10 @@ import * as XLSX from "xlsx";
 import WordExtractor from "word-extractor";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { locate, LocateError, type Lang, type LocateSdk } from "./locate.ts";
-import { applyCsvEdits, parseCsv, serializeCsv } from "./csv.ts";
-import { editMode, extensionOf } from "./sheet.ts";
-import { PatchError, patchXlsx, type CellEdit } from "./xlsx-patch.ts";
+import { locate, LocateError, type Lang, type LocateSdk } from "./src/server/locate.ts";
+import { applyCsvEdits, parseCsv, serializeCsv } from "./src/spreadsheet/csv.ts";
+import { editMode, extensionOf } from "./src/spreadsheet/sheet.ts";
+import { PatchError, patchXlsx, type CellEdit } from "./src/spreadsheet/xlsx-patch.ts";
 
 const say = (lang: Lang, en: string, ru: string) => (lang === "ru" ? ru : en);
 

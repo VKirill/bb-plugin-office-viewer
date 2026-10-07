@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import { applyInput, buildWorkbook, editsForSave, engineCell, initEngine, selectionStats } from "./engine.ts";
 import { parseWorkbook } from "./sheet.ts";
 
-initEngine(readFileSync(new URL("./node_modules/@ironcalc/wasm/wasm_bg.wasm", import.meta.url)));
+initEngine(readFileSync(new URL("../../node_modules/@ironcalc/wasm/wasm_bg.wasm", import.meta.url)));
 
 function book(rows: unknown[][], name = "Данные") {
   const wb = XLSX.utils.book_new();
@@ -93,7 +93,7 @@ test("selection stats skip text and parse formatted formula results", () => {
 });
 
 test("the demo workbook and the styled fixture load", () => {
-  for (const [path, sheets] of [["./docs/demo.xlsx", 4], ["./fixtures/styled.xlsx", 2]] as const) {
+  for (const [path, sheets] of [["../../docs/demo.xlsx", 4], ["../../fixtures/styled.xlsx", 2]] as const) {
     const started = performance.now();
     const wb = buildWorkbook(parseWorkbook(new Uint8Array(readFileSync(new URL(path, import.meta.url))), "xlsx"), "xlsx");
     assert.equal(wb.model.getWorksheetsProperties().length, sheets);
@@ -102,7 +102,7 @@ test("the demo workbook and the styled fixture load", () => {
 });
 
 test("save edits pass the server's input schema", async () => {
-  const { rpcContract } = await import("./server.ts");
+  const { rpcContract } = await import("../../server.ts");
   const wb = buildWorkbook(parseWorkbook(book(rows), "xlsx"), "xlsx");
   applyInput(wb, 0, 7, 0, "17.09.2026");
   applyInput(wb, 0, 7, 1, "15%");

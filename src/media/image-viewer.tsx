@@ -6,7 +6,7 @@ import type { PointerEvent } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowLeft01Icon, ArrowRight01Icon, ZoomInIcon, ZoomOutIcon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
-import { t } from "./i18n";
+import { t } from "../shared/i18n";
 
 const CHECKER = {
   backgroundColor: "#ffffff",

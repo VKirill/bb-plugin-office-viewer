@@ -7,11 +7,12 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Camera01Icon, PictureInPictureOnIcon, RepeatIcon } from "@hugeicons/core-free-icons";
 import { useRpc, type PluginFileOpenerProps } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
-import type { rpcContract } from "./server";
+import type { rpcContract } from "../../server";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
-import { detectLocale, t } from "./i18n";
-import { extensionOf } from "./sheet";
+import { detectLocale, t } from "../shared/i18n";
+import { formatSize } from "../shared/format";
+import { extensionOf } from "../spreadsheet/sheet";
 import { AudioPlayer } from "./audio-player";
 import { ImageEditor, canvasFromBlob, type ImageFormat, type WriteImage } from "./image-editor";
 import { ImageViewer, type ImageViewerHandle } from "./image-viewer";
@@ -35,12 +36,6 @@ function clock(seconds: number) {
 const MAX_BLOB_BYTES = 512 * 1024 * 1024;
 
 type Media = { src: string; blob: Blob | null; hostName: string; absPath: string; sizeBytes: number | null };
-
-export function formatSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
 
 /** The system clipboard takes images only as PNG, so other formats are redrawn (a GIF copies its first frame). */
 async function pngBlob(blob: Blob): Promise<Blob> {

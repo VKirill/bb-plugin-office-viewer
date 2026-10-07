@@ -5,10 +5,10 @@ import { parsePptx, slideMarkdown, type Deck, type Shape } from "./pptx.ts";
 import { arrowhead, outline } from "./pptx-geometry.ts";
 import { numberLabel } from "./pptx-text.ts";
 import { parseXml } from "./xml.ts";
-import { formatBlockquote } from "./quote.ts";
+import { formatBlockquote } from "../shared/quote.ts";
 
 // fixtures/deck.pptx: a python-pptx deck of six 16:9 slides (title, bullets with notes, picture, table, shapes, chart).
-const deck: Deck = parsePptx(new Uint8Array(readFileSync(new URL("./fixtures/deck.pptx", import.meta.url))));
+const deck: Deck = parsePptx(new Uint8Array(readFileSync(new URL("../../fixtures/deck.pptx", import.meta.url))));
 
 test("parseXml keeps prefixes, entities, CDATA and self-closing tags", () => {
   const root = parseXml('<?xml version="1.0"?><a:r x="1 &amp; 2"><a:t>5 &lt; 6 &#x41;</a:t><a:br/><![CDATA[<raw>]]></a:r>');

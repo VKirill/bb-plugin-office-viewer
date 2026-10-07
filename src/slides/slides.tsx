@@ -5,15 +5,15 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { KeyboardEvent, RefObject } from "react";
 import { useComposer, useRpc, type PluginFileOpenerProps } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
-import type { rpcContract } from "./server";
+import type { rpcContract } from "../../server";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
-import { detectLocale, t } from "./i18n";
-import { formatSize } from "./media";
-import { extensionOf } from "./sheet";
+import { detectLocale, t } from "../shared/i18n";
+import { formatSize } from "../shared/format";
+import { extensionOf } from "../spreadsheet/sheet";
 import { parsePptx, slideMarkdown, type Deck } from "./pptx";
-import { formatBlockquote } from "./quote";
+import { formatBlockquote } from "../shared/quote";
 import { ScaledSlide } from "./slide-view";
 
 export const SLIDES_EXTENSIONS = ["pptx", "ppsx", "potx"];

@@ -113,6 +113,23 @@ bb plugin build .
 bb plugin reload office-viewer
 ```
 
+```text
+app.tsx            frontend entry: registers the file openers
+server.ts          backend entry: RPC (open, save, docText, siblings, writeImage) and the PDF.js route
+src/
+  spreadsheet/     grid, IronCalc engine, formulas, xlsx/csv parsing and patching, the spreadsheet opener
+  word/            Word opener (docx-preview, .doc text)
+  slides/          PowerPoint parser and renderer
+  pdf/             PDF opener (PDF.js)
+  media/           images, image editor, video, audio player
+  shared/          UI strings, quoting, file size format
+  server/          locating a file on the machine that owns it
+components/ui, lib, hooks   UI kit from the BB registry
+fixtures/, docs/   test files, demo workbook, screenshots
+```
+
+Tests sit next to the code they cover (`src/**/*.test.ts`).
+
 Spreadsheet parsing uses [SheetJS Community Edition](https://sheetjs.com) (Apache-2.0); formulas are computed by [IronCalc](https://github.com/ironcalc/IronCalc) (MIT/Apache-2.0); `.xlsx` packages are rewritten with [fflate](https://github.com/101arrowz/fflate) (MIT); Word files are shown with docx-preview (Apache-2.0) and word-extractor (MIT), PDFs with PDF.js (Apache-2.0). `fixtures/styled.xlsx` is a formatted workbook used to check that saves keep styles, validation, comments and charts.
 
 ## License

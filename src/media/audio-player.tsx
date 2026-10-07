@@ -15,7 +15,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { t } from "./i18n";
+import { t } from "../shared/i18n";
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 const RATE_KEY = "office-viewer:audio-rate";

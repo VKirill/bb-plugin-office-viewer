@@ -6,7 +6,7 @@ import { arrowhead, outline, textInset } from "./pptx-geometry";
 import type { Fill } from "./pptx-style";
 import type { Body } from "./pptx-text";
 import type { Deck, Shape, Slide } from "./pptx";
-import { t } from "./i18n";
+import { t } from "../shared/i18n";
 
 function fillStyle(fill: Fill): CSSProperties {
   if (fill.kind === "solid") return { background: fill.color };

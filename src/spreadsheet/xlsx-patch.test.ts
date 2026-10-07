@@ -5,7 +5,7 @@ import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { parseWorkbook } from "./sheet.ts";
 import { PatchError, patchXlsx } from "./xlsx-patch.ts";
 
-const styled = new Uint8Array(readFileSync(new URL("./fixtures/styled.xlsx", import.meta.url)));
+const styled = new Uint8Array(readFileSync(new URL("../../fixtures/styled.xlsx", import.meta.url)));
 const budget = { index: 0, name: "Бюджет" };
 const part = (bytes: Uint8Array, name: string) => strFromU8(unzipSync(bytes)[name]);
 
