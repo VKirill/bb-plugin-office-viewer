@@ -24,6 +24,7 @@ import {
   RotateRightIcon,
   SentIcon,
   SquareIcon,
+  Tick02Icon,
   TextIcon,
   Undo02Icon,
   ZoomInIcon,
@@ -366,6 +367,7 @@ export function ImageEditor({
   write,
   onClose,
   onSaved,
+  onDone,
 }: {
   image: HTMLCanvasElement;
   /** Original file name; copies are named after it. */
@@ -375,6 +377,8 @@ export function ImageEditor({
   write: WriteImage | null;
   onClose: () => void;
   onSaved: (result: { name: string; absPath: string }, overwrite: boolean) => void;
+  /** Inside BB's image preview: hands the PNG back instead of saving files. */
+  onDone?: (png: Blob) => Promise<void>;
 }) {
   const composer = useComposer();
   const [{ history, index }, setTimeline] = useState(() => ({ history: [{ image, shapes: [] as Shape[], rev: ++nextRev }], index: 0 }));
@@ -401,6 +405,7 @@ export function ImageEditor({
   // Escape commits, then the unmounting field blurs: only the first finish counts.
   const finishing = useRef<string | null>(null);
   const startEditing = (id: string) => { finishing.current = null; setEditing(id); };
+  const textRef = useRef<HTMLTextAreaElement | null>(null);
   const W = doc.image.width, H = doc.image.height;
   const scale = zoom ?? fit;
   const unit = Math.max(2, Math.round(Math.max(W, H) / 400));
@@ -461,7 +466,8 @@ export function ImageEditor({
 
   const onPointerDown = (event: PointerEvent<SVGSVGElement>) => {
     if (event.button !== 0 || busy) return;
-    if (editing) { setEditing(null); return; }
+    // A click outside the text being typed commits it (the field keeps focus, so it never blurs).
+    if (editing) { finishText(textRef.current?.value ?? ""); return; }
     const { x, y } = point(event);
     const target = event.target as Element;
     const handle = target.closest("[data-handle]")?.getAttribute("data-handle");
@@ -603,6 +609,21 @@ export function ImageEditor({
   };
 
   const sendToChat = async () => {
+    // VK core function `image-editor`: a real attachment in the draft instead of a path in the text.
+    const attach = (composer as typeof composer & { experimental_vkAttachFiles?: (files: File[]) => Promise<void> }).experimental_vkAttachFiles;
+    if (typeof attach === "function") {
+      setBusy(true);
+      try {
+        await attach.call(composer, [new File([await render("png", 1, 1)], `${stem}-edited.png`, { type: "image/png" })]);
+        setSavedRev(doc.rev);
+        toast.success(t("attachedToChat"));
+      } catch (cause) {
+        toast.error(cause instanceof Error ? cause.message : String(cause));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     if (!write) return;
     setBusy(true);
     let clipboard = false;
@@ -624,6 +645,18 @@ export function ImageEditor({
     }
   };
 
+  const finish = async () => {
+    if (!onDone) return;
+    setBusy(true);
+    try {
+      await onDone(await render("png", 1, 1));
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const close = () => {
     if (dirty && !window.confirm(t("discardEdits"))) return;
     onClose();
@@ -636,7 +669,7 @@ export function ImageEditor({
     if (mod && key === "z") { event.preventDefault(); if (event.shiftKey) redo(); else undo(); return; }
     if (mod && key === "y") { event.preventDefault(); redo(); return; }
     if (mod && key === "c") { event.preventDefault(); copy(); return; }
-    if (mod && key === "s") { event.preventDefault(); setSaveOpen(true); return; }
+    if (mod && (key === "s" || event.key === "Enter")) { event.preventDefault(); if (onDone) void finish(); else if (key === "s") setSaveOpen(true); return; }
     if (mod && (key === "=" || key === "+")) { event.preventDefault(); setZoom(Math.min(8, scale * 1.25)); return; }
     if (mod && key === "-") { event.preventDefault(); setZoom(Math.max(0.05, scale / 1.25)); return; }
     if (mod && key === "0") { event.preventDefault(); setZoom(null); return; }
@@ -758,7 +791,11 @@ export function ImageEditor({
           {write ? (
             <span title={t("sendToChatHint")} className="shrink-0"><Button variant="ghost" size="sm" className="h-8 gap-1.5" aria-label={t("sendToChat")} disabled={busy} onClick={() => void sendToChat()}><ToolIcon icon={SentIcon} /> <span className="hidden @lg:inline">{t("sendToChat")}</span></Button></span>
           ) : null}
-          <Button size="sm" className="h-8 gap-1.5" disabled={busy} onClick={() => setSaveOpen(true)}><ToolIcon icon={Download01Icon} /> {t("saveImage")}</Button>
+          {onDone ? (
+            <Button size="sm" className="h-8 gap-1.5" disabled={busy} onClick={() => void finish()}><ToolIcon icon={Tick02Icon} /> {t("doneEditing")}</Button>
+          ) : (
+            <Button size="sm" className="h-8 gap-1.5" disabled={busy} onClick={() => setSaveOpen(true)}><ToolIcon icon={Download01Icon} /> {t("saveImage")}</Button>
+          )}
         </div>
       </div>
 
@@ -805,7 +842,10 @@ export function ImageEditor({
             </svg>
             {editingShape ? (
               <textarea
-                ref={(node) => { if (node && document.activeElement !== node) requestAnimationFrame(() => node.focus()); }}
+                ref={(node) => {
+                  textRef.current = node;
+                  if (node && document.activeElement !== node) requestAnimationFrame(() => node.focus());
+                }}
                 defaultValue={editingShape.text}
                 placeholder={t("textPlaceholder")}
                 rows={Math.max(1, editingShape.text.split("\n").length)}

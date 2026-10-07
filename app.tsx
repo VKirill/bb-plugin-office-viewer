@@ -23,6 +23,7 @@ import { FormulaInput, type FormulaInputHandle } from "./formula-input";
 import { Grid, type GridHandle } from "./grid";
 import { MEDIA_EXTENSIONS, MediaOpener } from "./media";
 import { DocumentOpener, WORD_EXTENSIONS } from "./document";
+import { ChatImageEditor, type VkImageEditorProps } from "./chat-image-editor";
 import { SLIDES_EXTENSIONS, SlidesOpener } from "./slides";
 import { PDF_EXTENSIONS, PdfOpener } from "./pdf";
 
@@ -941,4 +942,11 @@ export default definePluginApp((app) => {
     extensions: PDF_EXTENSIONS,
     component: PdfOpener,
   });
+  // VK core function `image-editor`: an Edit button in BB's image preview for chat attachments.
+  const vk = app.slots as typeof app.slots & {
+    experimental_vkImageEditor?: (registration: { id: string; title: string; component: React.ComponentType<VkImageEditorProps> }) => void;
+  };
+  if (typeof vk.experimental_vkImageEditor === "function") {
+    vk.experimental_vkImageEditor({ id: "image-editor", title: t("editImage"), component: ChatImageEditor });
+  }
 });
