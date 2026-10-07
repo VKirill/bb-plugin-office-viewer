@@ -54,13 +54,17 @@ Work with spreadsheets inside [BB](https://getbb.app) the way you do in Excel: o
 
 ### Images, videos and audio
 
-- Opens `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.bmp`, `.ico` and `.mp4`, `.m4v`, `.webm`, `.mov`, `.ogv` from chat links, the file picker and `bb thread open`.
+- Opens `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.bmp`, `.ico`, `.svg` and `.mp4`, `.m4v`, `.webm`, `.mov`, `.ogv` from chat links, the file picker and `bb thread open`.
+- Images fit the panel on a checkerboard (transparency shows) with the pixel size; zoom with pinch, ⌘/Ctrl+wheel, ⌘+/−/0 or a double-click, drag to pan. ← → or the side arrows step through the other images of the folder.
+- **Edit** (E) opens the image editor: rectangle (R), ellipse (O), arrow (A), line (L), pen (P), highlighter (M), text (T), numbered steps (N), blur (B), crop (C), select and move (V); eight colours (1–8), three widths, fill (tinted shapes, text on a label), Shift for squares and 45° lines, rotate and flip, undo/redo (⌘Z / ⇧⌘Z), arrow keys nudge the selection.
+- The editor saves **a copy** next to the original or **overwrites** it (PNG, JPEG or WebP, with quality and 100/75/50/25 % size), downloads the result, copies it (⌘C), or sends it **to the chat**: a copy is saved, its path goes into the message and the image is also put on the clipboard, so ⌘V attaches it.
+- Videos fit the panel in a 16:9 frame; speed 0.25×–3×, repeat, one-frame steps (, .), ← → 5 s, Space, F for full screen, picture in picture, and **Frame** opens the current frame in the editor.
 - Audio: `.mp3`, `.wav`, `.ogg`, `.oga`, `.opus` (Telegram voice messages), `.m4a`, `.aac`, `.flac`, `.weba` open in a player: a waveform you click or drag to seek, play/pause (Space), stop, ±10 s (← → move 5 s), repeat, volume and speed 0.5×–2× (pitch kept; the speed is remembered). Recordings longer than 10 minutes get a progress bar instead of a waveform.
 - **Download** saves the file to the device you are browsing BB on (⌘S / Ctrl+S).
 - **Copy** puts an image on the system clipboard (⌘C / Ctrl+C) so you can paste it into another app.
 - Videos play with seeking in every browser, Safari on iPhone and iPad included: the file is loaded into the page, because BB's preview links don't serve byte ranges. Videos over 512 MB stream from the link instead.
 
-The interface follows BB's language (English or Russian).
+The interface is Russian when BB's language or the browser's first language is Russian, English otherwise.
 
 ## Install
 

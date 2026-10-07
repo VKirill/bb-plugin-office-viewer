@@ -27,7 +27,7 @@ Search the text (⌘F), zoom, and quote a selection into the chat.
 
 ## Images, videos and audio
 
-Pictures, GIFs and videos (`.png`, `.jpg`, `.gif`, `.webp`, `.mp4`, `.mov`, `.webm` and more) open with **Download** to the device you're on and **Copy** to the clipboard for images. Videos play and seek in any browser, iPhone and iPad included. Audio (`.mp3`, `.wav`, `.ogg` voice messages, `.m4a`, `.flac` and more) opens in a player with a waveform, stop, ±10 s, repeat, volume and speed 0.5×–2×.
+Pictures, GIFs, SVGs and videos (`.png`, `.jpg`, `.gif`, `.webp`, `.svg`, `.mp4`, `.mov`, `.webm` and more) open with **Download** to the device you're on and **Copy** to the clipboard for images. Images zoom, pan and step through their folder. **Edit** marks a picture up — boxes, arrows, text, numbered steps, highlighter, blur, crop, rotate — and saves a copy, overwrites it, or sends it to the chat. Videos get speed, repeat, frame steps, picture in picture and **Frame**, which opens the current frame in the editor. Videos play and seek in any browser, iPhone and iPad included. Audio (`.mp3`, `.wav`, `.ogg` voice messages, `.m4a`, `.flac` and more) opens in a player with a waveform, stop, ±10 s, repeat, volume and speed 0.5×–2×.
 
 ## Machine-aware files
 
@@ -35,4 +35,4 @@ A file is read on the machine of the thread, environment or project it came from
 
 ## Requirements
 
-BB 0.43 or later. No account, API key or external service. Files up to 30 MB; `.xls`, `.xlsb` and `.ods` open read-only. The interface follows BB's language (English or Russian).
+BB 0.43 or later. No account, API key or external service. Files up to 30 MB; `.xls`, `.xlsb` and `.ods` open read-only. The interface is Russian when BB's language or the browser's first language is Russian, English otherwise.

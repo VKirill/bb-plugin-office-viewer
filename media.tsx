@@ -91,10 +91,12 @@ export function MediaOpener({ path: openedPath, source }: PluginFileOpenerProps)
   const viewer = useRef<ImageViewerHandle>(null);
   const video = useRef<HTMLVideoElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  // BB reuses the opener when a tab switches files; drop the old file's editor with it.
+  // BB reuses the opener when a tab switches files; drop the old file's editor and bytes with it,
+  // or a video tab briefly gets the previous picture as its source and reports it can't play.
   useEffect(() => {
     setPath(openedPath);
     setEditing(null);
+    setMedia(null);
   }, [openedPath]);
 
   const load = useCallback(async () => {
