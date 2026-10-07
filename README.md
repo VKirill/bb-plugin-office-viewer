@@ -1,8 +1,12 @@
+<img src="docs/icon.png" width="96" alt="Office Viewer icon" align="right">
+
 # Office Viewer for BB
 
 Work with spreadsheets inside [BB](https://getbb.app) the way you do in Excel: open `.xlsx`, `.xlsm`, `.xlsb`, `.xls`, `.ods`, `.csv` and `.tsv` files from chat links, the file picker and `bb thread open`, edit them with live formulas, and quote cells into the chat.
 
 ## Features
+
+![Spreadsheet with formatting, links and sheet tabs](docs/screenshots/spreadsheet.jpg)
 
 - **Sheet tabs** with hidden sheets marked.
 - **Excel-like grid**: column letters and row numbers stay in place, the first row can be frozen, numbers are right-aligned, merged cells span their range.
@@ -28,6 +32,8 @@ Work with spreadsheets inside [BB](https://getbb.app) the way you do in Excel: o
 
 ### Word documents
 
+![A Word contract with headings, a table and lists](docs/screenshots/word.jpg)
+
 - Opens `.docx`, `.docm`, `.dotx` as pages laid out like Word ([docx-preview](https://github.com/VolodymyrBaydalka/docxjs)): styles, tables, lists, pictures, headers, footers and footnotes. Pages shrink to the panel width, so a whole page fits on a phone.
 - Opens the legacy `.doc` / `.dot` as text (body, headers and footers, footnotes), extracted on the server by [word-extractor](https://github.com/morungos/node-word-extractor).
 - **Download** saves the original file (⌘S / Ctrl+S); text can be selected and copied.
@@ -36,6 +42,8 @@ Work with spreadsheets inside [BB](https://getbb.app) the way you do in Excel: o
 - **Quote in chat**: select text, then use the header button or right-click → *Quote in chat*; the file and the text go into the composer as a Markdown blockquote.
 
 ### PowerPoint presentations
+
+![Slides with thumbnails](docs/screenshots/powerpoint.jpg)
 
 - Opens `.pptx`, `.ppsx` and `.potx`: a slide list on the left (below the slide on a phone), the current slide fitted to the panel, `←` / `→` / PageUp / PageDown / Home / End to move, and a `3 / 12` counter.
 - **Present** shows the slides full screen (Fullscreen API) with the same keys plus Space and click; Esc leaves.
@@ -53,6 +61,8 @@ Work with spreadsheets inside [BB](https://getbb.app) the way you do in Excel: o
 - **Download** (⌘/Ctrl+S). Password-protected PDFs ask for the password.
 
 ### Images, videos and audio
+
+![Image editor: arrow, box, text, numbered steps and blur](docs/screenshots/image-editor.jpg)
 
 - Opens `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.bmp`, `.ico`, `.svg` and `.mp4`, `.m4v`, `.webm`, `.mov`, `.ogv` from chat links, the file picker and `bb thread open`.
 - Images fit the panel on a checkerboard (transparency shows) with the pixel size; zoom with pinch, ⌘/Ctrl+wheel, ⌘+/−/0 or a double-click, drag to pan. ← → or the side arrows step through the other images of the folder.
