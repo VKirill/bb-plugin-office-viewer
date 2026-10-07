@@ -155,6 +155,21 @@ const en = {
   slideObject: "Object (not shown)",
   notPptx: "This isn't a readable .pptx file (it may be encrypted or damaged).",
   legacyPpt: "The old PowerPoint format (.ppt) can't be shown here. Download the file to open it in PowerPoint.",
+  pageNumber: "Page number",
+  pdfZoomIn: "Zoom in ({mod}+=)",
+  pdfZoomOut: "Zoom out ({mod}+-)",
+  fitWidth: "Fit width ({mod}+0)",
+  fitPage: "Fit page",
+  searchPlaceholder: "Search in document",
+  searchDocument: "Search in document ({mod}+F)",
+  searching: "Searching…",
+  pdfSelectToQuote: "Select text in the document to quote it",
+  pageRef: "p. {n}",
+  pagesRef: "pp. {from}–{to}",
+  passwordRequired: "This PDF is password-protected.",
+  passwordWrong: "Wrong password, try again.",
+  password: "Password",
+  unlock: "Open",
 };
 
 export type I18nKey = keyof typeof en;
@@ -314,6 +329,21 @@ const ru: Record<I18nKey, string> = {
   slideObject: "Объект (не показан)",
   notPptx: "Не удалось прочитать файл .pptx (он зашифрован или повреждён).",
   legacyPpt: "Старый формат PowerPoint (.ppt) здесь не показывается. Скачайте файл, чтобы открыть его в PowerPoint.",
+  pageNumber: "Номер страницы",
+  pdfZoomIn: "Увеличить ({mod}+=)",
+  pdfZoomOut: "Уменьшить ({mod}+-)",
+  fitWidth: "По ширине ({mod}+0)",
+  fitPage: "Страница целиком",
+  searchPlaceholder: "Поиск по документу",
+  searchDocument: "Поиск по документу ({mod}+F)",
+  searching: "Поиск…",
+  pdfSelectToQuote: "Выделите текст в документе, чтобы цитировать его",
+  pageRef: "стр. {n}",
+  pagesRef: "стр. {from}–{to}",
+  passwordRequired: "PDF защищён паролем.",
+  passwordWrong: "Неверный пароль, попробуйте ещё раз.",
+  password: "Пароль",
+  unlock: "Открыть",
 };
 
 export type Locale = "en" | "ru";

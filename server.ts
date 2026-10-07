@@ -115,6 +115,20 @@ export default function plugin(bb: BbPluginApi) {
   const sdk = bb.sdk as unknown as LocateSdk;
   let engine: Promise<string> | null = null;
 
+  // PDF.js for the PDF opener, fetched by the browser on the first PDF instead of riding in every app bundle.
+  const require = createRequire(import.meta.url);
+  const pdfjsVersion = (require("pdfjs-dist/package.json") as { version: string }).version;
+  for (const name of ["pdf.min.mjs", "pdf.worker.min.mjs"]) {
+    let body: Promise<Buffer> | null = null;
+    bb.http.route("GET", `/pdfjs/${name}`, async (context) => {
+      if (context.req.header("if-none-match") === `"${pdfjsVersion}"`) return new Response(null, { status: 304 });
+      body ??= readFile(require.resolve(`pdfjs-dist/legacy/build/${name}`));
+      return new Response(new Uint8Array(await body), {
+        headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache", etag: `"${pdfjsVersion}"` },
+      });
+    });
+  }
+
   bb.rpc.register(rpcContract, {
     engine: async () => {
       engine ??= readFile(createRequire(import.meta.url).resolve("@ironcalc/wasm/wasm_bg.wasm")).then((bytes) => bytes.toString("base64"));

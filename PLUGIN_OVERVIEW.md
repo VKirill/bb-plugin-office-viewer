@@ -21,6 +21,10 @@ Search the text (⌘F), zoom, and quote a selection into the chat.
 
 `.pptx`, `.ppsx` and `.potx` open as slides with thumbnails, keyboard navigation, full-screen presenting, speaker notes and a *Quote in chat* button that sends the current slide's text to the agent. The old `.ppt` can be downloaded only.
 
+## PDF
+
+`.pdf` opens as a continuous scroll with zoom (fit width, fit page, ⌘ +/−/0), a page box to jump to a page, text search with highlights, selectable text and **Quote in chat** for the selection. Password-protected files ask for the password. Download with one click.
+
 ## Images, videos and audio
 
 Pictures, GIFs and videos (`.png`, `.jpg`, `.gif`, `.webp`, `.mp4`, `.mov`, `.webm` and more) open with **Download** to the device you're on and **Copy** to the clipboard for images. Videos play and seek in any browser, iPhone and iPad included. Audio (`.mp3`, `.wav`, `.ogg` voice messages, `.m4a`, `.flac` and more) opens in a player with a waveform, stop, ±10 s, repeat, volume and speed 0.5×–2×.

@@ -182,6 +182,15 @@ export function DocumentOpener({ path, source }: PluginFileOpenerProps) {
       });
       // The wrapper centres its pages, so its scrollWidth misses the left overflow: measure the widest page instead.
       const wrapper = pages.current.firstElementChild as HTMLElement | null;
+      // A file without page size or margins (generated, not saved by Word) gets Word's defaults, A4 and an inch,
+      // instead of a page as wide as its longest line with text on the edge.
+      wrapper?.querySelectorAll<HTMLElement>("section.docx").forEach((page) => {
+        if (!page.style.width) {
+          page.style.width = "595.3pt";
+          page.style.minHeight ||= "841.9pt";
+        }
+        if (!parseFloat(getComputedStyle(page).paddingLeft)) page.style.padding = "72pt";
+      });
       if (wrapper) {
         const padding = getComputedStyle(wrapper);
         const widest = Math.max(0, ...Array.from(wrapper.querySelectorAll<HTMLElement>("section.docx"), (page) => page.offsetWidth));
@@ -317,7 +326,7 @@ export function DocumentOpener({ path, source }: PluginFileOpenerProps) {
     <div className="flex h-full min-h-0 flex-col bg-background outline-none" tabIndex={0} onKeyDown={onKeyDown}>
       <style>{HIGHLIGHT_CSS}</style>
       <div className="flex min-h-10 shrink-0 flex-wrap items-center gap-1 border-b border-border px-2 py-1">
-        <div className="min-w-0 flex-1 px-1">
+        <div className="min-w-32 flex-1 basis-32 px-1">
           <div className="truncate text-sm font-medium" title={info?.absPath ?? path}>{fileName}</div>
           {info ? <div className="truncate text-xs text-muted-foreground">{info.hostName} · {formatSize(info.sizeBytes)}</div> : null}
         </div>
@@ -375,7 +384,7 @@ export function DocumentOpener({ path, source }: PluginFileOpenerProps) {
 
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <div ref={viewport} className="relative min-h-0 flex-1 overflow-auto">
+          <div ref={viewport} className="relative min-h-0 flex-1 overflow-auto" style={legacy || !info || error ? undefined : { backgroundColor: "gray" }}>
             {error ? (
               <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm">
                 <span className="font-medium">{t("openFailed")}</span>
