@@ -31,6 +31,18 @@ Work with spreadsheets inside [BB](https://getbb.app) the way you do in Excel: o
 - Opens `.docx`, `.docm`, `.dotx` as pages laid out like Word ([docx-preview](https://github.com/VolodymyrBaydalka/docxjs)): styles, tables, lists, pictures, headers, footers and footnotes. Pages shrink to the panel width, so a whole page fits on a phone.
 - Opens the legacy `.doc` / `.dot` as text (body, headers and footers, footnotes), extracted on the server by [word-extractor](https://github.com/morungos/node-word-extractor).
 - **Download** saves the original file (⌘S / Ctrl+S); text can be selected and copied.
+- **Search** in the document (⌘F / Ctrl+F): hits are highlighted, Enter / Shift+Enter step through them, with an "i of n" counter. Words split across formatting are found too.
+- **Zoom**: − / + buttons or ⌘ + / ⌘ − (Ctrl on Windows and Linux), click the percentage to fit the panel width, ⌘0 to reset.
+- **Quote in chat**: select text, then use the header button or right-click → *Quote in chat*; the file and the text go into the composer as a Markdown blockquote.
+
+### PowerPoint presentations
+
+- Opens `.pptx`, `.ppsx` and `.potx`: a slide list on the left (below the slide on a phone), the current slide fitted to the panel, `←` / `→` / PageUp / PageDown / Home / End to move, and a `3 / 12` counter.
+- **Present** shows the slides full screen (Fullscreen API) with the same keys plus Space and click; Esc leaves.
+- **Speaker notes** appear under the slide when the deck has any.
+- **Quote in chat** puts the current slide's title and text (bullets, tables) into the composer as a blockquote with the file and slide number.
+- Slides are drawn from the file's own XML, without extra libraries: theme colors and fonts, layouts and masters, text with bullets and numbering, pictures (cropped, rounded), tables with their styles, groups, rotation, gradients and about thirty preset shapes plus freeform paths.
+- The old binary `.ppt` isn't shown: the viewer says so and offers **Download**.
 
 ### Images, videos and audio
 
@@ -54,6 +66,7 @@ Requires BB 0.43 or later. No account, API key or external service. Files up to 
 
 ## Limits
 
+- PowerPoint slides are read-only and approximate PowerPoint's layout: charts, SmartArt and other embedded objects appear as labelled placeholders, and shadows, 3-D effects, animations, transitions and video are not shown. Fonts missing on the device are replaced, so line breaks may differ. `.ppt` is not supported.
 - Word documents are read-only. `.docx` layout is close to Word but not identical (fonts, floating shapes, charts and SmartArt may differ). Legacy `.doc` shows text only: no formatting, tables become tab-separated lines, pictures are skipped.
 - The clipboard only holds still images: copying a GIF copies its first frame (use Download for the animation), and videos can't be copied, only downloaded.
 - Safari before 18.4 doesn't play Ogg/Opus voice messages; Download always works.

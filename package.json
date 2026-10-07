@@ -64,13 +64,15 @@
     "file-opener",
     "word",
     "docx",
+    "powerpoint",
+    "pptx",
     "image",
     "video",
     "audio",
     "mp3"
   ],
   "scripts": {
-    "test": "node --experimental-strip-types --test locate.test.ts sheet.test.ts csv.test.ts xlsx-patch.test.ts edits.test.ts formula.test.ts engine.test.ts",
+    "test": "node --experimental-strip-types --test locate.test.ts sheet.test.ts csv.test.ts xlsx-patch.test.ts edits.test.ts formula.test.ts engine.test.ts pptx.test.ts",
     "typecheck": "tsc --noEmit",
     "build": "bb plugin build ."
   },

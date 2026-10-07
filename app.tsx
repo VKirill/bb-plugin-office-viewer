@@ -23,6 +23,7 @@ import { FormulaInput, type FormulaInputHandle } from "./formula-input";
 import { Grid, type GridHandle } from "./grid";
 import { MEDIA_EXTENSIONS, MediaOpener } from "./media";
 import { DocumentOpener, WORD_EXTENSIONS } from "./document";
+import { SLIDES_EXTENSIONS, SlidesOpener } from "./slides";
 
 type Loaded = { bytes: Uint8Array; hostName: string; absPath: string; sizeBytes: number; sha256: string };
 type SaveState = "idle" | "saving" | "conflict" | "error";
@@ -926,5 +927,11 @@ export default definePluginApp((app) => {
     title: "Office Viewer — Word",
     extensions: WORD_EXTENSIONS,
     component: DocumentOpener,
+  });
+  app.slots.fileOpener({
+    id: "slides",
+    title: "Office Viewer — PowerPoint",
+    extensions: SLIDES_EXTENSIONS,
+    component: SlidesOpener,
   });
 });

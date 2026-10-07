@@ -1,6 +1,6 @@
 ## What you get
 
-Office Viewer opens spreadsheets, Word documents, images, videos and audio in BB's side panel: `.xlsx`, `.xlsm`, `.xlsb`, `.xls`, `.ods`, `.csv` and `.tsv`, from chat links, the file picker and `bb thread open`.
+Office Viewer opens spreadsheets, Word and PowerPoint documents, images, videos and audio in BB's side panel: `.xlsx`, `.xlsm`, `.xlsb`, `.xls`, `.ods`, `.csv` and `.tsv`, from chat links, the file picker and `bb thread open`.
 
 - **A familiar grid** — column letters, row numbers, a frozen first row, right-aligned numbers and merged cells.
 - **Big sheets stay fast** — only the visible part is drawn, so thousands of rows scroll smoothly.
@@ -14,6 +14,12 @@ Office Viewer opens spreadsheets, Word documents, images, videos and audio in BB
 ## Word documents
 
 `.docx` opens as Word-like pages with styles, tables, pictures, headers and footnotes, fitted to the panel width. The legacy `.doc` shows its text. Download the original with one click.
+
+Search the text (⌘F), zoom, and quote a selection into the chat.
+
+## PowerPoint
+
+`.pptx`, `.ppsx` and `.potx` open as slides with thumbnails, keyboard navigation, full-screen presenting, speaker notes and a *Quote in chat* button that sends the current slide's text to the agent. The old `.ppt` can be downloaded only.
 
 ## Images, videos and audio
 
