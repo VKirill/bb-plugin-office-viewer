@@ -5,7 +5,7 @@
 import { useMemo, useState } from "react";
 import { useBbNavigate, useRpc, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Globe02Icon, SmartPhone01Icon } from "@hugeicons/core-free-icons";
+import { ArrowLeft01Icon, Globe02Icon, SmartPhone01Icon } from "@hugeicons/core-free-icons";
 import type { rpcContract } from "../../server";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ const bytesOf = (base64: string) => Uint8Array.from(atob(base64), (char) => char
 /** The panel tab: an address bar over the device viewer. */
 export function SitePanel({ params }: PluginThreadPanelProps) {
   const rpc = useRpc<typeof rpcContract>();
+  const navigate = useBbNavigate();
   const passed = params && typeof params === "object" && !Array.isArray(params) && typeof params.url === "string" ? params.url : null;
   const initial = normalizeAddress(passed ?? (() => { try { return localStorage.getItem(LAST_ADDRESS) ?? ""; } catch { return ""; } })());
   const [url, setUrl] = useState<string | null>(initial);
@@ -71,7 +72,16 @@ export function SitePanel({ params }: PluginThreadPanelProps) {
         submit();
       }}
     >
-      <HugeiconsIcon icon={Globe02Icon} size={16} className="shrink-0 text-muted-foreground" />
+      {url ? (
+        <span title={t("siteBackToBrowser")} className="shrink-0">
+          <Button type="button" variant="ghost" size="sm" className="h-8 gap-1 px-2" aria-label={t("siteBackToBrowser")} onClick={() => navigate.openUrl(url)}>
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={16} />
+            <span className="hidden sm:inline">{t("siteBrowser")}</span>
+          </Button>
+        </span>
+      ) : (
+        <HugeiconsIcon icon={Globe02Icon} size={16} className="shrink-0 text-muted-foreground" />
+      )}
       <Input
         value={draft}
         onChange={(event) => setDraft(event.target.value)}

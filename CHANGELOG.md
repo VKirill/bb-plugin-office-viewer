@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.5 — 2026-10-17
+
+### Added
+
+- Website on devices: a **Browser** button before the address goes back to the page in BB's Browser.
+
 ## 0.8.4 — 2026-10-17
 
 ### Fixed

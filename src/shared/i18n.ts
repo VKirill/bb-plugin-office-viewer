@@ -210,6 +210,8 @@ const en = {
   siteEmpty: "Enter a website address to see it on phones, tablets and monitors.",
   siteInvalid: "That isn't a web address.",
   siteOpenDevices: "See this page on devices",
+  siteBrowser: "Browser",
+  siteBackToBrowser: "Back to the page in BB's Browser",
 };
 
 export type I18nKey = keyof typeof en;
@@ -424,6 +426,8 @@ const ru: Record<I18nKey, string> = {
   siteEmpty: "Введите адрес сайта, чтобы посмотреть его на телефонах, планшетах и мониторах.",
   siteInvalid: "Это не адрес сайта.",
   siteOpenDevices: "Посмотреть страницу на устройствах",
+  siteBrowser: "В браузер",
+  siteBackToBrowser: "Вернуться к странице в браузере BB",
 };
 
 export type Locale = "en" | "ru";
