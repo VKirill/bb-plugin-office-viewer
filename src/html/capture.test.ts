@@ -1,0 +1,32 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { decodeHtml, insideSite, prepareHtml, SCREENSHOT_LIBRARY } from "./capture.ts";
+
+const BASE = "http://bb.local/api/v1/file-previews/abc/";
+
+test("the agent and a <base> go right after <head>, before anything that loads", () => {
+  const out = prepareHtml('<!doctype html><html lang="ru"><head><link rel="stylesheet" href="style.css"></head><body></body></html>', BASE);
+  const head = out.indexOf("<head>") + "<head>".length;
+  assert.equal(out.indexOf(`<base href="${BASE}">`), head);
+  assert.ok(out.indexOf(SCREENSHOT_LIBRARY) < out.indexOf("style.css"));
+});
+
+test("a page with its own <base> keeps it; fragments without <head> still get the agent", () => {
+  assert.ok(!prepareHtml('<html><head><base href="/x/"></head></html>', BASE).includes(`<base href="${BASE}">`));
+  assert.ok(prepareHtml("<p>hi</p>", BASE).startsWith(`<base href="${BASE}">`));
+  assert.ok(prepareHtml("<HTML><body>x</body></HTML>", BASE).startsWith("<HTML><base"));
+});
+
+test("the declared charset decodes the page", () => {
+  const cp1251 = new Uint8Array([...new TextEncoder().encode('<meta charset="windows-1251"><p>'), 0xcf, 0xf0, 0xe8, 0xe2, 0xe5, 0xf2]);
+  assert.ok(decodeHtml(cp1251).endsWith("Привет"));
+  assert.equal(decodeHtml(new TextEncoder().encode("<p>Привет")), "<p>Привет");
+});
+
+test("only the site's own folder is readable for the page", () => {
+  assert.equal(insideSite(`${BASE}img/a.png`, BASE), true);
+  assert.equal(insideSite("img/a.png", BASE), true);
+  assert.equal(insideSite("http://bb.local/api/v1/threads", BASE), false);
+  assert.equal(insideSite(`${BASE}../other/`, BASE), false);
+  assert.equal(insideSite("https://fonts.example/a.woff2", BASE), false);
+});

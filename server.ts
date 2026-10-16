@@ -129,6 +129,17 @@ export default function plugin(bb: BbPluginApi) {
     });
   }
 
+  // modern-screenshot for HTML screenshots: the page in its sandbox and the mockups around it draw themselves with it.
+  const screenshotVersion = (require("modern-screenshot/package.json") as { version: string }).version;
+  let screenshotBody: Promise<Buffer> | null = null;
+  bb.http.route("GET", "/capture/modern-screenshot.js", async (context) => {
+    if (context.req.header("if-none-match") === `"${screenshotVersion}"`) return new Response(null, { status: 304 });
+    screenshotBody ??= readFile(require.resolve("modern-screenshot/dist/index.js"));
+    return new Response(new Uint8Array(await screenshotBody), {
+      headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache", etag: `"${screenshotVersion}"`, "access-control-allow-origin": "*" },
+    });
+  });
+
   bb.rpc.register(rpcContract, {
     engine: async () => {
       engine ??= readFile(createRequire(import.meta.url).resolve("@ironcalc/wasm/wasm_bg.wasm")).then((bytes) => bytes.toString("base64"));

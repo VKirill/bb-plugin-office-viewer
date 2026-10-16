@@ -10,6 +10,7 @@ import { ChatImageEditor, type VkImageEditorProps } from "./src/media/chat-image
 import { DocumentOpener, WORD_EXTENSIONS } from "./src/word/document";
 import { SLIDES_EXTENSIONS, SlidesOpener } from "./src/slides/slides";
 import { PDF_EXTENSIONS, PdfOpener } from "./src/pdf/pdf";
+import { HTML_EXTENSIONS, HtmlOpener } from "./src/html/html";
 
 export default definePluginApp((app) => {
   app.slots.fileOpener({
@@ -41,6 +42,12 @@ export default definePluginApp((app) => {
     title: "Office Viewer — PDF",
     extensions: PDF_EXTENSIONS,
     component: PdfOpener,
+  });
+  app.slots.fileOpener({
+    id: "html",
+    title: "Office Viewer — HTML layout",
+    extensions: HTML_EXTENSIONS,
+    component: HtmlOpener,
   });
   // VK core function `image-editor`: an Edit button in BB's image preview for chat attachments.
   const vk = app.slots as typeof app.slots & {

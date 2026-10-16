@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Office Viewer — адаптивная страница</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header><strong>Студия</strong><nav><a href="#">Услуги</a><a href="#">Цены</a><a href="#">Контакты</a></nav><span class="burger">☰</span></header>
+  <section class="hero">
+    <h1>Проверка вёрстки</h1>
+    <p>Ширина окна: <b id="size"></b> <span class="badge"></span></p>
+  </section>
+  <section class="cards">
+    <div class="card"><img alt=""><h3>Первая</h3><p>Три колонки на десктопе, две на планшете, одна на телефоне.</p></div>
+    <div class="card"><img alt=""><h3>Вторая</h3><p>Уже 768 px меню прячется за бургер.</p></div>
+    <div class="card"><img alt=""><h3>Третья</h3><p>В ландшафте на телефоне бейдж становится красным.</p></div>
+  </section>
+  <script>
+    const show = () => { document.getElementById("size").textContent = innerWidth + "×" + innerHeight; };
+    addEventListener("resize", show); show();
+  </script>
+</body>
+</html>
