@@ -14,13 +14,16 @@ import { decodeHtml, normalizeAddress } from "./capture";
 import { DevicesViewer, type PageSource } from "./html";
 
 export const SITE_PANEL = "site";
+/** A tab opened from the panel's + menu has no params to keep its address in: it starts from the last one typed. */
+const LAST_ADDRESS = "office-viewer:site-address";
 
 const bytesOf = (base64: string) => Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
 
 /** The panel tab: an address bar over the device viewer. */
 export function SitePanel({ params }: PluginThreadPanelProps) {
   const rpc = useRpc<typeof rpcContract>();
-  const initial = params && typeof params === "object" && !Array.isArray(params) && typeof params.url === "string" ? normalizeAddress(params.url) : null;
+  const passed = params && typeof params === "object" && !Array.isArray(params) && typeof params.url === "string" ? params.url : null;
+  const initial = normalizeAddress(passed ?? (() => { try { return localStorage.getItem(LAST_ADDRESS) ?? ""; } catch { return ""; } })());
   const [url, setUrl] = useState<string | null>(initial);
   const [draft, setDraft] = useState(initial ?? "");
   const [invalid, setInvalid] = useState(false);
@@ -56,6 +59,7 @@ export function SitePanel({ params }: PluginThreadPanelProps) {
     if (next) {
       setDraft(next);
       setUrl(next);
+      try { localStorage.setItem(LAST_ADDRESS, next); } catch { /* private mode: nothing to remember */ }
     }
   };
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.4 — 2026-10-17
+
+### Fixed
+
+- A Website on devices tab opened from the panel's + menu reopens with the last address typed, instead of an empty address bar after a reload.
+
 ## 0.8.3 — 2026-10-17
 
 ### Fixed
