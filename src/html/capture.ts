@@ -164,10 +164,10 @@ const AGENT = `(function () {
 
 /**
  * The page with the capture agent, its relative links resolved against `baseUrl` (the site's folder). A page that
- * sets its own <base> keeps it.
+ * sets its own <base> keeps it. `libraryUrl` must be absolute: `<base>` may point at another site.
  */
-export function prepareHtml(html: string, baseUrl: string): string {
-  const inject = `${/<base\s/i.test(html) ? "" : `<base href="${attribute(baseUrl)}">`}<script src="${SCREENSHOT_LIBRARY}"></script><script>${AGENT}</script>`;
+export function prepareHtml(html: string, baseUrl: string, libraryUrl = SCREENSHOT_LIBRARY): string {
+  const inject = `${/<base\s/i.test(html) ? "" : `<base href="${attribute(baseUrl)}">`}<script src="${attribute(libraryUrl)}"></script><script>${AGENT}</script>`;
   for (const tag of [/<head\b[^>]*>/i, /<html\b[^>]*>/i]) {
     const match = tag.exec(html);
     if (match) return html.slice(0, match.index + match[0].length) + inject + html.slice(match.index + match[0].length);

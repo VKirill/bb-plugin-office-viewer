@@ -577,7 +577,7 @@ export function DevicesViewer({ pages, title, address, heading, Original }: { pa
       if (run !== generation.current) return;
       setUrl(page.openUrl);
       setSite(page.scope);
-      setDoc(prepareHtml(page.html, page.base));
+      setDoc(prepareHtml(page.html, page.base, new URL(SCREENSHOT_LIBRARY, window.location.href).href));
       setHostName(page.subtitle);
       setFrameKey((key) => key + 1);
     } catch (cause) {

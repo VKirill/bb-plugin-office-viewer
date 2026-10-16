@@ -46,3 +46,8 @@ test("typed addresses: a missing scheme becomes https, other schemes and junk ar
   assert.equal(normalizeAddress("javascript:alert(1)"), null);
   assert.equal(normalizeAddress(""), null);
 });
+
+test("the library is loaded from BB even when <base> points at another site", () => {
+  const out = prepareHtml("<html><head></head></html>", "https://example.com/page.html", "http://bb.local/api/v1/plugins/office-viewer/http/capture/modern-screenshot.js");
+  assert.ok(out.includes('<script src="http://bb.local/api/v1/plugins/office-viewer/http/capture/modern-screenshot.js">'));
+});

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.3 — 2026-10-17
+
+### Fixed
+
+- Screenshots of websites: the screenshot library loads from BB, not from the site the page's `<base>` points at.
+
 ## 0.8.2 — 2026-10-16
 
 ### Added
