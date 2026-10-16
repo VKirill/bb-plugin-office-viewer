@@ -30,3 +30,9 @@ test("only the site's own folder is readable for the page", () => {
   assert.equal(insideSite(`${BASE}../other/`, BASE), false);
   assert.equal(insideSite("https://fonts.example/a.woff2", BASE), false);
 });
+
+test("the agent survives being embedded: it parses and its patterns keep their escapes", () => {
+  const code = /<script>([\s\S]*)<\/script>/.exec(prepareHtml("<html><head></head></html>", BASE))![1]!;
+  assert.doesNotThrow(() => new Function(code));
+  for (const pattern of ['url\\(["', "\\.(woff2?", "\\.css(\\?", "@font-face\\s*{"]) assert.ok(code.includes(pattern), pattern);
+});

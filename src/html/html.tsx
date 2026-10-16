@@ -351,6 +351,10 @@ function Frame({ screen, scale, doc, shot, frameKey, title, address, ruler, onRe
               data-shot-skip=""
               title={`${screen.name} ${viewport.w}×${viewport.h}`}
               sandbox={SANDBOX}
+              onLoad={(event) => {
+                const target = event.currentTarget.contentWindow;
+                setTimeout(() => target?.postMessage({ type: "ov-warm" }, "*"), 1000);
+              }}
               className="absolute block border-0 bg-white"
               style={{ left: bars.left, top: bars.top, width: viewport.w, height: viewport.h }}
             />
@@ -428,7 +432,7 @@ function captureFrame(frame: HTMLIFrameElement, scale: number): Promise<string> 
       clearTimeout(timer);
       window.removeEventListener("message", onMessage);
     };
-    const timer = setTimeout(() => { done(); reject(new Error(t("htmlShotTimeout"))); }, 30_000);
+    const timer = setTimeout(() => { done(); reject(new Error(t("htmlShotTimeout"))); }, 90_000);
     const onMessage = (event: MessageEvent) => {
       const data = event.data as { type?: string; id?: string; url?: string; error?: string } | null;
       if (event.source !== frame.contentWindow || data?.type !== "ov-captured" || data.id !== id) return;
@@ -439,6 +443,23 @@ function captureFrame(frame: HTMLIFrameElement, scale: number): Promise<string> 
     window.addEventListener("message", onMessage);
     frame.contentWindow?.postMessage({ type: "ov-capture", id, scale }, "*");
   });
+}
+
+/** Photos larger than any device shows them are scaled down before they go into the shot. */
+const MAX_PICTURE = 1600;
+
+async function shrink(blob: Blob): Promise<Blob> {
+  if (!/^image\/(jpeg|png|webp)$/.test(blob.type)) return blob;
+  const bitmap = await createImageBitmap(blob).catch(() => null);
+  if (!bitmap) return blob;
+  const factor = MAX_PICTURE / Math.max(bitmap.width, bitmap.height);
+  if (factor >= 1) { bitmap.close(); return blob; }
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * factor);
+  canvas.height = Math.round(bitmap.height * factor);
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return new Promise((resolve) => canvas.toBlob((small) => resolve(small ?? blob), blob.type, 0.9));
 }
 
 const blobToDataUrl = (blob: Blob) =>
@@ -521,6 +542,11 @@ export function HtmlOpener({ path, source, Original }: PluginFileOpenerProps) {
     void load();
   }, [load]);
 
+  // Ready before the first screenshot is asked for.
+  useEffect(() => {
+    loadLibrary().catch(() => undefined);
+  }, []);
+
   // The sandboxed page can't read its own folder while it draws itself: the viewer reads files for it, from that folder only.
   useEffect(() => {
     if (!site) return;
@@ -531,11 +557,20 @@ export function HtmlOpener({ path, source, Original }: PluginFileOpenerProps) {
       if (!owner) return;
       const reply = (dataUrl: string | false) => (event.source as Window).postMessage({ type: "ov-fetched", id: data.id, dataUrl }, "*");
       if (typeof data.url !== "string" || !insideSite(data.url, site)) return reply(false);
-      fetch(new URL(data.url, site))
-        .then((response) => (response.ok ? response.blob() : Promise.reject(new Error(String(response.status)))))
-        .then(blobToDataUrl)
-        .then(reply, () => reply(false));
+      const url = new URL(data.url, site).href;
+      // Every device asks for the same photos and fonts: each is fetched and scaled down once per page load.
+      let file = files.get(url);
+      if (!file) {
+        file = fetch(url)
+          .then((response) => (response.ok ? response.blob() : Promise.reject(new Error(String(response.status)))))
+          .then(shrink)
+          .then(blobToDataUrl)
+          .catch(() => false as const);
+        files.set(url, file);
+      }
+      void file.then(reply);
     };
+    const files = new Map<string, Promise<string | false>>();
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [site]);
@@ -608,27 +643,28 @@ export function HtmlOpener({ path, source, Original }: PluginFileOpenerProps) {
     if (!element) return;
     setBusy(true);
     try {
-      // Drawn larger than on screen, up to the devices' own size or about 2400 px across.
-      const factor = Math.max(1, Math.min(1 / scale, 2400 / Math.max(1, element.getBoundingClientRect().width)));
+      // Drawn larger than on screen, up to the devices' own size or about 1600 px across: sharp enough, light for the chat.
+      const factor = Math.max(1, Math.min(1 / scale, 1600 / Math.max(1, element.getBoundingClientRect().width)));
       const iframes = Array.from(element.querySelectorAll<HTMLIFrameElement>("iframe[data-shot]"));
-      const [lib, pictures] = await Promise.all([loadLibrary(), Promise.all(iframes.map((frame) => captureFrame(frame, Math.min(2, scale * factor))))]);
+      const [lib, pictures] = await Promise.all([loadLibrary(), Promise.all(iframes.map((frame) => captureFrame(frame, Math.min(1, scale * factor))))]);
       setShots(Object.fromEntries(iframes.map((frame, index) => [frame.dataset.shot!, pictures[index]!])));
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       await Promise.all(Array.from(element.querySelectorAll<HTMLImageElement>("img[data-shot-image]")).map((image) => image.decode().catch(() => undefined)));
       const png = await lib.domToBlob(element, {
         scale: factor,
-        type: "image/png",
+        type: "image/webp",
+        quality: 0.85,
         font: false,
         filter: (node) => !(node instanceof Element && node.hasAttribute("data-shot-skip")),
       });
       const orientation = (size: Size) => (size.w > size.h ? t("htmlLandscape") : t("htmlPortrait"));
       const caption = screens.map((screen) => `${screen.name} ${screen.size.w}×${screen.size.h} (${orientation(screen.size)})`).join(", ");
       const stem = fileName.replace(/\.[^.]+$/, "");
-      const name = `${stem}-${layout.mode === "compare" ? "compare" : `${single.key}-${single.size.w}x${single.size.h}`}.png`;
+      const name = `${stem}-${layout.mode === "compare" ? "compare" : `${single.key}-${single.size.w}x${single.size.h}`}.webp`;
       // VK core function `image-editor`: a real attachment in the draft instead of a saved file.
       const attach = (composer as typeof composer & { experimental_vkAttachFiles?: (files: File[]) => Promise<void> }).experimental_vkAttachFiles;
       if (typeof attach === "function") {
-        await attach.call(composer, [new File([png], name, { type: "image/png" })]);
+        await attach.call(composer, [new File([png], name, { type: "image/webp" })]);
         composer.updateText((draft) => `${draft.trim() ? `${draft.trimEnd()}\n\n` : ""}${fileName}: ${caption}\n\n`);
         composer.focus();
         toast.success(t("attachedToChat"));

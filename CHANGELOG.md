@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.1 — 2026-10-16
+
+### Fixed
+
+- HTML screenshots no longer wait for unloaded images below the visible viewport, avoiding timeouts on long pages with lazy-loaded media.
+- Capture only visible content, preload visible images and fonts, and reuse assets across compared devices.
+- Resize large images and attach a smaller WebP composite, up to about 1600 pixels wide, for faster capture and chat attachment.
+- Preserve sandboxed page styles and loaded web fonts in screenshots; verify that the embedded capture script parses correctly.
+
 ## 0.8.0 — 2026-10-16
 
 ### Added
