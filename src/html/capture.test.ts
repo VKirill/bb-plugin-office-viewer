@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { decodeHtml, insideSite, prepareHtml, SCREENSHOT_LIBRARY } from "./capture.ts";
+import { decodeHtml, insideSite, normalizeAddress, prepareHtml, SCREENSHOT_LIBRARY } from "./capture.ts";
 
 const BASE = "http://bb.local/api/v1/file-previews/abc/";
 
@@ -21,6 +21,8 @@ test("the declared charset decodes the page", () => {
   const cp1251 = new Uint8Array([...new TextEncoder().encode('<meta charset="windows-1251"><p>'), 0xcf, 0xf0, 0xe8, 0xe2, 0xe5, 0xf2]);
   assert.ok(decodeHtml(cp1251).endsWith("Привет"));
   assert.equal(decodeHtml(new TextEncoder().encode("<p>Привет")), "<p>Привет");
+  // The header wins over a missing or different meta.
+  assert.ok(decodeHtml(new Uint8Array([0xcf, 0xf0, 0xe8, 0xe2, 0xe5, 0xf2]), "text/html; charset=windows-1251").endsWith("Привет"));
 });
 
 test("only the site's own folder is readable for the page", () => {
@@ -35,4 +37,12 @@ test("the agent survives being embedded: it parses and its patterns keep their e
   const code = /<script>([\s\S]*)<\/script>/.exec(prepareHtml("<html><head></head></html>", BASE))![1]!;
   assert.doesNotThrow(() => new Function(code));
   for (const pattern of ['url\\(["', "\\.(woff2?", "\\.css(\\?", "@font-face\\s*{"]) assert.ok(code.includes(pattern), pattern);
+});
+
+test("typed addresses: a missing scheme becomes https, other schemes and junk are refused", () => {
+  assert.equal(normalizeAddress(" selfystudio.art/demo "), "https://selfystudio.art/demo");
+  assert.equal(normalizeAddress("http://example.com"), "http://example.com/");
+  assert.equal(normalizeAddress("ftp://example.com"), null);
+  assert.equal(normalizeAddress("javascript:alert(1)"), null);
+  assert.equal(normalizeAddress(""), null);
 });

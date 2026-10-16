@@ -205,6 +205,11 @@ const en = {
   htmlViewport: "page {w}×{h}",
   htmlViewportHint: "What the page gets: the screen minus the status bar, the browser and the taskbar",
   htmlShares: "★ — main screens to check the layout on; % — share of screens of this kind: StatCounter, Russia, September 2026",
+  siteDevices: "Website on devices",
+  siteAddress: "Website address",
+  siteEmpty: "Enter a website address to see it on phones, tablets and monitors.",
+  siteInvalid: "That isn't a web address.",
+  siteOpenDevices: "See this page on devices",
 };
 
 export type I18nKey = keyof typeof en;
@@ -414,6 +419,11 @@ const ru: Record<I18nKey, string> = {
   htmlViewport: "страница {w}×{h}",
   htmlViewportHint: "Сколько достаётся странице: экран без строки состояния, браузера и панели задач",
   htmlShares: "★ — основные экраны для проверки вёрстки; % — доля таких экранов: StatCounter, Россия, сентябрь 2026",
+  siteDevices: "Сайт на устройствах",
+  siteAddress: "Адрес сайта",
+  siteEmpty: "Введите адрес сайта, чтобы посмотреть его на телефонах, планшетах и мониторах.",
+  siteInvalid: "Это не адрес сайта.",
+  siteOpenDevices: "Посмотреть страницу на устройствах",
 };
 
 export type Locale = "en" | "ru";

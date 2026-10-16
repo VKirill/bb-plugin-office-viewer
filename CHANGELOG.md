@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.2 — 2026-10-16
+
+### Added
+
+- Website on devices: a panel tab with an address bar that shows any web page in the same mockups as HTML files — compare, rotation, ruler and screenshots included. The plugin server fetches the page and its files, so sites that refuse to be framed still show; loopback, private and link-local addresses are refused.
+- A button beside BB's Browser address bar (BB 0.46+) opens the current page there.
+
 ## 0.8.1 — 2026-10-16
 
 ### Fixed

@@ -5,10 +5,10 @@
 
 export const SCREENSHOT_LIBRARY = "/api/v1/plugins/office-viewer/http/capture/modern-screenshot.js";
 
-/** Bytes as text in the charset the page declares near its start; UTF-8 otherwise. */
-export function decodeHtml(bytes: Uint8Array): string {
+/** Bytes as text in the charset of the Content-Type header, else the one the page declares near its start; UTF-8 otherwise. */
+export function decodeHtml(bytes: Uint8Array, contentType = ""): string {
   const head = new TextDecoder("latin1").decode(bytes.subarray(0, 2048));
-  const label = /<meta[^>]+charset\s*=\s*["']?\s*([\w-]+)/i.exec(head)?.[1];
+  const label = /charset\s*=\s*["']?([\w-]+)/i.exec(contentType)?.[1] ?? /<meta[^>]+charset\s*=\s*["']?\s*([\w-]+)/i.exec(head)?.[1];
   try {
     return new TextDecoder(label || "utf-8").decode(bytes);
   } catch {
@@ -185,3 +185,16 @@ export const insideSite = (url: string, baseUrl: string) => {
     return false;
   }
 };
+
+/** What the user typed as an address: a scheme is added when missing. */
+export function normalizeAddress(text: string): string | null {
+  const value = text.trim();
+  if (!value) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `https://${value}`;
+  try {
+    const url = new URL(withScheme);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}

@@ -43,6 +43,15 @@ Check how a page's layout behaves on the screens people actually use, without le
 | Screenshot | The devices as they are now, in their mockups, as one WebP in the draft with a caption listing the sizes. About a second for one device, a few for five. |
 | Reload / new tab / full screen / source | Reloads the frames, opens the page in a browser tab, fills the screen, shows BB's preview (`Original`). |
 
+## Websites
+
+The **Website on devices** panel tab (`src/html/site.tsx`) shows a web page in the same viewer. Open it from the panel's **+** menu and type an address, or press the phone button beside BB's Browser address bar. That button uses the `experimental_browserToolbarAction` slot of BB 0.46+, and the plugin registers it only when the host has the slot.
+
+- The plugin server fetches the page (`webPage`) and, for screenshots, the files of the same site (`webFile`). Framing rules (`X-Frame-Options`, `frame-ancestors`) don't apply. Redirects are followed only to public addresses. Loopback, private, link-local and CGNAT addresses are refused, since the server sits beside BB's own services (`src/server/web.ts`).
+- Relative links resolve against the page's own address; files from anywhere on the same origin can go into a screenshot.
+- The server fetches without the user's cookies: pages behind a login show as a logged-out visitor sees them.
+- Without the attachment slot, a screenshot downloads to the device instead of being saved next to a file.
+
 ## Business rules
 
 - Presets and shares come from StatCounter screen-resolution statistics for Russia, September 2026. Duplicate widths are left out. Phones and tablets are stored upright, computers wide (`src/html/devices.ts`).
@@ -56,7 +65,9 @@ Check how a page's layout behaves on the screens people actually use, without le
 
 | Import or call | File | Purpose |
 |---|---|---|
-| `HtmlOpener`, `HTML_EXTENSIONS` | `src/html/html.tsx` | Opener UI and extension registration. |
+| `HtmlOpener`, `HTML_EXTENSIONS`, `DevicesViewer`, `PageSource` | `src/html/html.tsx` | Opener for files; the device viewer around any page source. |
+| `SitePanel`, `BrowserDevicesButton`, `SITE_PANEL` | `src/html/site.tsx` | The website tab and the Browser address-bar button. |
+| RPC `webPage`, `webFile`; `fetchPublic()`, `isInternalAddress()` | `server.ts`; `src/server/web.ts` | Server-side fetching of public pages and their files. |
 | `DEVICES`, `MAIN_DEVICES`, `mockup()`, `fitGrid()`, `turned()` | `src/html/devices.ts` | Presets, mockup geometry, fitting. |
 | `prepareHtml()`, `decodeHtml()`, `insideSite()` | `src/html/capture.ts` | The page with `<base>` and the screenshot agent; which files the page may read. |
 | GET `/capture/modern-screenshot.js` | `server.ts` | modern-screenshot for the page and the viewer. |

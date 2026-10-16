@@ -10,6 +10,7 @@ import { locate, LocateError, type Lang, type LocateSdk } from "./src/server/loc
 import { applyCsvEdits, parseCsv, serializeCsv } from "./src/spreadsheet/csv.ts";
 import { editMode, extensionOf } from "./src/spreadsheet/sheet.ts";
 import { PatchError, patchXlsx, type CellEdit } from "./src/spreadsheet/xlsx-patch.ts";
+import { fetchPublic } from "./src/server/web.ts";
 
 const say = (lang: Lang, en: string, ru: string) => (lang === "ru" ? ru : en);
 
@@ -62,6 +63,16 @@ export const rpcContract = defineRpcContract({
       .extend({ name: z.string().min(1).max(255), base64: z.string().max(60 * 1024 * 1024), overwrite: z.boolean() })
       .strict(),
     output: z.object({ name: z.string(), absPath: z.string(), sizeBytes: z.number() }).strict(),
+  },
+  /** A web page for the site device viewer, fetched by the server: framing rules don't apply, internal addresses are refused. */
+  webPage: {
+    input: z.object({ url: z.string().min(1).max(8192) }).strict(),
+    output: z.object({ base64: z.string(), contentType: z.string(), finalUrl: z.string() }).strict(),
+  },
+  /** A file of that page's site (picture, font, stylesheet) for a screenshot. */
+  webFile: {
+    input: z.object({ url: z.string().min(1).max(8192) }).strict(),
+    output: z.object({ base64: z.string(), contentType: z.string() }).strict(),
   },
   save: {
     input: fileSchema
@@ -141,6 +152,14 @@ export default function plugin(bb: BbPluginApi) {
   });
 
   bb.rpc.register(rpcContract, {
+    webPage: async ({ url }) => {
+      const page = await fetchPublic(url);
+      return { base64: Buffer.from(page.bytes).toString("base64"), contentType: page.contentType, finalUrl: page.finalUrl };
+    },
+    webFile: async ({ url }) => {
+      const file = await fetchPublic(url);
+      return { base64: Buffer.from(file.bytes).toString("base64"), contentType: file.contentType };
+    },
     engine: async () => {
       engine ??= readFile(createRequire(import.meta.url).resolve("@ironcalc/wasm/wasm_bg.wasm")).then((bytes) => bytes.toString("base64"));
       try {

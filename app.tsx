@@ -11,6 +11,7 @@ import { DocumentOpener, WORD_EXTENSIONS } from "./src/word/document";
 import { SLIDES_EXTENSIONS, SlidesOpener } from "./src/slides/slides";
 import { PDF_EXTENSIONS, PdfOpener } from "./src/pdf/pdf";
 import { HTML_EXTENSIONS, HtmlOpener } from "./src/html/html";
+import { BrowserDevicesButton, SITE_PANEL, SitePanel } from "./src/html/site";
 
 export default definePluginApp((app) => {
   app.slots.fileOpener({
@@ -49,6 +50,14 @@ export default definePluginApp((app) => {
     extensions: HTML_EXTENSIONS,
     component: HtmlOpener,
   });
+  app.slots.threadPanelAction({ id: SITE_PANEL, title: t("siteDevices"), icon: "Globe", layout: "flush", component: SitePanel });
+  // A button beside BB's Browser address bar (BB 0.46+); older hosts don't have the slot.
+  const browser = app.slots as typeof app.slots & {
+    experimental_browserToolbarAction?: (registration: { id: string; title: string; component: ComponentType<{ url: string }> }) => void;
+  };
+  if (typeof browser.experimental_browserToolbarAction === "function") {
+    browser.experimental_browserToolbarAction({ id: "devices", title: t("siteOpenDevices"), component: BrowserDevicesButton });
+  }
   // VK core function `image-editor`: an Edit button in BB's image preview for chat attachments.
   const vk = app.slots as typeof app.slots & {
     experimental_vkImageEditor?: (registration: { id: string; title: string; component: ComponentType<VkImageEditorProps> }) => void;

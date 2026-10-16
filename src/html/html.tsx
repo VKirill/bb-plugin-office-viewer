@@ -4,7 +4,7 @@
 // side. The plugin server serves the file's folder, so relative CSS, scripts and
 // images load. BB's own preview with the source stays one click away.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
+import type { ComponentType, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
 import { useComposer, useRpc, type PluginFileOpenerProps } from "@get-bb/plugin-sdk/app";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import {
@@ -470,9 +470,28 @@ const blobToDataUrl = (blob: Blob) =>
     reader.readAsDataURL(blob);
   });
 
+/** A page to show: its HTML, the folder (or site) its relative links resolve against, and where it can be opened. */
+export type Page = {
+  html: string;
+  /** What relative links resolve against. */
+  base: string;
+  /** Files under this prefix may be read for a screenshot: the file's folder, or the whole site. */
+  scope: string;
+  openUrl: string;
+  subtitle: string | null;
+};
+
+/** Where pages come from: a file on a BB machine, or a site on the web. */
+export type PageSource = {
+  load(): Promise<Page>;
+  /** A file of the page's own site, for screenshots; the caller has checked it lies inside the site. */
+  fetchFile(url: string): Promise<Blob>;
+  /** Saves a screenshot next to the page, when the composer can't take an attachment; returns where. */
+  save?(name: string, picture: Blob): Promise<string>;
+};
+
 export function HtmlOpener({ path, source, Original }: PluginFileOpenerProps) {
   const rpc = useRpc<typeof rpcContract>();
-  const composer = useComposer();
   const locale = detectLocale();
   const request = useMemo(
     () => ({
@@ -489,11 +508,47 @@ export function HtmlOpener({ path, source, Original }: PluginFileOpenerProps) {
     [path, locale, source.kind, source.threadId, source.environmentId, source.projectId, source.experimental_hostId],
   );
   const fileName = path.slice(path.lastIndexOf("/") + 1);
+  // The preview link lives ten minutes: every load asks for a fresh one, so later relative loads keep working.
+  const pages = useMemo<PageSource>(
+    () => ({
+      async load() {
+        const file = await rpc.call("open", request);
+        const absolute = new URL(file.url, window.location.href).href;
+        const response = await fetch(`${absolute}${absolute.includes("?") ? "&" : "?"}v=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) throw new Error(response.status === 404 ? t("fileMissing", { path: file.absPath }) : `HTTP ${response.status}`);
+        const folder = new URL(".", absolute).href;
+        return { html: decodeHtml(new Uint8Array(await response.arrayBuffer())), base: folder, scope: folder, openUrl: absolute, subtitle: file.hostName };
+      },
+      async fetchFile(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(String(response.status));
+        return response.blob();
+      },
+      async save(name, picture) {
+        const bytes = new Uint8Array(await picture.arrayBuffer());
+        let binary = "";
+        for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        return (await rpc.call("writeImage", { ...request, name, base64: btoa(binary), overwrite: false })).absPath;
+      },
+    }),
+    [rpc, request],
+  );
+  return <DevicesViewer pages={pages} title={fileName} address={path} Original={Original} />;
+}
+
+/**
+ * The device viewer around any page: mockups, comparison, rotation, ruler, screenshots. `heading` replaces the
+ * title block (the site viewer puts its address bar there); `Original` adds the source-code toggle.
+ */
+export function DevicesViewer({ pages, title, address, heading, Original }: { pages: PageSource; title: string; address: string; heading?: ReactNode; Original?: ComponentType }) {
+  const composer = useComposer();
+  const fileName = title;
+  const path = address;
 
   const [layout, update] = useLayout();
   const [showSource, setShowSource] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
-  /** The site's folder, which relative links resolve against. */
+  /** Where the page's files may be read from for a screenshot. */
   const [site, setSite] = useState<string | null>(null);
   const [doc, setDoc] = useState<string | null>(null);
   const [shots, setShots] = useState<Record<string, string>>({});
@@ -513,30 +568,24 @@ export function HtmlOpener({ path, source, Original }: PluginFileOpenerProps) {
   const generation = useRef(0);
   const area = useSize(stage, !showSource);
 
-  // The preview link lives ten minutes: every reload asks for a fresh one, so later relative loads keep working.
   const load = useCallback(async () => {
     const run = ++generation.current;
     setLoading(true);
     setError(null);
     try {
-      const file = await rpc.call("open", request);
-      const absolute = new URL(file.url, window.location.href).href;
-      const response = await fetch(`${absolute}${absolute.includes("?") ? "&" : "?"}v=${Date.now()}`, { cache: "no-store" });
-      if (!response.ok) throw new Error(response.status === 404 ? t("fileMissing", { path: file.absPath }) : `HTTP ${response.status}`);
-      const folder = new URL(".", absolute).href;
-      const html = prepareHtml(decodeHtml(new Uint8Array(await response.arrayBuffer())), folder);
+      const page = await pages.load();
       if (run !== generation.current) return;
-      setUrl(absolute);
-      setSite(folder);
-      setDoc(html);
-      setHostName(file.hostName);
+      setUrl(page.openUrl);
+      setSite(page.scope);
+      setDoc(prepareHtml(page.html, page.base));
+      setHostName(page.subtitle);
       setFrameKey((key) => key + 1);
     } catch (cause) {
       if (run === generation.current) setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       if (run === generation.current) setLoading(false);
     }
-  }, [rpc, request]);
+  }, [pages]);
 
   useEffect(() => {
     void load();
@@ -561,8 +610,8 @@ export function HtmlOpener({ path, source, Original }: PluginFileOpenerProps) {
       // Every device asks for the same photos and fonts: each is fetched and scaled down once per page load.
       let file = files.get(url);
       if (!file) {
-        file = fetch(url)
-          .then((response) => (response.ok ? response.blob() : Promise.reject(new Error(String(response.status)))))
+        file = pages
+          .fetchFile(url)
           .then(shrink)
           .then(blobToDataUrl)
           .catch(() => false as const);
@@ -573,7 +622,7 @@ export function HtmlOpener({ path, source, Original }: PluginFileOpenerProps) {
     const files = new Map<string, Promise<string | false>>();
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [site]);
+  }, [site, pages]);
 
   useEffect(() => {
     const onChange = () => setFullscreen(document.fullscreenElement === root.current);
@@ -670,11 +719,18 @@ export function HtmlOpener({ path, source, Original }: PluginFileOpenerProps) {
         toast.success(t("attachedToChat"));
         return;
       }
-      const bytes = new Uint8Array(await png.arrayBuffer());
-      let binary = "";
-      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-      const saved = await rpc.call("writeImage", { ...request, name, base64: btoa(binary), overwrite: false });
-      composer.updateText((draft) => `${draft.trim() ? `${draft.trimEnd()}\n\n` : ""}${t("htmlShotNote", { caption, path: saved.absPath })}\n\n`);
+      if (!pages.save) {
+        // Nowhere to save it: the picture goes to the device as a download.
+        const href = URL.createObjectURL(png);
+        const a = document.createElement("a");
+        a.href = href;
+        a.download = name;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(href), 10_000);
+        return;
+      }
+      const savedPath = await pages.save(name, png);
+      composer.updateText((draft) => `${draft.trim() ? `${draft.trimEnd()}\n\n` : ""}${t("htmlShotNote", { caption, path: savedPath })}\n\n`);
       composer.focus();
       toast.success(t("sentToChat"));
     } catch (cause) {
@@ -689,10 +745,12 @@ export function HtmlOpener({ path, source, Original }: PluginFileOpenerProps) {
 
   const toolbar = (
     <div className="flex min-h-10 shrink-0 flex-wrap items-center gap-x-1 gap-y-0.5 border-b border-border px-2 py-1">
-      <div className="min-w-0 flex-1 basis-32 px-1">
-        <div className="truncate text-sm font-medium" title={path}>{fileName}</div>
-        {hostName ? <div className="truncate text-xs text-muted-foreground">{hostName}</div> : null}
-      </div>
+      {heading ?? (
+        <div className="min-w-0 flex-1 basis-32 px-1">
+          <div className="truncate text-sm font-medium" title={path}>{fileName}</div>
+          {hostName ? <div className="truncate text-xs text-muted-foreground">{hostName}</div> : null}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-1">
         {showSource ? (
           <ToolButton label={t("htmlDevices")} icon={SmartPhone01Icon} onClick={() => setShowSource(false)}>
@@ -790,7 +848,7 @@ export function HtmlOpener({ path, source, Original }: PluginFileOpenerProps) {
             <ToolButton label={t("htmlReload")} icon={ArrowReloadHorizontalIcon} disabled={loading} onClick={() => void load()} />
             {url ? <ToolButton label={t("htmlOpenTab")} icon={Link01Icon} onClick={() => window.open(url, "_blank", "noopener")} /> : null}
             <ToolButton label={fullscreen ? t("htmlExitFullscreen") : t("htmlFullscreen")} icon={fullscreen ? MinimizeScreenIcon : FullScreenIcon} onClick={toggleFullscreen} />
-            <ToolButton label={t("htmlSource")} icon={SourceCodeIcon} onClick={() => setShowSource(true)} />
+            {Original ? <ToolButton label={t("htmlSource")} icon={SourceCodeIcon} onClick={() => setShowSource(true)} /> : null}
           </>
         )}
       </div>
@@ -801,7 +859,7 @@ export function HtmlOpener({ path, source, Original }: PluginFileOpenerProps) {
     <div ref={root} className="flex h-full min-h-0 flex-col bg-background">
       {toolbar}
       {showSource ? (
-        <div className="min-h-0 flex-1 overflow-hidden"><Original /></div>
+        <div className="min-h-0 flex-1 overflow-hidden">{Original ? <Original /> : null}</div>
       ) : (
         <div ref={stage} className="relative min-h-0 flex-1 overflow-auto bg-muted/30">
           {error ? (
