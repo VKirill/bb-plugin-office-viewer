@@ -114,6 +114,20 @@ import {
   type ConnectorAnchor,
   type ConnectorProps,
 } from "./connectors";
+import {
+  absolutePosition,
+  addPanelState,
+  attachToScope,
+  boardElements,
+  deletePanelState,
+  duplicatePanelState,
+  enterScopeForElement,
+  orphanChildren,
+  renamePanelState,
+  setPanelViewAllStates,
+  type EditScope,
+} from "./containers";
+import { ContainerScopeBar, PanelScopeBar } from "./panel-scope-bar";
 
 const MAX_HISTORY = 60;
 
@@ -185,6 +199,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [drawPreview, setDrawPreview] = useState<ElementBox | null>(null);
   const [connectorHoverId, setConnectorHoverId] = useState<string | null>(null);
   const [connectorDraft, setConnectorDraft] = useState<{ from: { x: number; y: number }; to: { x: number; y: number } } | null>(null);
+  const [editScope, setEditScope] = useState<EditScope>({ kind: "page" });
   const [modifiers, setModifiers] = useState<CanvasModifiers>({ shift: false, alt: false, meta: false, space: false });
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [quickInsertOpen, setQuickInsertOpen] = useState(false);
@@ -287,24 +302,21 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     setSelected([el.id]);
   };
 
-  const addQuickTool = (tool: QuickTool, x: number, y: number) => {
-    const base = defaultElement(tool.type, x, y, pageElements(doc));
-    const el = placeOnCanvas(
-      { ...base, props: { ...base.props, ...(tool.props ?? {}) } },
-      pageCanvas(doc),
-    );
+  const insertOnBoard = (draft: WireframeElement, absX: number, absY: number) => {
+    const scoped = editScope.kind === "page" ? draft : attachToScope(draft, editScope, absX, absY, pageElements(doc));
+    const el = placeOnCanvas(scoped, pageCanvas(doc));
     replace([...pageElements(doc), el]);
     setSelected([el.id]);
   };
 
+  const addQuickTool = (tool: QuickTool, x: number, y: number) => {
+    const base = defaultElement(tool.type, x, y, pageElements(doc));
+    insertOnBoard({ ...base, props: { ...base.props, ...(tool.props ?? {}) } }, x, y);
+  };
+
   const placeDrawnElement = (tool: QuickTool, box: ElementBox) => {
     const base = defaultElement(tool.type, box.x, box.y, pageElements(doc));
-    const el = placeOnCanvas(
-      { ...base, props: { ...base.props, ...(tool.props ?? {}) }, w: box.w, h: box.h },
-      pageCanvas(doc),
-    );
-    replace([...pageElements(doc), el]);
-    setSelected([el.id]);
+    insertOnBoard({ ...base, props: { ...base.props, ...(tool.props ?? {}) }, w: box.w, h: box.h }, box.x, box.y);
   };
 
   const cancelActiveDrag = () => {
@@ -391,7 +403,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   const removeSelected = () => {
     if (!selected.length) return;
     const removed = new Set(selected);
-    const remaining = pageElements(doc).filter((el) => !removed.has(el.id));
+    const remaining = orphanChildren(pageElements(doc).filter((el) => !removed.has(el.id)), removed);
     replace(detachConnectorsOnDelete(remaining, removed));
     setSelected([]);
   };
@@ -1094,6 +1106,13 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     const id = (event.target as HTMLElement).closest("[data-el]")?.getAttribute("data-el");
     const el = pageElements(view).find((item) => item.id === id);
     if (!el) return;
+    const scope = enterScopeForElement(el, pageElements(view));
+    if (scope) {
+      event.preventDefault();
+      setEditScope(scope);
+      setSelected([]);
+      return;
+    }
     event.preventDefault();
     const localX = boardPoint(event).x - el.x;
     const localY = boardPoint(event).y - el.y;
@@ -1243,6 +1262,11 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
         cancelActiveDrag();
         return;
       }
+      if (editScope.kind !== "page") {
+        event.preventDefault();
+        setEditScope({ kind: "page" });
+        return;
+      }
       if (pendingTool) {
         event.preventDefault();
         setPendingTool(null);
@@ -1279,10 +1303,68 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   
   const activePage = getActivePage(view);
   const openTabs = doc.pages.filter((p) => openTabIds.includes(p.id));
+  const pageEls = pageElements(view);
+  const boardItems = useMemo(() => boardElements(pageEls, editScope), [pageEls, editScope]);
   const selectionBand = useMemo(() => {
-    const b = selectionBounds(pageElements(view), selected);
+    const b = selectionBounds(pageEls, selected);
     return b ? { left: b.left, top: b.top, right: b.right, bottom: b.bottom } : null;
-  }, [view, selected]);
+  }, [pageEls, selected]);
+
+  const scopeOverlay = useMemo(() => {
+    if (editScope.kind === "panel") {
+      const panel = pageEls.find((el) => el.id === editScope.panelId);
+      if (!panel) return null;
+      const origin = absolutePosition(panel, pageEls);
+      return (
+        <>
+          <div
+            data-proto-skip
+            className="pointer-events-none absolute border-2 border-primary/50 bg-primary/5"
+            style={{ left: origin.x, top: origin.y, width: panel.w, height: panel.h }}
+          />
+          <PanelScopeBar
+            panel={panel}
+            state={editScope.state}
+            onState={(state) => setEditScope({ kind: "panel", panelId: panel.id, state })}
+            onAdd={() => {
+              const nextPanel = addPanelState(panel);
+              replace(pageEls.map((el) => (el.id === panel.id ? nextPanel : el)));
+              setEditScope({ kind: "panel", panelId: panel.id, state: String(nextPanel.props.active) });
+            }}
+            onDuplicate={() => {
+              const result = duplicatePanelState(panel, editScope.state, pageEls);
+              replace(result.elements.map((el) => (el.id === panel.id ? result.panel : el)));
+              setEditScope({ kind: "panel", panelId: panel.id, state: result.panel.props.active as string });
+            }}
+            onRename={(name) => replace(renamePanelState(panel, pageEls, editScope.state, name))}
+            onDelete={() => {
+              const next = deletePanelState(panel, pageEls, editScope.state);
+              const nextPanel = next.find((el) => el.id === panel.id)!;
+              setEditScope({ kind: "panel", panelId: panel.id, state: String(nextPanel.props.active) });
+              replace(next);
+            }}
+            onViewAll={(on) => replace(pageEls.map((el) => (el.id === panel.id ? setPanelViewAllStates(el, on) : el)))}
+            onExit={() => setEditScope({ kind: "page" })}
+          />
+        </>
+      );
+    }
+    if (editScope.kind === "container") {
+      const box = pageEls.find((el) => el.id === editScope.containerId);
+      if (!box) return null;
+      const origin = absolutePosition(box, pageEls);
+      return (
+        <>
+          <div data-proto-skip className="pointer-events-none absolute border-2 border-primary/50" style={{ left: origin.x, top: origin.y, width: box.w, height: box.h }} />
+          <ContainerScopeBar label={box.label} onExit={() => setEditScope({ kind: "page" })} />
+        </>
+      );
+    }
+    if (editScope.kind === "group") {
+      return <ContainerScopeBar label={t("protoScopeGroup")} onExit={() => setEditScope({ kind: "page" })} />;
+    }
+    return null;
+  }, [editScope, pageEls, replace, t]);
 
   const switchPage = (pageId: string) => {
     commit(setActivePageId(doc, pageId));
@@ -1538,6 +1620,8 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             connectorTool={isConnectorTool(pendingTool)}
             connectorHoverId={connectorHoverId}
             connectorDraft={connectorDraft}
+            boardItems={boardItems}
+            scopeOverlay={scopeOverlay}
             onOpenShortcuts={() => setShortcutsOpen(true)}
             onPanePointerDown={onPanePointerDown}
             onPanePointerMove={onPanePointerMove}

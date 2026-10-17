@@ -10,6 +10,7 @@ import { useT } from "../../shared/i18n";
 import { elementFaceStyleOverrides, resolveStylePatch, readTable } from "./inspector-model";
 import type { CSSProperties } from "react";
 import type { PropValue, WireframeElement } from "./model";
+import { NestedContent } from "./nested-content";
 import { isFlowShape, shapePath } from "./shapes";
 
 const VARIANTS = ["default", "secondary", "outline", "ghost", "destructive"] as const;
@@ -67,7 +68,7 @@ function markerBg(color: string): string {
 }
 
 /** Looks like the real control; the canvas wrapper owns pointer events. */
-export function ElementFace({ el }: { el: WireframeElement }) {
+export function ElementFace({ el, allElements = [] }: { el: WireframeElement; allElements?: readonly WireframeElement[] }) {
   const t = useT();
   const p = el.props;
   switch (el.type) {
@@ -239,7 +240,11 @@ export function ElementFace({ el }: { el: WireframeElement }) {
     case "Divider":
       return <div className={cn(inert, "flex items-center")}><div className="h-px w-full bg-border" /></div>;
     case "Container":
-      return <div className={cn(inert, "border border-dashed border-border bg-muted/20")} style={faceStyle(el)} />;
+      return (
+        <div className={cn(inert, "relative border border-dashed border-border bg-muted/20")} style={faceStyle(el)}>
+          <NestedContent host={el} elements={allElements.length ? allElements : [el]} />
+        </div>
+      );
     case "Box": {
       const radius = num(p, "radius", 0);
       const fill = text(p, "fill", "none");
@@ -301,50 +306,20 @@ export function ElementFace({ el }: { el: WireframeElement }) {
       const states = list(p, "states", ["State 1"]);
       const active = text(p, "active", states[0] ?? "State 1");
       return (
-        <div className={cn(inert, "flex flex-col border border-border bg-muted/20 p-2 text-xs")}>
+        <div className={cn(inert, "relative flex flex-col border border-border bg-muted/20 p-2 text-xs")}>
           <div className="mb-1 font-medium text-muted-foreground">{active}</div>
-          <div className="flex-1 rounded-sm border border-dashed border-border bg-background/60" />
+          <div className="relative min-h-0 flex-1 rounded-sm border border-dashed border-border bg-background/60">
+            <NestedContent host={el} elements={allElements.length ? allElements : [el]} />
+          </div>
         </div>
       );
     }
-    case "Repeater": {
-      const layout = text(p, "layout", "table");
-      const columns = list(p, "columns", ["Col 1", "Col 2"]);
-      const rows = Math.min(8, Math.max(1, Math.round(num(p, "rows", 3))));
-      if (layout === "cards") {
-        return (
-          <div className={cn(inert, "grid grid-cols-2 gap-1 p-1")}>
-            {Array.from({ length: Math.min(4, rows) }, (_, i) => (
-              <div key={i} className="rounded border border-border bg-card p-1 text-[10px] text-muted-foreground">
-                Card {i + 1}
-              </div>
-            ))}
-          </div>
-        );
-      }
+    case "Repeater":
       return (
-        <table className={cn(inert, "border-collapse text-[10px]")}>
-          <thead>
-            <tr>
-              {columns.map((col) => (
-                <th key={col} className="border border-border bg-muted px-1 py-0.5 font-medium">{col}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({ length: rows }, (_, r) => (
-              <tr key={r}>
-                {columns.map((col) => (
-                  <td key={col} className="border border-border px-1 py-0.5 text-muted-foreground">
-                    {r + 1}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className={cn(inert, "relative size-full overflow-hidden border border-border bg-background/80")}>
+          <NestedContent host={el} elements={allElements.length ? allElements : [el]} />
+        </div>
       );
-    }
     case "HotSpot":
       return <div className={cn(inert, "border border-dashed border-primary/50 bg-primary/5")} title={text(p, "note", "")} />;
     case "InlineFrame":

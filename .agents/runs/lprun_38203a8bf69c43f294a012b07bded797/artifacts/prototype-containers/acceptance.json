@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "task_id": "prototype-containers",
+  "task_sha256": "b68ed5d3b717642e7774941a07c46a3673f257448cc5e41e5686024c76181e2e",
+  "attempt": 1,
+  "provider_exit": 0,
+  "report": "complete",
+  "report_sha256": "4262e8741fcb7dd0c193ec4ea3ba74485d5e7fa7d1340fa7b67d99f9ceccaaae",
+  "owns_check": "passed",
+  "verification": "passed",
+  "review": "not_required",
+  "accepted": true,
+  "accepted_at": "2026-10-17T21:58:51.372Z",
+  "model": "composer-2.5"
+}

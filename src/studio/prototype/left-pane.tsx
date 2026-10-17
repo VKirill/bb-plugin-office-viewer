@@ -33,6 +33,7 @@ import {
   type SplitDividerKey,
 } from "./pane-split";
 import { clickSelection, expandToGroups } from "./canvas-math";
+import { flattenOutline, outlineTree } from "./containers";
 import type { MenuTarget } from "./menus";
 import type { PaletteGroup, WireframeElement, WireframePage } from "./model";
 
@@ -194,7 +195,7 @@ export function PrototypeLeftPane({
     [paneHeight],
   );
 
-  const outline = [...elements].reverse();
+  const outline = useMemo(() => flattenOutline(outlineTree(elements)).reverse(), [elements]);
   const filteredFormTemplates = useMemo(
     () => filterTemplates(FORM_TEMPLATES, query, (template) => t(template.labelKey)),
     [query],
@@ -278,8 +279,9 @@ export function PrototypeLeftPane({
             </ul>
           ) : (
             <ul className="space-y-0.5">
-              {outline.map((el, index) => {
-                const realIndex = elements.length - 1 - index;
+              {outline.map((row, index) => {
+                const el = row.element;
+                const realIndex = elements.findIndex((item) => item.id === el.id);
                 return (
                   <li
                     key={el.id}
@@ -302,6 +304,7 @@ export function PrototypeLeftPane({
                     <button
                       type="button"
                       className="min-w-0 flex-1 truncate text-left text-xs"
+                      style={{ paddingLeft: row.depth * 10 }}
                       onClick={(event) => {
                         onSelectElements(expandToGroups(elements, clickSelection(selected, el.id, event.metaKey || event.ctrlKey, event.shiftKey)));
                       }}

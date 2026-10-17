@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { studioT } from "../../shared/i18n.ts";
 import { localizeProps } from "../localize.ts";
+import { normalizePageElements } from "./containers.ts";
 
 export const WIREFRAME_FORMAT = "bb-wireframe" as const;
 export const WIREFRAME_VERSION = 2;
@@ -96,6 +97,8 @@ export type WireframeElement = {
   hidden?: boolean;
   locked?: boolean;
   groupId?: string;
+  parentId?: string;
+  parentState?: string;
   style?: ElementStyle;
 };
 
@@ -303,6 +306,8 @@ const elementSchema = z
     hidden: z.boolean().optional(),
     locked: z.boolean().optional(),
     groupId: z.string().min(1).max(128).optional(),
+    parentId: z.string().min(1).max(128).optional(),
+    parentState: z.string().min(1).max(200).optional(),
     style: elementStyleSchema.optional(),
   })
   .strict();
@@ -436,7 +441,14 @@ export function parseWireframe(input: unknown): Wireframe {
   if (typeof raw === "object" && raw !== null && (raw as { version?: number }).version === WIREFRAME_VERSION_LEGACY) {
     return migrateWireframeV1(wireframeV1Schema.parse(raw));
   }
-  return wireframeV2Schema.parse(raw);
+  const doc = wireframeV2Schema.parse(raw);
+  return {
+    ...doc,
+    pages: doc.pages.map((page) => ({
+      ...page,
+      elements: normalizePageElements(page.elements),
+    })),
+  };
 }
 
 export function cloneWireframe(doc: Wireframe): Wireframe {
