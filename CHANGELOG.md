@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.14 — 2026-10-18
+
+### Added
+
+- Prototype: right-click menus everywhere — layers (order: to front, forward, backward, to back; group, lock, hide, rename, delete), canvas, pages and tabs, library tiles; one consistent click, double-click and drag behaviour.
+- Connectors between flowchart shapes (E): anchors, straight, elbow and curved routes, arrowheads, dashed lines and labels; they follow the shapes.
+- Dynamic panels with their own content per state and in-place editing; repeaters render rows from an editable data grid (paste from Excel, CSV import); double-click enters groups.
+- Components: make a reusable component from a selection, a Components tab, instances that update together, per-instance text overrides, detach.
+- Interactions (event → case → action: go to page, open link, show/hide, set panel state, set text…) and a Preview player («.» or ▶) with pages, zoom, hotspots and notes; send a preview screenshot to the chat.
+
 ## 0.8.13 — 2026-10-17
 
 ### Added
