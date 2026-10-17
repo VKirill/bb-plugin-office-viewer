@@ -41,6 +41,7 @@ graph LR
 - [ ] slides (phase 2), components/states (Axure masters, dynamic panels) v2
 - [x] release 0.8.8
 - [x] release 0.8.9 (prototype palette, inline editing, and toolbar improvements)
+- [x] release 0.8.10 (Axure parity batch renumbered to stay within the installed `^0.8` range)
 - [ ] Studio live check
 
 ### Accepted work
@@ -48,6 +49,7 @@ graph LR
 - `lprun_38203a8bf69c43f294a012b07bded797`: `prototype-inline-edit`, `prototype-palette-previews`, and `prototype-toolbar` accepted; release 0.8.8 shipped. Slides and the Studio live check remain open.
 - `lprun_38203a8bf69c43f294a012b07bded797`: release 0.8.9 accepted; Slides and the Studio live check remain open.
 - `lprun_38203a8bf69c43f294a012b07bded797`: the Axure parity batch was accepted through release 0.9.0; Slides and the Studio live check remain open.
+- `lprun_38203a8bf69c43f294a012b07bded797`: release 0.8.10 accepted as the compatible version for the Axure parity batch; Slides and the Studio live check remain open.
 
 ## Axure parity batch (2026-10-17, from axure-re/index.md)
 
