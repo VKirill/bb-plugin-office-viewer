@@ -20,6 +20,7 @@ import {
   newWireframe,
   nextLabel,
   parseWireframe,
+  tryParseWireframe,
   type PaletteGroup,
   type PropValue,
   type Wireframe,
@@ -94,6 +95,12 @@ import {
 import { ProtoShortcutsSheet } from "./proto-shortcuts-sheet";
 import { PrototypePreviewPlayer } from "./preview-player";
 import { WireframeHistoryDialog } from "./wireframe-history-dialog";
+import { AgentGenerateDialog } from "./agent-generate-dialog";
+import {
+  replaceWireframeFromRemote,
+  shouldApplyRemoteWireframe,
+  wireframeContentSha256,
+} from "./agent-sync";
 import { ElementSpatialIndex, SNAP_SPATIAL_MIN_PEERS } from "./spatial-index";
 import { PrototypeContextMenu } from "./prototype-context-menu";
 import {
@@ -238,7 +245,14 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const previewBoardRef = useRef<HTMLDivElement>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
+  const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const lastHistorySnapshotAt = useRef(0);
+  const lastWrittenHashRef = useRef<string | null>(null);
+  const lastAppliedRemoteHashRef = useRef<string | null>(null);
+  const syncBusyRef = useRef(false);
+  const docRef = useRef(doc);
+  docRef.current = doc;
   const [renameElementId, setRenameElementId] = useState<string | null>(null);
   const [renamePageId, setRenamePageId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -317,8 +331,59 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     });
   }, []);
 
+  const markWrittenJson = useCallback(async (json: string) => {
+    lastWrittenHashRef.current = await wireframeContentSha256(json);
+  }, []);
+
+  const resolveAsset = useCallback(
+    (src: string) => {
+      if (src.startsWith("data:")) return src;
+      const cached = assetUrls[src];
+      if (cached) return cached;
+      void rpc
+        .call("readPrototypeAsset", { threadId, relPath: src, locale })
+        .then(({ base64, contentType }) => {
+          const url = `data:${contentType};base64,${base64}`;
+          setAssetUrls((prev) => (prev[src] ? prev : { ...prev, [src]: url }));
+        })
+        .catch(() => {});
+      return undefined;
+    },
+    [assetUrls, locale, rpc, threadId],
+  );
+
   const undo = () => setTimeline((s) => ({ ...s, index: Math.max(0, s.index - 1) }));
   const redo = () => setTimeline((s) => ({ ...s, index: Math.min(s.history.length - 1, s.index + 1) }));
+
+  useEffect(() => {
+    if (!openedStem) return;
+    const tick = async () => {
+      if (document.hidden || syncBusyRef.current) return;
+      syncBusyRef.current = true;
+      try {
+        const { sha256 } = await rpc.call("statWireframe", { threadId, name: openedStem, locale });
+        if (!shouldApplyRemoteWireframe(sha256, lastWrittenHashRef.current, lastAppliedRemoteHashRef.current)) return;
+        const loaded = await rpc.call("loadWireframe", { threadId, name: openedStem, locale });
+        const parsed = tryParseWireframe(loaded.json);
+        if (!parsed.ok) {
+          lastAppliedRemoteHashRef.current = sha256;
+          toast.error(t("protoAgentSyncInvalid", { message: parsed.message }));
+          return;
+        }
+        commit(replaceWireframeFromRemote(docRef.current, parsed.doc));
+        lastAppliedRemoteHashRef.current = sha256;
+        toast.message(t("protoAgentSyncApplied"), {
+          action: { label: t("undo"), onClick: () => undo() },
+        });
+      } catch {
+        /* polling is best-effort */
+      } finally {
+        syncBusyRef.current = false;
+      }
+    };
+    const id = window.setInterval(() => void tick(), 2000);
+    return () => clearInterval(id);
+  }, [commit, locale, openedStem, rpc, t]);
 
   const withBoardElements = (elements: WireframeElement[]) => {
     if (editScope.kind === "component") {
@@ -1030,10 +1095,12 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
 
   const persist = async (name: string, overwrite: boolean, snapshotReason: "save" | "autosave" = "save") => {
     const png = await capturePng();
+    const json = JSON.stringify({ ...doc, name });
+    await markWrittenJson(json);
     const saved = await rpc.call("saveWireframe", {
       threadId,
       name,
-      json: JSON.stringify({ ...doc, name }),
+      json,
       pngBase64: await blobToBase64(png),
       overwrite,
       locale,
@@ -1054,10 +1121,12 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       pngBase64 = undefined;
     }
     const snapshotDue = Date.now() - lastHistorySnapshotAt.current >= HISTORY_SNAPSHOT_INTERVAL_MS;
+    const json = JSON.stringify({ ...doc, name });
+    await markWrittenJson(json);
     const saved = await rpc.call("saveWireframe", {
       threadId,
       name,
-      json: JSON.stringify({ ...doc, name }),
+      json,
       pngBase64,
       overwrite: true,
       locale,
@@ -1151,6 +1220,8 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     try {
       const loaded = await rpc.call("loadWireframe", { threadId, name, locale });
       const next = parseWireframe(loaded.json);
+      await markWrittenJson(loaded.json);
+      lastAppliedRemoteHashRef.current = null;
       commit(next);
       setOpenedStem(name);
       setSelected([]);
@@ -1740,6 +1811,7 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             onToggleConnectorTool={() => setPendingTool((tool) => (isConnectorTool(tool) ? null : { type: "Connector" }))}
             onPreview={() => setPreviewOpen(true)}
             onHistory={() => { setMenu(null); setHistoryOpen(true); }}
+            onGenerate={() => setGenerateOpen(true)}
           />
         }
         styleBar={<PrototypeStyleBar inspect={inspect} canvas={pageCanvas(doc)} onCanvas={(patch) => commit(patchCanvas(doc, patch))} onUpdate={updateOne} />}
@@ -1841,6 +1913,7 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             onCommitEdit={commitEdit}
             skipBlur={skipBlur}
             onPaneClick={() => setMenu(null)}
+            resolveAsset={resolveAsset}
           />
         }
         inspector={
@@ -1947,6 +2020,21 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
                 )}
               </DialogContent>
             </Dialog>
+            <AgentGenerateDialog
+              threadId={threadId}
+              open={generateOpen}
+              onOpenChange={setGenerateOpen}
+              onOpened={(name, json) => {
+                const next = parseWireframe(json);
+                void markWrittenJson(json);
+                lastAppliedRemoteHashRef.current = null;
+                commit(next);
+                setOpenedStem(name);
+                setSelected([]);
+                setEdit(null);
+                setOpenTabIds([getActivePage(next).id]);
+              }}
+            />
             <WireframeHistoryDialog
               open={historyOpen}
               onOpenChange={setHistoryOpen}

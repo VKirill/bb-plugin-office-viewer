@@ -73,10 +73,12 @@ export function ElementFace({
   el,
   allElements = [],
   components = [],
+  resolveAsset,
 }: {
   el: WireframeElement;
   allElements?: readonly WireframeElement[];
   components?: readonly WireframeComponent[];
+  resolveAsset?: (src: string) => string | undefined;
 }) {
   const t = useT();
   const p = el.props;
@@ -165,13 +167,19 @@ export function ElementFace({
           <div className="text-xs text-muted-foreground">{text(p, "text", "")}</div>
         </Card>
       );
-    case "Image":
+    case "Image": {
+      const src = text(p, "src", "");
+      const assetUrl = src ? resolveAsset?.(src) : undefined;
+      if (assetUrl) {
+        return <img src={assetUrl} alt={text(p, "alt", "Image")} className={cn(inert, "h-full w-full object-contain")} draggable={false} />;
+      }
       return (
         <div className={cn(inert, "flex flex-col items-center justify-center gap-1 bg-muted text-xs text-muted-foreground")}>
           <Icon name="File" className="size-5" />
           {text(p, "alt", "Image")}
         </div>
       );
+    }
     case "Avatar":
       return <div className={cn(inert, "flex items-center justify-center rounded-full bg-secondary text-xs font-semibold")}>{text(p, "initials", "AB")}</div>;
     case "Icon": {

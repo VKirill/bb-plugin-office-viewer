@@ -512,6 +512,18 @@ export function parseWireframe(input: unknown): Wireframe {
   };
 }
 
+export function tryParseWireframe(input: unknown): { ok: true; doc: Wireframe } | { ok: false; message: string } {
+  try {
+    return { ok: true, doc: parseWireframe(input) };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { ok: false, message: error.issues.map((issue) => issue.message).join("; ") };
+    }
+    if (error instanceof SyntaxError) return { ok: false, message: error.message };
+    return { ok: false, message: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 export function cloneWireframe(doc: Wireframe): Wireframe {
   return structuredClone(doc);
 }
