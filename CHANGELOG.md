@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.6 — 2026-10-17
+
+### Changed
+
+- Spreadsheets: a cell with a link shows a chip like BB's chat links: the site's icon (GitHub, Figma, Notion, Slack, Telegram, YouTube, Google Docs and Drive; a globe for other sites) and the address without `https://`. A hyperlink with its own name keeps the name. Cmd/Ctrl+click opens it as before.
+
 ## 0.8.5 — 2026-10-17
 
 ### Added
