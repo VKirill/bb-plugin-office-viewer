@@ -5,6 +5,8 @@ import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useT } from "../../shared/i18n";
+import { AutosaveLabel } from "../autosave-label";
+import type { AutosaveStatus } from "../session";
 import type { AlignEdge, DistributeAxis } from "./align";
 import { ALIGN_ROW_ITEMS } from "./align-ui";
 
@@ -42,6 +44,7 @@ export function PrototypeToolbar({
   onSave,
   toggleLeftPane,
   toggleRightPane,
+  autosaveStatus,
 }: {
   barRef: React.RefObject<HTMLDivElement | null>;
   menu: ToolbarMenu | null;
@@ -72,6 +75,7 @@ export function PrototypeToolbar({
   onSave: () => void;
   toggleLeftPane: () => void;
   toggleRightPane: () => void;
+  autosaveStatus: AutosaveStatus;
 }) {
   const t = useT();
   return (
@@ -194,6 +198,7 @@ export function PrototypeToolbar({
         <ToolBtn tip={t("protoBadges")} pressed={badges} onClick={() => setBadges((on) => !on)}>
           <TagGlyph />
         </ToolBtn>
+        <AutosaveLabel status={autosaveStatus} />
         <div className="relative ml-auto" data-toolbar-menu>
           <Button type="button" variant="default" size="sm" className="h-8 gap-1" disabled={busy} aria-expanded={menu === "send"} onClick={() => toggleMenu("send")}>
             {t("sendToChat")}

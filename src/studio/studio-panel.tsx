@@ -1,9 +1,10 @@
-import { useState, type ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import type { PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { useT } from "../shared/i18n";
 import { OfficeStudioLogo, PaintLogo, PrototypeLogo, SlidesLogo } from "./logos";
+import { patchThreadSession, readThreadSession } from "./session";
 import { StudioSettingsButton } from "./settings-dialog";
 import { studioToolOf, type StudioTool } from "./studio-tool";
 import { StudioToolView } from "./tools";
@@ -30,19 +31,27 @@ const TOOLS: { id: StudioTool; Logo: ComponentType<{ className?: string }>; titl
 
 export function StudioPanel({ threadId, params }: PluginThreadPanelProps) {
   const t = useT();
-  const [picked, setPicked] = useState<StudioTool | null>(() => studioToolOf(params));
+  const fromParams = studioToolOf(params);
+  const [picked, setPicked] = useState<StudioTool | null>(() => fromParams ?? readThreadSession(threadId).tool);
+  useEffect(() => {
+    setPicked(fromParams ?? readThreadSession(threadId).tool);
+  }, [threadId, fromParams]);
+  const pick = (tool: StudioTool | null) => {
+    setPicked(tool);
+    patchThreadSession(threadId, { tool });
+  };
 
   if (picked) {
     return (
       <div className="flex h-full min-h-0 flex-col bg-background">
         <div className="flex min-h-10 shrink-0 items-center justify-between border-b border-border px-2 py-1">
-          <Button type="button" variant="ghost" size="sm" className="h-8 gap-1 px-2" aria-label={t("studioBack")} onClick={() => setPicked(null)}>
+          <Button type="button" variant="ghost" size="sm" className="h-8 gap-1 px-2" aria-label={t("studioBack")} onClick={() => pick(null)}>
             <Icon name="ChevronLeft" className="size-4" />
             {t("studioBack")}
           </Button>
           <StudioSettingsButton />
         </div>
-        <StudioToolView tool={picked} threadId={threadId} />
+        <StudioToolView key={threadId} tool={picked} threadId={threadId} />
       </div>
     );
   }
@@ -63,7 +72,7 @@ export function StudioPanel({ threadId, params }: PluginThreadPanelProps) {
           <ul className="grid grid-cols-1 gap-2 @xl:grid-cols-3 @xl:gap-3">
             {TOOLS.map((tool) => (
               <li key={tool.id}>
-                <button type="button" disabled={tool.soon} onClick={() => setPicked(tool.id)} className={CARD}>
+                <button type="button" disabled={tool.soon} onClick={() => pick(tool.id)} className={CARD}>
                   <tool.Logo className="size-11 shrink-0 rounded-[27%] shadow-sm transition-[opacity,filter] group-disabled:opacity-60 group-disabled:shadow-none group-disabled:grayscale-[35%] @xl:size-12" />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2 @xl:flex-wrap">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import type { rpcContract } from "../../../server";
 import { ImageEditor, type WriteImage } from "../../media/image-editor";
 import { studioLocale, useT } from "../../shared/i18n";
+import { AutosaveLabel } from "../autosave-label";
+import { patchThreadSession, readThreadSession } from "../session";
+import { useChatAutosave } from "../use-chat-autosave";
 import {
   PAINT_BACKGROUNDS,
   PAINT_FORMAT,
@@ -13,6 +16,7 @@ import {
   PAINT_VERSION,
   parsePaintDoc,
   type PaintCanvas,
+  type PaintDoc,
   type PaintShape,
 } from "./paint-model";
 
@@ -49,16 +53,33 @@ function clampSize(value: number): number {
   return Math.max(1, Math.min(8192, Math.round(value)));
 }
 
+function sessionFromPaint(doc: PaintDoc, openedStem: string | null): Session {
+  return {
+    id: `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+    image: blankCanvas(doc.canvas.width, doc.canvas.height, doc.canvas.background),
+    name: `${doc.name}.png`,
+    shapes: doc.shapes,
+    openedStem,
+    canvas: doc.canvas,
+  };
+}
+
 export function PaintCanvas({ threadId }: { threadId: string }) {
   const t = useT();
   const rpc = useRpc<typeof rpcContract>();
   const locale = studioLocale();
-  const [session, setSession] = useState<Session | null>(null);
+  const restored = readThreadSession(threadId).paint;
+  const [session, setSession] = useState<Session | null>(() => (restored?.editorOpen ? sessionFromPaint(restored.doc, restored.openedStem) : null));
   const [preset, setPreset] = useState<keyof typeof PAINT_SIZE_PRESETS | "custom">("wide");
   const [custom, setCustom] = useState<{ width: number; height: number }>({ ...PAINT_SIZE_PRESETS.wide });
   const [background, setBackground] = useState<string>(PAINT_BACKGROUNDS.white);
   const [savedNames, setSavedNames] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const autosaveRef = useRef<() => Promise<void>>(async () => {});
+  const paintFingerprint = session
+    ? JSON.stringify({ canvas: session.canvas, shapes: session.shapes, stem: session.openedStem })
+    : "";
+  const autosaveStatus = useChatAutosave(paintFingerprint, () => autosaveRef.current());
 
   const size = preset === "custom" ? custom : PAINT_SIZE_PRESETS[preset];
 
@@ -92,7 +113,7 @@ export function PaintCanvas({ threadId }: { threadId: string }) {
       overwrite,
       locale,
     });
-    setSession((current) => (current ? { ...current, name: `${saved.name}.png`, openedStem: saved.name, canvas: { ...current.canvas } } : current));
+    setSession((current) => (current ? { ...current, name: `${saved.name}.png`, openedStem: saved.name, shapes: doc.shapes, canvas: { ...current.canvas } } : current));
     return { name: saved.name, absPath: saved.pngPath };
   };
 
@@ -108,6 +129,44 @@ export function PaintCanvas({ threadId }: { threadId: string }) {
     if (session) return;
     void loadList();
   }, [session, threadId]);
+
+  useEffect(() => {
+    if (!session) return;
+    patchThreadSession(threadId, {
+      tool: "paint",
+      paint: {
+        doc: {
+          format: PAINT_FORMAT,
+          version: PAINT_VERSION,
+          name: session.openedStem ?? untitled,
+          canvas: session.canvas,
+          shapes: session.shapes,
+        },
+        openedStem: session.openedStem,
+        editorOpen: true,
+      },
+    });
+  }, [threadId, session, untitled]);
+
+  autosaveRef.current = async () => {
+    if (!session) return;
+    const name = session.openedStem ?? untitled;
+    const doc = parsePaintDoc({
+      format: PAINT_FORMAT,
+      version: PAINT_VERSION,
+      name,
+      canvas: session.canvas,
+      shapes: session.shapes,
+    });
+    const saved = await rpc.call("savePaint", {
+      threadId,
+      name,
+      json: JSON.stringify(doc),
+      overwrite: true,
+      locale,
+    });
+    setSession((current) => (current ? { ...current, name: `${saved.name}.png`, openedStem: saved.name } : current));
+  };
 
   const loadOne = async (name: string) => {
     setBusy(true);
@@ -125,21 +184,43 @@ export function PaintCanvas({ threadId }: { threadId: string }) {
 
   if (session) {
     return (
-      <ImageEditor
-        key={session.id}
-        image={session.image}
-        name={session.name}
-        write={write}
-        variant="paint"
-        initialShapes={session.shapes}
-        defaultSaveStem={session.openedStem ?? untitled}
-        persistOnSend
-        onClose={() => setSession(null)}
-        overwriteFormat={session.openedStem ? "png" : null}
-        onSaved={(saved) => {
-          setSession((current) => (current ? { ...current, name: `${saved.name}.png`, openedStem: saved.name } : current));
-        }}
-      />
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex shrink-0 items-center justify-end border-b border-border px-2 py-1">
+          <AutosaveLabel status={autosaveStatus} />
+        </div>
+        <div className="min-h-0 flex-1">
+          <ImageEditor
+            key={session.id}
+            image={session.image}
+            name={session.name}
+            write={write}
+            variant="paint"
+            initialShapes={session.shapes}
+            defaultSaveStem={session.openedStem ?? untitled}
+            persistOnSend
+            onClose={() => {
+              patchThreadSession(threadId, {
+                paint: {
+                  doc: {
+                    format: PAINT_FORMAT,
+                    version: PAINT_VERSION,
+                    name: session.openedStem ?? untitled,
+                    canvas: session.canvas,
+                    shapes: session.shapes,
+                  },
+                  openedStem: session.openedStem,
+                  editorOpen: false,
+                },
+              });
+              setSession(null);
+            }}
+            overwriteFormat={session.openedStem ? "png" : null}
+            onSaved={(saved) => {
+              setSession((current) => (current ? { ...current, name: `${saved.name}.png`, openedStem: saved.name } : current));
+            }}
+          />
+        </div>
+      </div>
     );
   }
 

@@ -6,6 +6,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import type { rpcContract } from "../../../server";
 import { studioLocale, useT } from "../../shared/i18n";
+import { AutosaveLabel } from "../autosave-label";
+import { patchThreadSession, readThreadSession } from "../session";
+import { useChatAutosave } from "../use-chat-autosave";
 import {
   applyThemeToDeck,
   cloneDeck,
@@ -38,10 +41,11 @@ export function SlidesEditor({ threadId }: { threadId: string }) {
   const rpc = useRpc<typeof rpcContract>();
   const composer = useComposer();
   const locale = studioLocale();
+  const restored = readThreadSession(threadId).slides;
   const captureRef = useRef<(() => Promise<Blob>) | null>(null);
   const dragSlide = useRef<number | null>(null);
 
-  const [{ history, index }, setTimeline] = useState(() => ({ history: [newDeck()], index: 0 }));
+  const [{ history, index }, setTimeline] = useState(() => ({ history: [restored?.deck ?? newDeck()], index: 0 }));
   const deck = history[index]!;
   const active = getActiveSlide(deck);
 
@@ -51,9 +55,12 @@ export function SlidesEditor({ threadId }: { threadId: string }) {
   const [openOpen, setOpenOpen] = useState(false);
   const [layoutOpen, setLayoutOpen] = useState(false);
   const [savedNames, setSavedNames] = useState<string[]>([]);
-  const [openedStem, setOpenedStem] = useState<string | null>(null);
+  const [openedStem, setOpenedStem] = useState<string | null>(() => restored?.openedStem ?? null);
   const [saveName, setSaveName] = useState(() => t("protoUntitled"));
   const [sendMenu, setSendMenu] = useState(false);
+  const [view, setView] = useState({ zoom: restored?.zoom ?? 0.65, selected: restored?.selected ?? [] });
+  const autosaveRef = useRef<() => Promise<void>>(async () => {});
+  const autosaveStatus = useChatAutosave(JSON.stringify(deck), () => autosaveRef.current());
 
   const commit = useCallback((next: SlidesDeck) => {
     setTimeline((s) => {
@@ -78,6 +85,14 @@ export function SlidesEditor({ threadId }: { threadId: string }) {
     void loadList();
   }, [threadId]);
 
+  useEffect(() => {
+    patchThreadSession(threadId, { tool: "slides", slides: { deck, openedStem, zoom: view.zoom, selected: view.selected } });
+  }, [threadId, deck, openedStem, view]);
+
+  const onViewChange = useCallback((next: { zoom: number; selected: string[] }) => {
+    setView(next);
+  }, []);
+
   const persist = async (name: string, overwrite: boolean) => {
     if (!captureRef.current) throw new Error(t("protoCaptureFailed"));
     const pngBase64 = await slidePngBase64(captureRef.current);
@@ -92,6 +107,25 @@ export function SlidesEditor({ threadId }: { threadId: string }) {
     commit({ ...deck, name });
     setOpenedStem(saved.name);
     return saved;
+  };
+
+  autosaveRef.current = async () => {
+    const name = openedStem ?? t("protoUntitled");
+    let pngBase64: string | undefined;
+    try {
+      if (captureRef.current) pngBase64 = await slidePngBase64(captureRef.current);
+    } catch {
+      pngBase64 = undefined;
+    }
+    const saved = await rpc.call("saveSlides", {
+      threadId,
+      name,
+      json: JSON.stringify({ ...deck, name }),
+      pngBase64,
+      overwrite: true,
+      locale,
+    });
+    setOpenedStem(saved.name);
   };
 
   const save = async (overwrite: boolean) => {
@@ -245,6 +279,7 @@ export function SlidesEditor({ threadId }: { threadId: string }) {
             </div>
           ) : null}
         </div>
+        <AutosaveLabel status={autosaveStatus} />
         <Input className="ml-auto h-8 max-w-[12rem]" value={deck.name} onChange={(e) => commit({ ...deck, name: e.target.value })} aria-label={t("slidesDeckName")} />
       </div>
       <div className="flex min-h-0 flex-1">
@@ -280,7 +315,14 @@ export function SlidesEditor({ threadId }: { threadId: string }) {
             </div>
           ))}
         </aside>
-        <SlideBoard slide={active} onChange={patchActiveSlide} captureRef={captureRef} />
+        <SlideBoard
+          slide={active}
+          onChange={patchActiveSlide}
+          captureRef={captureRef}
+          initialZoom={restored?.zoom}
+          initialSelected={restored?.selected}
+          onViewChange={onViewChange}
+        />
       </div>
 
       <Dialog open={saveOpen} onOpenChange={setSaveOpen}>

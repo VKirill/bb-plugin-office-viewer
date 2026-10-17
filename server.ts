@@ -101,7 +101,7 @@ export const rpcContract = defineRpcContract({
         threadId: z.string().min(1).max(256),
         name: z.string().min(1).max(255),
         json: z.string().min(2).max(8 * 1024 * 1024),
-        pngBase64: z.string().min(1).max(60 * 1024 * 1024),
+        pngBase64: z.string().min(1).max(60 * 1024 * 1024).optional(),
         overwrite: z.boolean(),
         locale: z.enum(["en", "ru"]).optional(),
       })
@@ -123,7 +123,7 @@ export const rpcContract = defineRpcContract({
         threadId: z.string().min(1).max(256),
         name: z.string().min(1).max(255),
         json: z.string().min(2).max(8 * 1024 * 1024),
-        pngBase64: z.string().min(1).max(60 * 1024 * 1024),
+        pngBase64: z.string().min(1).max(60 * 1024 * 1024).optional(),
         overwrite: z.boolean(),
         locale: z.enum(["en", "ru"]).optional(),
       })
@@ -144,7 +144,7 @@ export const rpcContract = defineRpcContract({
         threadId: z.string().min(1).max(256),
         name: z.string().min(1).max(255),
         json: z.string().min(2).max(8 * 1024 * 1024),
-        pngBase64: z.string().min(1).max(60 * 1024 * 1024),
+        pngBase64: z.string().min(1).max(60 * 1024 * 1024).optional(),
         overwrite: z.boolean(),
         locale: z.enum(["en", "ru"]).optional(),
       })
@@ -364,9 +364,11 @@ export default function plugin(bb: BbPluginApi) {
       await bb.sdk.files
         .write({ hostId: storage.hostId, path: jsonAbs, content: json, contentEncoding: "utf8", createParents: true })
         .catch((error: unknown) => { throw describe(error, hostName, jsonAbs, locale); });
-      await bb.sdk.files
-        .write({ hostId: storage.hostId, path: pngAbs, content: pngBase64, contentEncoding: "base64", createParents: true })
-        .catch((error: unknown) => { throw describe(error, hostName, pngAbs, locale); });
+      if (pngBase64) {
+        await bb.sdk.files
+          .write({ hostId: storage.hostId, path: pngAbs, content: pngBase64, contentEncoding: "base64", createParents: true })
+          .catch((error: unknown) => { throw describe(error, hostName, pngAbs, locale); });
+      }
       bb.log.info(`wrote wireframe ${storage.hostId}:${jsonAbs}`);
       return { name: stem, jsonPath: jsonAbs, pngPath: pngAbs };
     },
@@ -410,9 +412,11 @@ export default function plugin(bb: BbPluginApi) {
       await bb.sdk.files
         .write({ hostId: storage.hostId, path: jsonAbs, content: json, contentEncoding: "utf8", createParents: true })
         .catch((error: unknown) => { throw describe(error, hostName, jsonAbs, locale); });
-      await bb.sdk.files
-        .write({ hostId: storage.hostId, path: pngAbs, content: pngBase64, contentEncoding: "base64", createParents: true })
-        .catch((error: unknown) => { throw describe(error, hostName, pngAbs, locale); });
+      if (pngBase64) {
+        await bb.sdk.files
+          .write({ hostId: storage.hostId, path: pngAbs, content: pngBase64, contentEncoding: "base64", createParents: true })
+          .catch((error: unknown) => { throw describe(error, hostName, pngAbs, locale); });
+      }
       bb.log.info(`wrote paint ${storage.hostId}:${jsonAbs}`);
       return { name: stem, jsonPath: jsonAbs, pngPath: pngAbs };
     },
@@ -456,9 +460,11 @@ export default function plugin(bb: BbPluginApi) {
       await bb.sdk.files
         .write({ hostId: storage.hostId, path: jsonAbs, content: json, contentEncoding: "utf8", createParents: true })
         .catch((error: unknown) => { throw describe(error, hostName, jsonAbs, locale); });
-      await bb.sdk.files
-        .write({ hostId: storage.hostId, path: pngAbs, content: pngBase64, contentEncoding: "base64", createParents: true })
-        .catch((error: unknown) => { throw describe(error, hostName, pngAbs, locale); });
+      if (pngBase64) {
+        await bb.sdk.files
+          .write({ hostId: storage.hostId, path: pngAbs, content: pngBase64, contentEncoding: "base64", createParents: true })
+          .catch((error: unknown) => { throw describe(error, hostName, pngAbs, locale); });
+      }
       bb.log.info(`wrote slides ${storage.hostId}:${jsonAbs}`);
       return { name: stem, jsonPath: jsonAbs, pngPath: pngAbs };
     },

@@ -55,17 +55,23 @@ export function SlideBoard({
   slide,
   onChange,
   captureRef,
+  initialZoom,
+  initialSelected,
+  onViewChange,
 }: {
   slide: Slide;
   onChange: (slide: Slide) => void;
   captureRef?: React.MutableRefObject<(() => Promise<Blob>) | null>;
+  initialZoom?: number;
+  initialSelected?: string[];
+  onViewChange?: (view: { zoom: number; selected: string[] }) => void;
 }) {
   const t = useT();
   const canvasPaneRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [zoom, setZoom] = useState(0.65);
+  const [selected, setSelected] = useState<string[]>(() => initialSelected ?? []);
+  const [zoom, setZoom] = useState(() => initialZoom ?? 0.65);
   const [snapGrid, setSnapGrid] = useState(true);
   const [fineGrid, setFineGrid] = useState(true);
   const [marquee, setMarquee] = useState<CanvasRect | null>(null);
@@ -98,10 +104,15 @@ export function SlideBoard({
   );
 
   useEffect(() => {
+    if (initialZoom != null) return;
     const pane = canvasPaneRef.current;
     if (!pane) return;
     setZoom(zoomToFit(slide.canvas.width, slide.canvas.height, pane.clientWidth, pane.clientHeight));
-  }, [slide.canvas.width, slide.canvas.height]);
+  }, [slide.canvas.width, slide.canvas.height, initialZoom]);
+
+  useEffect(() => {
+    onViewChange?.({ zoom, selected });
+  }, [zoom, selected, onViewChange]);
 
   useEffect(() => {
     if (!captureRef) return;
