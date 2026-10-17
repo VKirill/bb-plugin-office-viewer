@@ -3,6 +3,7 @@ import { z } from "zod";
 import { studioT } from "../../shared/i18n.ts";
 import { localizeProps } from "../localize.ts";
 import { normalizePageElements } from "./containers.ts";
+import type { Interaction } from "./interactions.ts";
 
 export const WIREFRAME_FORMAT = "bb-wireframe" as const;
 export const WIREFRAME_VERSION = 2;
@@ -101,6 +102,7 @@ export type WireframeElement = {
   parentId?: string;
   parentState?: string;
   style?: ElementStyle;
+  interactions?: Interaction[];
 };
 
 export type WireframeCanvas = { width: number; height: number; background: string };
@@ -320,6 +322,43 @@ const elementSchema = z
     parentId: z.string().min(1).max(128).optional(),
     parentState: z.string().min(1).max(200).optional(),
     style: elementStyleSchema.optional(),
+    interactions: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1).max(128),
+            event: z.enum(["click", "doubleClick", "mouseEnter", "mouseLeave"]),
+            cases: z.array(
+              z
+                .object({
+                  id: z.string().min(1).max(128),
+                  name: z.string().max(200).optional(),
+                  actions: z.array(
+                    z
+                      .object({
+                        type: z.enum([
+                          "openLink",
+                          "goToPage",
+                          "show",
+                          "hide",
+                          "toggle",
+                          "setPanelState",
+                          "setText",
+                          "setSelected",
+                          "scrollTo",
+                          "wait",
+                        ]),
+                      })
+                      .passthrough(),
+                  ),
+                })
+                .strict(),
+            ),
+          })
+          .strict(),
+      )
+      .max(40)
+      .optional(),
   })
   .strict();
 

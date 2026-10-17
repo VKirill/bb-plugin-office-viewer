@@ -47,6 +47,7 @@ export function PrototypeToolbar({
   autosaveStatus,
   connectorToolActive = false,
   onToggleConnectorTool,
+  onPreview,
 }: {
   barRef: React.RefObject<HTMLDivElement | null>;
   menu: ToolbarMenu | null;
@@ -80,6 +81,7 @@ export function PrototypeToolbar({
   autosaveStatus: AutosaveStatus;
   connectorToolActive?: boolean;
   onToggleConnectorTool?: () => void;
+  onPreview?: () => void;
 }) {
   const t = useT();
   return (
@@ -122,6 +124,11 @@ export function PrototypeToolbar({
         {onToggleConnectorTool ? (
           <ToolBtn tip={t("protoToolConnector")} pressed={connectorToolActive} onClick={onToggleConnectorTool}>
             <Icon name="GitBranch" className="size-4" />
+          </ToolBtn>
+        ) : null}
+        {onPreview ? (
+          <ToolBtn tip={t("protoPreviewTip")} onClick={onPreview}>
+            <Icon name="Play" className="size-4" />
           </ToolBtn>
         ) : null}
         <ToolBtn tip={t("protoUndoTip")} disabled={index === 0} onClick={undo}>
