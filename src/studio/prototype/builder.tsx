@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useComposer, useRpc } from "@get-bb/plugin-sdk/app";
 import type { domToBlob } from "modern-screenshot";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Icon } from "@/components/ui/icon";
+import { Icon, type IconName } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -45,12 +45,33 @@ import {
   type InlineEdit,
   type InlineTarget,
 } from "./editing";
+import { alignElements, distributeElements, type AlignEdge, type DistributeAxis } from "./align";
 
 const MAX_HISTORY = 60;
 const MIN_SIZE = SNAP;
 const HANDLES = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
 type Handle = (typeof HANDLES)[number];
 type SendKind = "both" | "png" | "json";
+type ToolbarMenu = "file" | "send" | "zoom" | "more";
+const ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+const DEVICE_ICON: Record<keyof typeof CANVAS_PRESETS, IconName> = {
+  desktop: "Laptop",
+  tablet: "AppWindow",
+  phone: "Smartphone",
+};
+const DEVICE_LABEL: Record<keyof typeof CANVAS_PRESETS, I18nKey> = {
+  desktop: "protoDesktop",
+  tablet: "protoTablet",
+  phone: "protoPhone",
+};
+const ALIGN_TOOLS: { kind: AlignEdge; label: I18nKey }[] = [
+  { kind: "left", label: "protoAlignLeft" },
+  { kind: "center", label: "protoAlignCenter" },
+  { kind: "right", label: "protoAlignRight" },
+  { kind: "top", label: "protoAlignTop" },
+  { kind: "middle", label: "protoAlignMiddle" },
+  { kind: "bottom", label: "protoAlignBottom" },
+];
 type FieldKind = "text" | "textarea" | "number" | "boolean" | "list" | "select";
 type Field = { key: string; kind: FieldKind; label: I18nKey; options?: string[] };
 
@@ -230,6 +251,8 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const composer = useComposer();
   const locale = detectLocale();
   const rootRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const canvasPaneRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const clipboard = useRef<WireframeElement[]>([]);
@@ -245,10 +268,12 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [busy, setBusy] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const [openOpen, setOpenOpen] = useState(false);
-  const [sendOpen, setSendOpen] = useState(false);
+  const [menu, setMenu] = useState<ToolbarMenu | null>(null);
+  const [narrow, setNarrow] = useState(false);
   const [savedNames, setSavedNames] = useState<string[]>([]);
   const [openedStem, setOpenedStem] = useState<string | null>(null);
   const [saveName, setSaveName] = useState("Untitled");
+  const [nameDraft, setNameDraft] = useState(doc.name);
   const [edit, setEdit] = useState<InlineEdit | null>(null);
   const editRef = useRef<InlineEdit | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -265,6 +290,30 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
     editInputRef.current?.focus();
     editInputRef.current?.select();
   }, [editFocusKey]);
+
+  useEffect(() => {
+    setNameDraft(doc.name);
+  }, [doc.name]);
+
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      setNarrow((entries[0]?.contentRect.width ?? el.clientWidth) < 720);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!menu) return;
+    const onPointer = (event: PointerEvent) => {
+      if ((event.target as HTMLElement).closest("[data-toolbar-menu]")) return;
+      setMenu(null);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    return () => document.removeEventListener("pointerdown", onPointer);
+  }, [menu]);
 
   const commit = useCallback((next: Wireframe) => {
     setLive(null);
@@ -337,6 +386,32 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
     replace([...doc.elements, ...copies]);
     setSelected(copies.map((el) => el.id));
   };
+
+  const commitName = () => {
+    const name = nameDraft.trim() || "Untitled";
+    setNameDraft(name);
+    if (name !== doc.name) commit({ ...doc, name });
+  };
+
+  const applyAlign = (edge: AlignEdge) => {
+    if (!selected.length) return;
+    replace(alignElements(doc.elements, selected, edge, doc.canvas));
+  };
+
+  const applyDistribute = (axis: DistributeAxis) => {
+    if (selected.length < 3) return;
+    replace(distributeElements(doc.elements, selected, axis));
+  };
+
+  const fitZoom = () => {
+    const pane = canvasPaneRef.current;
+    if (!pane) return;
+    const pad = 32;
+    const next = Math.min((pane.clientWidth - pad) / doc.canvas.width, (pane.clientHeight - pad) / doc.canvas.height);
+    setZoom(Math.max(0.25, Math.min(2, Math.round(next * 100) / 100)));
+  };
+
+  const toggleMenu = (id: ToolbarMenu) => setMenu((was) => (was === id ? null : id));
 
   const nudgeLayer = (delta: 1 | -1) => {
     if (!selected.length) return;
@@ -462,7 +537,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   };
 
   const sendToChat = async (kind: SendKind) => {
-    setSendOpen(false);
+    setMenu(null);
     setBusy(true);
     try {
       const saved = await persist(openedStem ?? doc.name, Boolean(openedStem));
@@ -679,99 +754,151 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
       className="flex h-full min-h-0 flex-col bg-background outline-none"
       onKeyDown={onKeyDown}
     >
-      <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border px-2 py-1">
-        <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => { commit(newWireframe()); setOpenedStem(null); setSelected([]); setEdit(null); }}>
-          {t("protoNew")}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8"
-          onClick={() => {
-            setOpenOpen(true);
-            void loadList();
-          }}
-        >
-          {t("protoOpen")}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8"
-          disabled={busy}
-          onClick={() => {
-            setSaveName(openedStem ?? doc.name);
-            setSaveOpen(true);
-          }}
-        >
-          {t("save")}
-        </Button>
-        <div className="relative">
-          <Button type="button" variant="ghost" size="sm" className="h-8" disabled={busy} onClick={() => setSendOpen((open) => !open)}>
-            {t("sendToChat")}
+      <div ref={barRef} className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border px-2 py-1">
+        <div className="relative" data-toolbar-menu>
+          <Button type="button" variant="ghost" size="sm" className="h-8 gap-1" aria-expanded={menu === "file"} onClick={() => toggleMenu("file")}>
+            {t("protoFile")}
+            <Icon name="ChevronDown" className="size-3" />
           </Button>
-          {sendOpen ? (
-            <div className="absolute left-0 z-20 mt-1 w-48 rounded-md border border-border bg-background p-1 shadow-md">
-              <button type="button" className="block w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-state-hover" onClick={() => void sendToChat("both")}>
-                {t("protoSendBoth")}
-              </button>
-              <button type="button" className="block w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-state-hover" onClick={() => void sendToChat("png")}>
-                {t("protoSendPng")}
-              </button>
-              <button type="button" className="block w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-state-hover" onClick={() => void sendToChat("json")}>
-                {t("protoSendJson")}
-              </button>
+          {menu === "file" ? (
+            <div className="absolute left-0 z-30 mt-1 w-44 rounded-md border border-border bg-background p-1 shadow-md">
+              <MenuItem onClick={() => { setMenu(null); commit(newWireframe()); setOpenedStem(null); setSelected([]); setEdit(null); }}>
+                {t("protoNew")}
+              </MenuItem>
+              <MenuItem onClick={() => { setMenu(null); setOpenOpen(true); void loadList(); }}>{t("protoOpen")}</MenuItem>
+              <MenuItem
+                disabled={busy}
+                onClick={() => {
+                  setMenu(null);
+                  setSaveName(openedStem ?? doc.name);
+                  setSaveOpen(true);
+                }}
+              >
+                {t("save")}
+              </MenuItem>
             </div>
           ) : null}
         </div>
-        <Button type="button" variant="ghost" size="sm" className="h-8" aria-pressed={badges} onClick={() => setBadges((on) => !on)}>
-          {t("protoBadges")}
-        </Button>
-        <div className="mx-1 h-5 w-px bg-border" />
-        {(Object.keys(CANVAS_PRESETS) as (keyof typeof CANVAS_PRESETS)[]).map((id) => (
-          <Button
-            key={id}
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8"
-            aria-pressed={doc.canvas.width === CANVAS_PRESETS[id].width && doc.canvas.height === CANVAS_PRESETS[id].height}
-            onClick={() => commit({ ...doc, canvas: { ...doc.canvas, ...CANVAS_PRESETS[id] } })}
-          >
-            {t(id === "desktop" ? "protoDesktop" : id === "tablet" ? "protoTablet" : "protoPhone")}
+        <Input
+          value={nameDraft}
+          aria-label={t("protoRename")}
+          className="h-8 w-32 min-w-16 max-w-40"
+          onChange={(event) => setNameDraft(event.target.value.replace(/[/\\]/g, ""))}
+          onBlur={commitName}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              (event.target as HTMLInputElement).blur();
+            }
+          }}
+        />
+        <Sep />
+        <ToolBtn tip={t("protoUndoTip")} disabled={index === 0} onClick={undo}>
+          <Icon name="ArrowTurnBackward" className="size-4" />
+        </ToolBtn>
+        <ToolBtn tip={t("protoRedoTip")} disabled={index >= history.length - 1} onClick={redo}>
+          <Icon name="ArrowTurnForward" className="size-4" />
+        </ToolBtn>
+        <ToolBtn tip={t("protoDuplicateTip")} disabled={!selected.length} onClick={duplicateSelected}>
+          <Icon name="Copy" className="size-4" />
+        </ToolBtn>
+        <ToolBtn tip={t("protoDeleteTip")} disabled={!selected.length} onClick={removeSelected}>
+          <Icon name="Trash2" className="size-4" />
+        </ToolBtn>
+        <ToolBtn tip={t("protoBringForward")} disabled={!selected.length} onClick={() => nudgeLayer(1)}>
+          <Icon name="ChevronsUp" className="size-4" />
+        </ToolBtn>
+        <ToolBtn tip={t("protoSendBackward")} disabled={!selected.length} onClick={() => nudgeLayer(-1)}>
+          <Icon name="ChevronsDown" className="size-4" />
+        </ToolBtn>
+        {narrow ? (
+          <>
+            <Sep />
+            <div className="relative" data-toolbar-menu>
+              <ToolBtn tip={t("protoMore")} pressed={menu === "more"} onClick={() => toggleMenu("more")}>
+                <Icon name="MoreHorizontal" className="size-4" />
+              </ToolBtn>
+              {menu === "more" ? (
+                <div className="absolute left-0 z-30 mt-1 w-56 rounded-md border border-border bg-background p-1 shadow-md">
+                  {ALIGN_TOOLS.map((item) => (
+                    <MenuItem key={item.kind} disabled={!selected.length} onClick={() => { setMenu(null); applyAlign(item.kind); }}>
+                      <AlignGlyph kind={item.kind} />
+                      {t(item.label)}
+                    </MenuItem>
+                  ))}
+                  <MenuItem disabled={selected.length < 3} onClick={() => { setMenu(null); applyDistribute("horizontal"); }}>
+                    <AlignGlyph kind="horizontal" />
+                    {t("protoDistributeH")}
+                  </MenuItem>
+                  <MenuItem disabled={selected.length < 3} onClick={() => { setMenu(null); applyDistribute("vertical"); }}>
+                    <AlignGlyph kind="vertical" />
+                    {t("protoDistributeV")}
+                  </MenuItem>
+                </div>
+              ) : null}
+            </div>
+          </>
+        ) : (
+          <>
+            <Sep />
+            {ALIGN_TOOLS.map((item) => (
+              <ToolBtn key={item.kind} tip={t(item.label)} disabled={!selected.length} onClick={() => applyAlign(item.kind)}>
+                <AlignGlyph kind={item.kind} />
+              </ToolBtn>
+            ))}
+            <ToolBtn tip={t("protoDistributeH")} disabled={selected.length < 3} onClick={() => applyDistribute("horizontal")}>
+              <AlignGlyph kind="horizontal" />
+            </ToolBtn>
+            <ToolBtn tip={t("protoDistributeV")} disabled={selected.length < 3} onClick={() => applyDistribute("vertical")}>
+              <AlignGlyph kind="vertical" />
+            </ToolBtn>
+          </>
+        )}
+        <Sep />
+        <div className="flex rounded-md border border-border">
+          {(Object.keys(CANVAS_PRESETS) as (keyof typeof CANVAS_PRESETS)[]).map((id) => (
+            <ToolBtn
+              key={id}
+              tip={t(DEVICE_LABEL[id])}
+              pressed={doc.canvas.width === CANVAS_PRESETS[id].width && doc.canvas.height === CANVAS_PRESETS[id].height}
+              onClick={() => commit({ ...doc, canvas: { ...doc.canvas, ...CANVAS_PRESETS[id] } })}
+            >
+              <Icon name={DEVICE_ICON[id]} className="size-4" />
+            </ToolBtn>
+          ))}
+        </div>
+        <div className="relative" data-toolbar-menu title={t("protoZoomMenu")}>
+          <Button type="button" variant="ghost" size="sm" className="h-8 min-w-14 gap-1 tabular-nums" aria-label={t("protoZoomMenu")} aria-expanded={menu === "zoom"} onClick={() => toggleMenu("zoom")}>
+            {Math.round(zoom * 100)}%
+            <Icon name="ChevronDown" className="size-3" />
           </Button>
-        ))}
-        <div className="mx-1 h-5 w-px bg-border" />
-        <Button type="button" variant="ghost" size="icon" className="size-8" aria-label={t("zoomOut")} onClick={() => setZoom((z) => Math.max(0.25, Math.round(z / 1.25 * 100) / 100))}>
-          <Icon name="ZoomOut" className="size-4" />
-        </Button>
-        <button type="button" className="h-8 min-w-12 rounded-md px-1 text-xs tabular-nums text-muted-foreground hover:bg-state-hover" onClick={() => setZoom(1)}>
-          {Math.round(zoom * 100)}%
-        </button>
-        <Button type="button" variant="ghost" size="icon" className="size-8" aria-label={t("zoomIn")} onClick={() => setZoom((z) => Math.min(2, Math.round(z * 1.25 * 100) / 100))}>
-          <Icon name="ZoomIn" className="size-4" />
-        </Button>
-        <div className="mx-1 h-5 w-px bg-border" />
-        <Button type="button" variant="ghost" size="sm" className="h-8" disabled={index === 0} onClick={undo}>
-          {t("undo")}
-        </Button>
-        <Button type="button" variant="ghost" size="sm" className="h-8" disabled={index >= history.length - 1} onClick={redo}>
-          {t("redo")}
-        </Button>
-        <Button type="button" variant="ghost" size="sm" className="h-8" disabled={!selected.length} onClick={duplicateSelected}>
-          {t("protoDuplicate")}
-        </Button>
-        <Button type="button" variant="ghost" size="sm" className="h-8" disabled={!selected.length} onClick={removeSelected}>
-          {t("protoDelete")}
-        </Button>
-        <Button type="button" variant="ghost" size="sm" className="h-8" disabled={!selected.length} onClick={() => nudgeLayer(1)}>
-          {t("protoBringForward")}
-        </Button>
-        <Button type="button" variant="ghost" size="sm" className="h-8" disabled={!selected.length} onClick={() => nudgeLayer(-1)}>
-          {t("protoSendBackward")}
-        </Button>
+          {menu === "zoom" ? (
+            <div className="absolute left-0 z-30 mt-1 w-36 rounded-md border border-border bg-background p-1 shadow-md">
+              {ZOOM_PRESETS.map((value) => (
+                <MenuItem key={value} onClick={() => { setMenu(null); setZoom(value); }}>
+                  {Math.round(value * 100)}%
+                </MenuItem>
+              ))}
+              <MenuItem onClick={() => { setMenu(null); fitZoom(); }}>{t("zoomFit")}</MenuItem>
+            </div>
+          ) : null}
+        </div>
+        <ToolBtn tip={t("protoBadges")} pressed={badges} onClick={() => setBadges((on) => !on)}>
+          <TagGlyph />
+        </ToolBtn>
+        <div className="relative ml-auto" data-toolbar-menu>
+          <Button type="button" variant="default" size="sm" className="h-8 gap-1" disabled={busy} aria-expanded={menu === "send"} onClick={() => toggleMenu("send")}>
+            {t("sendToChat")}
+            <Icon name="ChevronDown" className="size-3" />
+          </Button>
+          {menu === "send" ? (
+            <div className="absolute right-0 z-30 mt-1 w-48 rounded-md border border-border bg-background p-1 shadow-md">
+              <MenuItem onClick={() => void sendToChat("both")}>{t("protoSendBoth")}</MenuItem>
+              <MenuItem onClick={() => void sendToChat("png")}>{t("protoSendPng")}</MenuItem>
+              <MenuItem onClick={() => void sendToChat("json")}>{t("protoSendJson")}</MenuItem>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1">
@@ -809,7 +936,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
           </div>
         </aside>
 
-        <div className="min-w-0 flex-1 overflow-auto bg-muted/40 p-4" onClick={() => setSendOpen(false)}>
+        <div ref={canvasPaneRef} className="min-w-0 flex-1 overflow-auto bg-muted/40 p-4" onClick={() => setMenu(null)}>
           <div className="flex min-h-full min-w-full items-start justify-center">
             <div style={{ width: view.canvas.width * zoom, height: view.canvas.height * zoom }}>
             <div
@@ -984,6 +1111,66 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function Sep() {
+  return <div className="mx-0.5 h-5 w-px bg-border" />;
+}
+
+function ToolBtn({
+  tip,
+  disabled,
+  pressed,
+  onClick,
+  children,
+}: {
+  tip: string;
+  disabled?: boolean;
+  pressed?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <span title={tip} className="inline-flex">
+      <Button type="button" variant="ghost" size="icon" className="size-8" aria-label={tip} aria-pressed={pressed} disabled={disabled} onClick={onClick}>
+        {children}
+      </Button>
+    </span>
+  );
+}
+
+function MenuItem({ disabled, onClick, children }: { disabled?: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" disabled={disabled} className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-state-hover disabled:pointer-events-none disabled:opacity-50" onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+function AlignGlyph({ kind }: { kind: AlignEdge | DistributeAxis }) {
+  const path: Record<AlignEdge | DistributeAxis, string> = {
+    left: "M3 3v10 M7 5h6 M7 8h4 M7 11h6",
+    center: "M8 3v10 M4 5h8 M5 8h6 M4 11h8",
+    right: "M13 3v10 M3 5h6 M5 8h4 M3 11h6",
+    top: "M3 3h10 M5 7v6 M8 7v4 M11 7v6",
+    middle: "M3 8h10 M5 4v8 M8 5v6 M11 4v8",
+    bottom: "M3 13h10 M5 3v6 M8 5v4 M11 3v6",
+    horizontal: "M2 8h3 M7 8h2 M11 8h3 M3 5v6 M8 5v6 M13 5v6",
+    vertical: "M8 2v3 M8 7v2 M8 11v3 M5 3h6 M5 8h6 M5 13h6",
+  };
+  return (
+    <svg viewBox="0 0 16 16" className="size-4 shrink-0" aria-hidden>
+      <path d={path[kind]} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TagGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" className="size-4 shrink-0" aria-hidden>
+      <path d="M2.5 8.5 8.5 2.5h5v5L7.5 13.5z M11 5.5h.01" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
   );
 }
 
