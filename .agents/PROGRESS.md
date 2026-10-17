@@ -14,7 +14,7 @@
 
 ## Last verify
 - command: Lane Pilot acceptance for `lprun_38203a8bf69c43f294a012b07bded797`.
-- result: green (accepted work includes Office Studio Paint and Axure-style prototype updates; spreadsheet links remain underlined after the 0.8.7 revert; the Axure parity release was renumbered from 0.9.0 to 0.8.10)
+- result: green (accepted work includes Office Studio Paint, Axure-style prototypes, Slides, templates, and settings; releases 0.8.6–0.8.11 shipped, with spreadsheet links underlined after the 0.8.7 revert and the Axure parity release renumbered from 0.9.0 to 0.8.10)
 - when: 2026-10-17
 
 ## Pointers

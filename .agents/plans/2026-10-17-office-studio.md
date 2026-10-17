@@ -23,7 +23,7 @@ research: .bb/chats/thr_wdpmipwdxc/artifacts/axure-analog-research.md
 | Storage | thread storage `<storageRoot>/Prototypes/` (`bb.sdk.threads.storageLocation` + `bb.sdk.files.write`) | Native per-chat files; agent sees `$BB_THREAD_STORAGE` |
 | To chat | `composer.experimental_vkAttachFiles([png, json])`; fallback absolute paths in composer text | Same path as image editor |
 | Paint | Extend `src/media/image-editor.tsx`: blank canvas, eraser, palette, perfect-freehand | Research 4.2 |
-| Slides | Phase 2, on the prototype engine | Lower priority |
+| Slides | Delivered on the prototype engine in release 0.8.11 | Accepted |
 
 ## Tasks
 
@@ -31,7 +31,7 @@ research: .bb/chats/thr_wdpmipwdxc/artifacts/axure-analog-research.md
 graph LR
   A[studio-launcher] --> B[prototype-builder]
   B --> C[paint-canvas]
-  C --> D[slides — later]
+  C --> D[slides — completed in 0.8.11]
 ```
 
 - [x] `studio-launcher`: header icon + panel tab «Office Studio» with tool cards
@@ -43,6 +43,7 @@ graph LR
 - [x] release 0.8.8
 - [x] release 0.8.9 (prototype palette, inline editing, and toolbar improvements)
 - [x] release 0.8.10 (Axure parity batch renumbered to stay within the installed `^0.8` range)
+- [x] release 0.8.11 (Slides, templates, settings, and Style panel)
 - [ ] Studio live check
 
 ### Accepted work
