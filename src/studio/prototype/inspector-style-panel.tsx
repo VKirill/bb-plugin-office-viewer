@@ -1,10 +1,13 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { IconTooltipButton } from "@/components/ui/icon-tooltip-button";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { useT, type I18nKey } from "../../shared/i18n";
 import type { AlignEdge, DistributeAxis } from "./align";
+import { InspectorAlignRow } from "./align-ui";
 import { IconInspector, readIconColor, readIconSize } from "./icon-inspector";
 import { InspectorColourPicker } from "./inspector-colour-picker";
 import {
@@ -106,6 +109,7 @@ export function InspectorStylePanel({
   const toggleSection = (id: string) => setOpenSections((was) => ({ ...was, [id]: !was[id] }));
 
   return (
+    <TooltipProvider delayDuration={400}>
     <div className="space-y-2 text-xs">
       {multi ? <div className="text-muted-foreground">{t("protoMultiSelection", { count: selection.length })}</div> : null}
       {!multi && inspect ? (
@@ -115,80 +119,45 @@ export function InspectorStylePanel({
         </label>
       ) : null}
 
-      <div className="grid grid-cols-3 gap-0.5 rounded-md border border-border p-1">
-        {(
-          [
-            ["left", "protoAlignLeft"],
-            ["center", "protoAlignCenter"],
-            ["right", "protoAlignRight"],
-            ["top", "protoAlignTop"],
-            ["middle", "protoAlignMiddle"],
-            ["bottom", "protoAlignBottom"],
-            ["horizontal", "protoDistributeH"],
-            ["lock", "protoLockAspect"],
-            ["vertical", "protoDistributeV"],
-          ] as const
-        ).map(([kind, labelKey]) => {
-          if (kind === "lock") {
-            return (
-              <span key={kind} title={t(labelKey)} className="inline-flex">
-                <Button type="button" variant="ghost" size="icon" className="size-7" aria-label={t(labelKey)} aria-pressed={lockAspect} onClick={() => setLockAspect((on) => !on)}>
-                  <Icon name={lockAspect ? "Lock" : "SquareUnlock02"} className="size-3.5" />
-                </Button>
-              </span>
-            );
-          }
-          if (kind === "horizontal" || kind === "vertical") {
-            return (
-              <span key={kind} title={t(labelKey)} className="inline-flex">
-                <Button type="button" variant="ghost" size="icon" className="size-7" aria-label={t(labelKey)} disabled={selection.length < 3} onClick={() => applyDistribute(kind)}>
-                  <DistributeIcon axis={kind} />
-                </Button>
-              </span>
-            );
-          }
-          return (
-            <span key={kind} title={t(labelKey)} className="inline-flex">
-              <Button type="button" variant="ghost" size="icon" className="size-7" aria-label={t(labelKey)} disabled={!selection.length} onClick={() => applyAlign(kind as AlignEdge)}>
-                <AlignIcon kind={kind as AlignEdge} />
-              </Button>
-            </span>
-          );
-        })}
-      </div>
+      <InspectorAlignRow selectionCount={selection.length} applyAlign={applyAlign} applyDistribute={applyDistribute} />
 
       <CollapseSection title={t("protoStyleSectionGeometry")} open={openSections.geometry} onToggle={() => toggleSection("geometry")}>
         <div className="grid grid-cols-2 gap-2">
           <ScrubField prefix="X" value={inspect?.x ?? 0} mixed={multi && new Set(selection.map((el) => el.x)).size > 1} onChange={(value) => updateMany((el) => (selection.some((s) => s.id === el.id) ? { ...el, x: snap(value) } : el))} />
           <ScrubField prefix="Y" value={inspect?.y ?? 0} mixed={multi && new Set(selection.map((el) => el.y)).size > 1} onChange={(value) => updateMany((el) => (selection.some((s) => s.id === el.id) ? { ...el, y: snap(value) } : el))} />
-          <ScrubField
-            prefix="W"
-            value={inspect?.w ?? 0}
-            mixed={multi && new Set(selection.map((el) => el.w)).size > 1}
-            onChange={(value) => {
-              const w = Math.max(SNAP, snap(value));
-              updateMany((el) => {
-                if (!selection.some((s) => s.id === el.id)) return el;
-                if (!lockAspect || !inspect) return { ...el, w };
-                const ratio = el.h / el.w;
-                return { ...el, w, h: Math.max(SNAP, snap(w * ratio)) };
-              });
-            }}
-          />
-          <ScrubField
-            prefix="H"
-            value={inspect?.h ?? 0}
-            mixed={multi && new Set(selection.map((el) => el.h)).size > 1}
-            onChange={(value) => {
-              const h = Math.max(SNAP, snap(value));
-              updateMany((el) => {
-                if (!selection.some((s) => s.id === el.id)) return el;
-                if (!lockAspect || !inspect) return { ...el, h };
-                const ratio = el.w / el.h;
-                return { ...el, h, w: Math.max(SNAP, snap(h * ratio)) };
-              });
-            }}
-          />
+          <div className="col-span-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <ScrubField
+              prefix="W"
+              value={inspect?.w ?? 0}
+              mixed={multi && new Set(selection.map((el) => el.w)).size > 1}
+              onChange={(value) => {
+                const w = Math.max(SNAP, snap(value));
+                updateMany((el) => {
+                  if (!selection.some((s) => s.id === el.id)) return el;
+                  if (!lockAspect || !inspect) return { ...el, w };
+                  const ratio = el.h / el.w;
+                  return { ...el, w, h: Math.max(SNAP, snap(w * ratio)) };
+                });
+              }}
+            />
+            <IconTooltipButton label={t("protoLockAspect")} pressed={lockAspect} onClick={() => setLockAspect((on) => !on)}>
+              <Icon name={lockAspect ? "Lock" : "SquareUnlock02"} className="size-4" />
+            </IconTooltipButton>
+            <ScrubField
+              prefix="H"
+              value={inspect?.h ?? 0}
+              mixed={multi && new Set(selection.map((el) => el.h)).size > 1}
+              onChange={(value) => {
+                const h = Math.max(SNAP, snap(value));
+                updateMany((el) => {
+                  if (!selection.some((s) => s.id === el.id)) return el;
+                  if (!lockAspect || !inspect) return { ...el, h };
+                  const ratio = el.w / el.h;
+                  return { ...el, h, w: Math.max(SNAP, snap(h * ratio)) };
+                });
+              }}
+            />
+          </div>
           <ScrubField
             prefix="°"
             value={rotation}
@@ -359,6 +328,7 @@ export function InspectorStylePanel({
         />
       ) : null}
     </div>
+    </TooltipProvider>
   );
 }
 
@@ -405,29 +375,8 @@ function ScrubField({ prefix, value, mixed, onChange }: { prefix: string; value:
   );
 }
 
-function AlignIcon({ kind }: { kind: AlignEdge }) {
-  const path: Record<AlignEdge, string> = {
-    left: "M3 3v10 M7 5h6",
-    center: "M8 3v10 M4 5h8",
-    right: "M13 3v10 M3 5h6",
-    top: "M3 3h10 M5 7v6",
-    middle: "M3 8h10 M5 4v8",
-    bottom: "M3 13h10 M5 3v6",
-  };
-  return (
-    <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden>
-      <path d={path[kind]} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function TextAlignIcon({ align }: { align: "left" | "center" | "right" }) {
   const d = align === "left" ? "M2 4h10M2 8h6M2 12h8" : align === "center" ? "M3 4h10M5 8h6M4 12h8" : "M4 4h10M8 8h6M6 12h8";
-  return <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden><path d={d} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>;
-}
-
-function DistributeIcon({ axis }: { axis: "horizontal" | "vertical" }) {
-  const d = axis === "horizontal" ? "M2 8h3 M7 8h2 M11 8h3" : "M8 2v3 M8 7v2 M8 11v3";
   return <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden><path d={d} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>;
 }
 
