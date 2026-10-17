@@ -5,7 +5,7 @@ import { Icon } from "@/components/ui/icon";
 import { t } from "../shared/i18n";
 import { OfficeStudioLogo, PaintLogo, PrototypeLogo, SlidesLogo } from "./logos";
 import { studioToolOf, type StudioTool } from "./studio-tool";
-import { PaintTool, PrototypeTool, SlidesTool } from "./tools";
+import { StudioToolView } from "./tools";
 
 export const STUDIO_PANEL = "studio";
 export const STUDIO_ICON = "Palette";
@@ -39,7 +39,7 @@ export function StudioPanel({ threadId, params }: PluginThreadPanelProps) {
             {t("studioBack")}
           </Button>
         </div>
-        {picked === "prototype" ? <PrototypeTool threadId={threadId} /> : picked === "paint" ? <PaintTool threadId={threadId} /> : <SlidesTool threadId={threadId} />}
+        <StudioToolView tool={picked} threadId={threadId} />
       </div>
     );
   }
