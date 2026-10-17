@@ -49,6 +49,7 @@ graph LR
 - [x] release 0.8.11 (Slides, templates, settings, and Style panel)
 - [x] release 0.8.12 (autosave, Style panel, and colour picker fixes)
 - [x] release 0.8.13 (draw tools and modifier keys)
+- [x] release 0.8.14 (menus, connectors, containers, components, interactions and preview)
 - [ ] Studio live check
 
 ### Accepted work
@@ -60,6 +61,7 @@ graph LR
 - `lprun_38203a8bf69c43f294a012b07bded797`: remaining accepted Axure parity tasks, autosave/restore, settings/i18n, Slides deck, and spreadsheet link-chip revert completed, including alignment icons, colour picker, icon loading, native inspector, pane and screen-size fixes, and style application/layout; releases 0.8.6–0.8.11 are accepted. Only the Studio live check and v2 component/state work remain.
 - `lprun_38203a8bf69c43f294a012b07bded797`: accepted remaining Studio Paint, prototype, Slides, autosave/restore and settings work, including release 0.8.12; spreadsheet links remain underlined after the 0.8.7 revert. Only the Studio live check and v2 component/state work remain.
 - `lprun_38203a8bf69c43f294a012b07bded797`: accepted modifier-key prototype gestures and release 0.8.13, along with the remaining listed prototype refinements. Only the Studio live check and v2 component/state work remain.
+- `lprun_38203a8bf69c43f294a012b07bded797`: accepted the final prototype batch (context menus, connectors, dynamic states/repeaters, reusable components, interactions/preview), i18n placeholder coverage fix, and release 0.8.14. Only the Studio live check remains.
 
 ## Axure parity batch (2026-10-17, from axure-re/index.md)
 
@@ -79,5 +81,21 @@ graph LR
 - [x] `prototype-canvas-axure` — marquee, groups, snap guides, distances, context menu, single-key tools, quick insert
 - [x] `prototype-inspector-axure` — Style tab, properties, radio group combo, list editor, table editing, notes
 - [x] pictograms swap (design-lead set)
-- [ ] later: interactions (event → case → action) + preview player, connectors for Flow, components (masters), Sample UI / form patterns
+- [x] interactions (event → case → action) + preview player, connectors for Flow, components (masters), Sample UI / form patterns
 - `lprun_38203a8bf69c43f294a012b07bded797`: accepted the listed Paint, prototype, Slides, autosave/restore, settings and release tasks through 0.8.12; spreadsheet links remain underlined after the 0.8.7 revert. Only the Studio live check and v2 component/state work remain.
+
+## Final stage batch (2026-10-17)
+
+Owner: «дорабатывай прототипировщик до конечной стадии»; right-click on Outline shows the native browser menu.
+
+```mermaid
+graph LR
+  M[prototype-context-menus] --> K[prototype-connectors] --> C[prototype-containers] --> P[prototype-components] --> I[prototype-interactions-preview]
+```
+
+- [x] `prototype-context-menus` — one mouse model (INTERACTIONS.md), context menus in outline, pages, tabs, palette, canvas
+- [x] `prototype-connectors` — Connector tool E, anchors, routing, arrowheads, labels
+- [x] `prototype-containers` — dynamic panel states with content, repeater data grid, in-place container/group editing
+- [x] `prototype-components` — masters: create, components tab, instances, overrides, detach
+- [x] `prototype-interactions-preview` — event → case → action, preview player, send preview to chat
+- [x] release 0.8.14; Studio live check remains (needs owner's BB browser sign-in)
