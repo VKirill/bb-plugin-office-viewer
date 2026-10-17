@@ -2,6 +2,7 @@
 import { hitConnector, isConnector } from "./connectors.ts";
 import type { ElementType, WireframeElement } from "./model.ts";
 import { SNAP, snap } from "./model.ts";
+import { ElementSpatialIndex, SNAP_SPATIAL_CELL, SNAP_SPATIAL_MIN_PEERS } from "./spatial-index.ts";
 
 export const FINE_GRID = 10;
 export const NUDGE_FINE = 1;
@@ -147,6 +148,7 @@ export function snapRectToPeers(
   peers: readonly WireframeElement[],
   excludeIds: ReadonlySet<string>,
   threshold = SNAP_GUIDE_THRESHOLD,
+  spatialIndex?: ElementSpatialIndex | null,
 ): { dx: number; dy: number; guides: SnapGuide[] } {
   const guides: SnapGuide[] = [];
   let dx = 0;
@@ -157,7 +159,14 @@ export function snapRectToPeers(
   const movingX = edges(rect, "x");
   const movingY = edges(rect, "y");
 
-  for (const peer of peers) {
+  let pool = peers;
+  if (spatialIndex) {
+    pool = spatialIndex.query(rect, threshold + SNAP_SPATIAL_CELL);
+  } else if (peers.length >= SNAP_SPATIAL_MIN_PEERS) {
+    pool = new ElementSpatialIndex(peers).query(rect, threshold + SNAP_SPATIAL_CELL);
+  }
+
+  for (const peer of pool) {
     if (excludeIds.has(peer.id) || peer.hidden) continue;
     const box = elementRect(peer);
     const peerX = edges(box, "x");

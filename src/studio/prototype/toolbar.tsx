@@ -48,6 +48,7 @@ export function PrototypeToolbar({
   connectorToolActive = false,
   onToggleConnectorTool,
   onPreview,
+  onHistory,
 }: {
   barRef: React.RefObject<HTMLDivElement | null>;
   menu: ToolbarMenu | null;
@@ -82,6 +83,7 @@ export function PrototypeToolbar({
   connectorToolActive?: boolean;
   onToggleConnectorTool?: () => void;
   onPreview?: () => void;
+  onHistory?: () => void;
 }) {
   const t = useT();
   return (
@@ -97,6 +99,7 @@ export function PrototypeToolbar({
               <MenuItem onClick={onNew}>{t("protoNew")}</MenuItem>
               <MenuItem onClick={onOpen}>{t("protoOpen")}</MenuItem>
               <MenuItem disabled={busy} onClick={onSave}>{t("save")}</MenuItem>
+              {onHistory ? <MenuItem disabled={busy} onClick={onHistory}>{t("protoHistoryTitle")}</MenuItem> : null}
             </div>
           ) : null}
         </div>

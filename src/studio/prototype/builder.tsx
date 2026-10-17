@@ -93,6 +93,8 @@ import {
 } from "./canvas-math";
 import { ProtoShortcutsSheet } from "./proto-shortcuts-sheet";
 import { PrototypePreviewPlayer } from "./preview-player";
+import { WireframeHistoryDialog } from "./wireframe-history-dialog";
+import { ElementSpatialIndex, SNAP_SPATIAL_MIN_PEERS } from "./spatial-index";
 import { PrototypeContextMenu } from "./prototype-context-menu";
 import {
   applyZOrder,
@@ -149,9 +151,17 @@ import {
 } from "./components";
 
 const MAX_HISTORY = 60;
+const HISTORY_SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
 
 type Drag =
-  | { kind: "move"; ids: string[]; ox: number; oy: number; orig: Record<string, { x: number; y: number }> }
+  | {
+      kind: "move";
+      ids: string[];
+      ox: number;
+      oy: number;
+      orig: Record<string, { x: number; y: number }>;
+      snapIndex?: ElementSpatialIndex | null;
+    }
   | { kind: "resize"; id: string; handle: Handle; orig: WireframeElement }
   | {
       kind: "draw";
@@ -227,6 +237,8 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [deleteComponentId, setDeleteComponentId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const previewBoardRef = useRef<HTMLDivElement>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const lastHistorySnapshotAt = useRef(0);
   const [renameElementId, setRenameElementId] = useState<string | null>(null);
   const [renamePageId, setRenamePageId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -438,6 +450,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
 
   const removeSelected = () => {
     if (!selected.length) return;
+    void recordRiskySnapshot();
     const removed = new Set(selected);
     const remaining = orphanChildren(pageElements(doc).filter((el) => !removed.has(el.id)), removed);
     replace(detachConnectorsOnDelete(remaining, removed));
@@ -672,7 +685,9 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       const orig: Record<string, { x: number; y: number }> = {};
       const source = live ? pageElements(live) : elements;
       for (const el of source) if (ids.includes(el.id)) orig[el.id] = { x: el.x, y: el.y };
-      drag.current = { kind: "move", ids, ox: p.x, oy: p.y, orig };
+      const snapPeers = boardElementsFor(doc);
+      const snapIndex = snapPeers.length >= SNAP_SPATIAL_MIN_PEERS ? new ElementSpatialIndex(snapPeers) : null;
+      drag.current = { kind: "move", ids, ox: p.x, oy: p.y, orig, snapIndex };
       event.currentTarget.setPointerCapture(event.pointerId);
       return;
     }
@@ -771,7 +786,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       const guides: SnapGuide[] = [];
       const snapOff = event.metaKey || event.ctrlKey;
       if (bounds && !snapOff) {
-        const peerSnap = snapRectToPeers(bounds, boardElementsFor(doc), new Set(current.ids));
+        const peerSnap = snapRectToPeers(bounds, boardElementsFor(doc), new Set(current.ids), undefined, current.snapIndex ?? null);
         dx += peerSnap.dx;
         dy += peerSnap.dy;
         guides.push(...peerSnap.guides);
@@ -998,7 +1013,22 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     });
   };
 
-  const persist = async (name: string, overwrite: boolean) => {
+  const recordRiskySnapshot = async () => {
+    if (!openedStem) return;
+    try {
+      await rpc.call("appendWireframeSnapshot", {
+        threadId,
+        name: openedStem,
+        json: JSON.stringify(doc),
+        reason: "risky",
+        locale,
+      });
+    } catch {
+      /* history is best-effort */
+    }
+  };
+
+  const persist = async (name: string, overwrite: boolean, snapshotReason: "save" | "autosave" = "save") => {
     const png = await capturePng();
     const saved = await rpc.call("saveWireframe", {
       threadId,
@@ -1007,7 +1037,9 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       pngBase64: await blobToBase64(png),
       overwrite,
       locale,
+      snapshotReason,
     });
+    lastHistorySnapshotAt.current = Date.now();
     commit({ ...doc, name });
     setOpenedStem(saved.name);
     return { ...saved, png };
@@ -1021,6 +1053,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     } catch {
       pngBase64 = undefined;
     }
+    const snapshotDue = Date.now() - lastHistorySnapshotAt.current >= HISTORY_SNAPSHOT_INTERVAL_MS;
     const saved = await rpc.call("saveWireframe", {
       threadId,
       name,
@@ -1028,7 +1061,9 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       pngBase64,
       overwrite: true,
       locale,
+      snapshotReason: snapshotDue ? "autosave" : undefined,
     });
+    if (snapshotDue) lastHistorySnapshotAt.current = Date.now();
     setOpenedStem(saved.name);
   };
 
@@ -1123,6 +1158,38 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       setOpenTabIds([getActivePage(next).id]);
       setOpenOpen(false);
       toast.success(t("protoOpened", { name }));
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const loadHistorySnapshots = async () => {
+    if (!openedStem) return [];
+    const { snapshots } = await rpc.call("listWireframeHistory", { threadId, name: openedStem, locale });
+    return snapshots;
+  };
+
+  const loadHistorySnapshotJson = async (snapshotId: string) => {
+    if (!openedStem) throw new Error(t("protoHistorySaveFirst"));
+    const { json } = await rpc.call("loadWireframeHistory", { threadId, name: openedStem, snapshotId, locale });
+    return json;
+  };
+
+  const restoreHistorySnapshot = async (snapshotId: string) => {
+    if (!openedStem) return;
+    setBusy(true);
+    try {
+      await rpc.call("restoreWireframeHistory", { threadId, name: openedStem, snapshotId, locale });
+      const loaded = await rpc.call("loadWireframe", { threadId, name: openedStem, locale });
+      const next = parseWireframe(loaded.json);
+      commit(next);
+      setSelected([]);
+      setEdit(null);
+      setOpenTabIds([getActivePage(next).id]);
+      lastHistorySnapshotAt.current = Date.now();
+      toast.success(t("protoHistoryRestored"));
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -1507,6 +1574,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
 
   const deletePage = (pageId: string) => {
     if (doc.pages.length <= 1) return;
+    void recordRiskySnapshot();
     const pages = doc.pages.filter((p) => p.id !== pageId);
     const nextActive = pageId === doc.activePageId ? pages[0]!.id : doc.activePageId;
     commit({ ...doc, pages, activePageId: nextActive });
@@ -1671,6 +1739,7 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             connectorToolActive={isConnectorTool(pendingTool)}
             onToggleConnectorTool={() => setPendingTool((tool) => (isConnectorTool(tool) ? null : { type: "Connector" }))}
             onPreview={() => setPreviewOpen(true)}
+            onHistory={() => { setMenu(null); setHistoryOpen(true); }}
           />
         }
         styleBar={<PrototypeStyleBar inspect={inspect} canvas={pageCanvas(doc)} onCanvas={(patch) => commit(patchCanvas(doc, patch))} onUpdate={updateOne} />}
@@ -1841,6 +1910,7 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
                     variant="destructive"
                     onClick={() => {
                       if (!deleteComponentId) return;
+                      void recordRiskySnapshot();
                       commit(purgeComponent(doc, deleteComponentId));
                       if (editScope.kind === "component" && editScope.componentId === deleteComponentId) setEditScope({ kind: "page" });
                       setDeleteComponentId(null);
@@ -1877,6 +1947,14 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
                 )}
               </DialogContent>
             </Dialog>
+            <WireframeHistoryDialog
+              open={historyOpen}
+              onOpenChange={setHistoryOpen}
+              stem={openedStem}
+              loadSnapshots={loadHistorySnapshots}
+              loadSnapshotJson={loadHistorySnapshotJson}
+              onRestore={restoreHistorySnapshot}
+            />
           </>
         }
       />
