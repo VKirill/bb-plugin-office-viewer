@@ -16,7 +16,6 @@ import {
   newElementId,
   newWireframe,
   parseWireframe,
-  snap,
   type PaletteGroup,
   type PropValue,
   type Wireframe,
@@ -51,12 +50,42 @@ import {
 } from "./editing";
 import { alignElements, distributeElements, type AlignEdge, type DistributeAxis } from "./align";
 import { ICON_DRAG_PREFIX, iconDisplayLabel } from "./icons";
+import {
+  arrowNudge,
+  CANVAS_TOOL_KEYS,
+  clickSelection,
+  distanceLinesFor,
+  elementAtPoint,
+  expandToGroups,
+  gridStep,
+  groupIds,
+  marqueeHitTest,
+  moveElementsByDelta,
+  normalizeRect,
+  nudgeStep,
+  resizeByArrow,
+  selectionRect,
+  snapDelta,
+  snapRectToPeers,
+  type CanvasRect,
+  type DistanceLine,
+  type QuickTool,
+  type SnapGuide,
+  ungroupIds,
+  zoomIn,
+  zoomOut,
+  zoomToBounds,
+  zoomToFit,
+} from "./canvas-math";
+import { PrototypeContextMenu, type ContextMenuAction } from "./canvas-context-menu";
 
 const MAX_HISTORY = 60;
 
 type Drag =
   | { kind: "move"; ids: string[]; ox: number; oy: number; orig: Record<string, { x: number; y: number }> }
-  | { kind: "resize"; id: string; handle: Handle; orig: WireframeElement };
+  | { kind: "resize"; id: string; handle: Handle; orig: WireframeElement }
+  | { kind: "marquee"; ox: number; oy: number; contain: boolean }
+  | { kind: "pan"; startX: number; startY: number; scrollLeft: number; scrollTop: number };
 type SendKind = "both" | "png" | "json";
 
 function pageElements(doc: Wireframe) { return getActivePage(doc).elements; }
@@ -73,6 +102,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const canvasPaneRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
+  const spaceHeld = useRef(false);
   const clipboard = useRef<WireframeElement[]>([]);
   const [{ history, index }, setTimeline] = useState(() => ({ history: [newWireframe()], index: 0 }));
   const doc = history[index]!;
@@ -81,6 +111,17 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [badges, setBadges] = useState(true);
   const [zoom, setZoom] = useState(1);
+  const [snapGrid, setSnapGrid] = useState(true);
+  const [fineGrid, setFineGrid] = useState(true);
+  const [marquee, setMarquee] = useState<CanvasRect | null>(null);
+  const [snapGuides, setSnapGuides] = useState<SnapGuide[]>([]);
+  const [distanceLines, setDistanceLines] = useState<DistanceLine[]>([]);
+  const [moveTooltip, setMoveTooltip] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [panning, setPanning] = useState(false);
+  const [pendingTool, setPendingTool] = useState<QuickTool | null>(null);
+  const [quickInsertOpen, setQuickInsertOpen] = useState(false);
+  const [quickQuery, setQuickQuery] = useState("");
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [query, setQuery] = useState("");
   
   const [leftTab, setLeftTab] = useState<LeftTopTab>("pages");
@@ -166,6 +207,16 @@ const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements")
     setSelected([el.id]);
   };
 
+  const addQuickTool = (tool: QuickTool, x: number, y: number) => {
+    const base = defaultElement(tool.type, x, y, pageElements(doc));
+    const el = placeOnCanvas(
+      { ...base, props: { ...base.props, ...(tool.props ?? {}) } },
+      pageCanvas(doc),
+    );
+    replace([...pageElements(doc), el]);
+    setSelected([el.id]);
+  };
+
   const addIconFromLibrary = (iconName: string, x?: number, y?: number) => {
     const size = 24;
     const el = placeOnCanvas(
@@ -221,6 +272,34 @@ const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements")
     clipboard.current = selectedEls.map((el) => structuredClone(el));
   };
 
+  const cutSelected = () => {
+    copySelected();
+    removeSelected();
+  };
+
+  const groupSelected = () => {
+    if (selected.length < 2) return;
+    replace(groupIds(pageElements(doc), selected));
+  };
+
+  const ungroupSelected = () => {
+    replace(ungroupIds(pageElements(doc), selected));
+  };
+
+  const toggleLockSelected = () => {
+    if (!selected.length) return;
+    const pick = new Set(selected);
+    const locking = pageElements(doc).some((el) => pick.has(el.id) && !el.locked);
+    replace(pageElements(doc).map((el) => (pick.has(el.id) ? { ...el, locked: locking } : el)));
+  };
+
+  const setHiddenSelected = (hidden?: boolean) => {
+    if (!selected.length) return;
+    const pick = new Set(selected);
+    const nextHidden = hidden ?? !pageElements(doc).some((el) => pick.has(el.id) && el.hidden);
+    replace(pageElements(doc).map((el) => (pick.has(el.id) ? { ...el, hidden: nextHidden } : el)));
+  };
+
   const paste = () => {
     if (!clipboard.current.length) return;
     const copies = clipboard.current.map((el) =>
@@ -250,9 +329,14 @@ const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements")
   const fitZoom = () => {
     const pane = canvasPaneRef.current;
     if (!pane) return;
-    const pad = 32;
-    const next = Math.min((pane.clientWidth - pad) / pageCanvas(doc).width, (pane.clientHeight - pad) / pageCanvas(doc).height);
-    setZoom(Math.max(0.25, Math.min(2, Math.round(next * 100) / 100)));
+    setZoom(zoomToFit(pageCanvas(doc).width, pageCanvas(doc).height, pane.clientWidth, pane.clientHeight));
+  };
+
+  const zoomSelection = () => {
+    const pane = canvasPaneRef.current;
+    const bounds = selectionRect(pageElements(doc), selected);
+    if (!pane || !bounds) return;
+    setZoom(zoomToBounds(bounds, pane.clientWidth, pane.clientHeight));
   };
 
   const toggleMenu = (id: ToolbarMenu) => setMenu((was) => (was === id ? null : id));
@@ -277,12 +361,50 @@ const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements")
     return { x: (event.clientX - box.left) / zoom, y: (event.clientY - box.top) / zoom };
   };
 
+  const onPanePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 && event.button !== 1) return;
+    if (!spaceHeld.current && event.button !== 1) return;
+    const pane = canvasPaneRef.current;
+    if (!pane) return;
+    drag.current = {
+      kind: "pan",
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: pane.scrollLeft,
+      scrollTop: pane.scrollTop,
+    };
+    setPanning(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onPanePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const current = drag.current;
+    if (current?.kind !== "pan") return;
+    const pane = canvasPaneRef.current;
+    if (!pane) return;
+    pane.scrollLeft = current.scrollLeft - (event.clientX - current.startX);
+    pane.scrollTop = current.scrollTop - (event.clientY - current.startY);
+  };
+
+  const onPanePointerUp = () => {
+    if (drag.current?.kind === "pan") {
+      drag.current = null;
+      setPanning(false);
+    }
+  };
+
   const onBoardPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
+    if (spaceHeld.current) return;
     if ((event.target as HTMLElement).closest("input")) return;
+    setContextMenu(null);
     const handle = (event.target as HTMLElement).dataset.handle as Handle | undefined;
     const id = (event.target as HTMLElement).closest("[data-el]")?.getAttribute("data-el");
     const p = boardPoint(event);
+    if (pendingTool && !handle) {
+      addQuickTool(pendingTool, p.x, p.y);
+      return;
+    }
     if (handle && one) {
       drag.current = { kind: "resize", id: one.id, handle, orig: { ...one, props: { ...one.props } } };
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -291,7 +413,8 @@ const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements")
     if (id) {
       const target = pageElements(view).find((item) => item.id === id);
       if (target?.locked) return;
-      const ids = event.shiftKey ? (selected.includes(id) ? selected.filter((item) => item !== id) : [...selected, id]) : selected.includes(id) ? selected : [id];
+      const picked = clickSelection(selected, id, event.metaKey || event.ctrlKey, event.shiftKey);
+      const ids = expandToGroups(pageElements(view), picked);
       setSelected(ids);
       const orig: Record<string, { x: number; y: number }> = {};
       for (const el of pageElements(view)) if (ids.includes(el.id)) orig[el.id] = { x: el.x, y: el.y };
@@ -299,36 +422,76 @@ const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements")
       event.currentTarget.setPointerCapture(event.pointerId);
       return;
     }
-    if (!event.shiftKey) setSelected([]);
+    if (!event.shiftKey && !event.metaKey && !event.ctrlKey) setSelected([]);
+    drag.current = { kind: "marquee", ox: p.x, oy: p.y, contain: event.altKey };
+    setMarquee(normalizeRect(p.x, p.y, p.x, p.y));
+    event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const onBoardPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const current = drag.current;
-    if (!current) return;
     const p = boardPoint(event);
-    if (current.kind === "move") {
-      const dx = snap(p.x - current.ox);
-      const dy = snap(p.y - current.oy);
-      setLive(
-        patchElements(
-          doc,
-          pageElements(doc).map((el) => {
-            const from = current.orig[el.id];
-            return from ? { ...el, x: from.x + dx, y: from.y + dy } : el;
-          }),
-        ),
-      );
+    if (!current) {
+      if (event.altKey) {
+        const hit = elementAtPoint(pageElements(view), p.x, p.y);
+        setDistanceLines(hit ? distanceLinesFor(hit, pageElements(view)) : []);
+      } else setDistanceLines([]);
       return;
     }
-    setLive(patchElements(doc, pageElements(doc).map((el) => (el.id === current.id ? resized(current.orig, current.handle, p.x, p.y) : el))));
+    if (current.kind === "marquee") {
+      setMarquee(normalizeRect(current.ox, current.oy, p.x, p.y));
+      return;
+    }
+    if (current.kind === "move") {
+      let dx = p.x - current.ox;
+      let dy = p.y - current.oy;
+      const bounds = selectionRect(
+        pageElements(doc).map((el) => {
+          const from = current.orig[el.id];
+          return from ? { ...el, x: from.x + dx, y: from.y + dy } : el;
+        }),
+        current.ids,
+      );
+      const guides: SnapGuide[] = [];
+      if (bounds) {
+        const peerSnap = snapRectToPeers(bounds, pageElements(doc), new Set(current.ids));
+        dx += peerSnap.dx;
+        dy += peerSnap.dy;
+        guides.push(...peerSnap.guides);
+      }
+      const grid = snapGrid ? gridStep(fineGrid) : null;
+      const snapped = snapDelta(dx, dy, grid);
+      setSnapGuides(guides);
+      if (bounds) {
+        setMoveTooltip({ x: bounds.left + snapped.dx, y: bounds.top + snapped.dy, w: bounds.right - bounds.left, h: bounds.bottom - bounds.top });
+      }
+      setLive(patchElements(doc, moveElementsByDelta(pageElements(doc), new Set(current.ids), snapped.dx, snapped.dy, current.orig)));
+      return;
+    }
+    if (current.kind === "resize") {
+      setLive(patchElements(doc, pageElements(doc).map((el) => (el.id === current.id ? resized(current.orig, current.handle, p.x, p.y) : el))));
+    }
   };
 
   const onBoardPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
     const current = drag.current;
     drag.current = null;
+    setSnapGuides([]);
+    setMoveTooltip(null);
+    if (current?.kind === "marquee") {
+      const p = boardPoint(event);
+      const rect = normalizeRect(current.ox, current.oy, p.x, p.y);
+      setMarquee(null);
+      const hits = marqueeHitTest(pageElements(view), rect, current.contain ? "contain" : "intersect");
+      setSelected(expandToGroups(pageElements(view), hits));
+      return;
+    }
+    setMarquee(null);
     if (current?.kind === "move") {
       const p = boardPoint(event);
-      if (snap(p.x - current.ox) === 0 && snap(p.y - current.oy) === 0) {
+      const grid = snapGrid ? gridStep(fineGrid) : null;
+      const raw = snapDelta(p.x - current.ox, p.y - current.oy, grid);
+      if (raw.dx === 0 && raw.dy === 0) {
         const el = pageElements(doc).find((item) => current.ids[0] === item.id);
         if (el && event.detail === 1 && (el.type === "Radio" || el.type === "Checkbox") && p.x - el.x < 28) {
           setLive(null);
@@ -344,6 +507,28 @@ const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements")
       return;
     }
     commit(live);
+  };
+
+  const onBoardContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const id = (event.target as HTMLElement).closest("[data-el]")?.getAttribute("data-el");
+    if (id && !selected.includes(id)) setSelected(expandToGroups(pageElements(view), [id]));
+    setContextMenu({ x: event.clientX, y: event.clientY });
+  };
+
+  const onContextAction = (action: ContextMenuAction) => {
+    if (action === "cut") cutSelected();
+    else if (action === "copy") copySelected();
+    else if (action === "paste") paste();
+    else if (action === "duplicate") duplicateSelected();
+    else if (action === "delete") removeSelected();
+    else if (action === "group") groupSelected();
+    else if (action === "ungroup") ungroupSelected();
+    else if (action === "lock" || action === "unlock") toggleLockSelected();
+    else if (action === "hide") setHiddenSelected(true);
+    else if (action === "show") setHiddenSelected(false);
+    else if (action === "bringForward") nudgeLayer(1);
+    else if (action === "sendBackward") nudgeLayer(-1);
   };
 
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -577,10 +762,77 @@ const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements")
       paste();
       return;
     }
+    if (mod && key === "x") {
+      event.preventDefault();
+      cutSelected();
+      return;
+    }
+    if (mod && key === "g") {
+      event.preventDefault();
+      if (event.shiftKey) ungroupSelected();
+      else groupSelected();
+      return;
+    }
+    if (mod && key === "l") {
+      event.preventDefault();
+      toggleLockSelected();
+      return;
+    }
+    if (mod && key === "h") {
+      event.preventDefault();
+      if (event.shiftKey) setHiddenSelected(false);
+      else setHiddenSelected(true);
+      return;
+    }
+    if (mod && key === "a") {
+      event.preventDefault();
+      setSelected(pageElements(doc).map((el) => el.id));
+      return;
+    }
     if (mod && key === "s") {
       event.preventDefault();
       setSaveName(openedStem ?? doc.name);
       setSaveOpen(true);
+      return;
+    }
+    if (mod && (key === "=" || key === "+")) {
+      event.preventDefault();
+      setZoom((z) => zoomIn(z));
+      return;
+    }
+    if (mod && key === "-") {
+      event.preventDefault();
+      setZoom((z) => zoomOut(z));
+      return;
+    }
+    if (mod && key === "0") {
+      event.preventDefault();
+      fitZoom();
+      return;
+    }
+    if (mod && key === "1") {
+      event.preventDefault();
+      setZoom(1);
+      return;
+    }
+    if (mod && key === "2" && event.shiftKey) {
+      event.preventDefault();
+      zoomSelection();
+      return;
+    }
+    if (mod && key === "2") {
+      event.preventDefault();
+      setZoom(2);
+      return;
+    }
+    if (mod && event.key === "'") {
+      event.preventDefault();
+      setSnapGrid((on) => !on);
+      return;
+    }
+    if (mod && event.altKey && event.key === "'") {
+      event.preventDefault();
+      setFineGrid((on) => !on);
       return;
     }
     if (event.key === "Delete" || event.key === "Backspace") {
@@ -590,10 +842,34 @@ const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements")
     }
     if (event.key.startsWith("Arrow") && selected.length) {
       event.preventDefault();
-      const step = event.shiftKey ? SNAP * 2 : SNAP;
-      const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
-      const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
+      const step = nudgeStep(event.shiftKey);
+      const { dx, dy } = arrowNudge(event.key, step);
+      if (mod && one) {
+        replace(pageElements(doc).map((el) => (el.id === one.id ? resizeByArrow(el, event.key, step) : el)));
+        return;
+      }
       replace(pageElements(doc).map((el) => (selected.includes(el.id) ? { ...el, x: el.x + dx, y: el.y + dy } : el)));
+      return;
+    }
+    if (quickInsertOpen && event.key === "Escape") {
+      event.preventDefault();
+      setQuickInsertOpen(false);
+      setQuickQuery("");
+      return;
+    }
+    if (!mod && key === "/") {
+      event.preventDefault();
+      setQuickInsertOpen(true);
+      return;
+    }
+    if (!mod && key === "v") {
+      setPendingTool(null);
+      return;
+    }
+    if (!mod && key.length === 1 && CANVAS_TOOL_KEYS[key]) {
+      event.preventDefault();
+      setPendingTool(CANVAS_TOOL_KEYS[key]);
+      setQuickInsertOpen(false);
     }
   };
 
@@ -670,7 +946,29 @@ const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements")
     return () => window.removeEventListener("keydown", onKey);
   }, [leftTab, doc]);
 
+  useEffect(() => {
+    const block = (event: globalThis.KeyboardEvent) => {
+      const tag = (event.target as HTMLElement).closest("input, textarea, [role=dialog]");
+      if (tag) return;
+      if (event.code === "Space") {
+        event.preventDefault();
+        spaceHeld.current = event.type === "keydown";
+      }
+    };
+    window.addEventListener("keydown", block);
+    window.addEventListener("keyup", block);
+    return () => {
+      window.removeEventListener("keydown", block);
+      window.removeEventListener("keyup", block);
+    };
+  }, []);
+
 const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(tile.labelKey, tile.labelParams ?? {})));
+  const quickTiles = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, quickQuery, t(tile.labelKey, tile.labelParams ?? {}))).slice(0, 12);
+  const canGroup = selected.length > 1;
+  const canUngroup = selected.some((id) => pageElements(doc).find((el) => el.id === id)?.groupId);
+  const selectionLocked = selected.length > 0 && selected.every((id) => pageElements(doc).find((el) => el.id === id)?.locked);
+  const selectionHidden = selected.length > 0 && selected.every((id) => pageElements(doc).find((el) => el.id === id)?.hidden);
 
   return (
     <div ref={rootRef} tabIndex={0} data-thread-id={threadId} className="h-full min-h-0 outline-none" onKeyDown={onKeyDown}>
@@ -768,10 +1066,22 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             edit={edit}
             editInputRef={editInputRef}
             selectionBand={selectionBand}
+            showSnapGrid={snapGrid}
+            gridSize={gridStep(fineGrid)}
+            marquee={marquee}
+            snapGuides={snapGuides}
+            distanceLines={distanceLines}
+            moveTooltip={moveTooltip}
+            panning={panning}
+            insertMode={pendingTool !== null}
+            onPanePointerDown={onPanePointerDown}
+            onPanePointerMove={onPanePointerMove}
+            onPanePointerUp={onPanePointerUp}
             onBoardPointerDown={onBoardPointerDown}
             onBoardPointerMove={onBoardPointerMove}
             onBoardPointerUp={onBoardPointerUp}
             onBoardDoubleClick={onBoardDoubleClick}
+            onBoardContextMenu={onBoardContextMenu}
             onDrop={onDrop}
             onEditChange={(draft) => setEdit((e) => (e ? { ...e, draft } : e))}
             onInlineKeyDown={onInlineKeyDown}
@@ -824,6 +1134,42 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
           </>
         }
       />
+      <PrototypeContextMenu
+        open={contextMenu !== null}
+        x={contextMenu?.x ?? 0}
+        y={contextMenu?.y ?? 0}
+        canPaste={clipboard.current.length > 0}
+        canGroup={canGroup}
+        canUngroup={canUngroup}
+        locked={selectionLocked}
+        hidden={selectionHidden}
+        onAction={onContextAction}
+        onClose={() => setContextMenu(null)}
+      />
+      {quickInsertOpen ? (
+        <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/20 pt-24" onClick={() => { setQuickInsertOpen(false); setQuickQuery(""); }}>
+          <div className="w-full max-w-md rounded-lg border border-border bg-popover p-3 shadow-lg" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-2 text-sm font-medium">{t("protoQuickInsert")}</div>
+            <Input autoFocus value={quickQuery} onChange={(event) => setQuickQuery(event.target.value)} placeholder={t("protoSearch")} />
+            <div className="mt-2 max-h-64 overflow-auto">
+              {quickTiles.map((tile) => (
+                <button
+                  key={tile.id}
+                  type="button"
+                  className="flex w-full rounded px-2 py-1.5 text-left text-sm hover:bg-state-hover"
+                  onClick={() => {
+                    addTile(tile);
+                    setQuickInsertOpen(false);
+                    setQuickQuery("");
+                  }}
+                >
+                  {t(tile.labelKey, tile.labelParams ?? {})}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

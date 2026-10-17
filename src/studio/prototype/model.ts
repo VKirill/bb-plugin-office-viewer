@@ -74,6 +74,7 @@ export type WireframeElement = {
   note?: string;
   hidden?: boolean;
   locked?: boolean;
+  groupId?: string;
 };
 
 export type WireframeCanvas = { width: number; height: number; background: string };
@@ -177,6 +178,7 @@ const elementSchema = z
     note: z.string().max(4000).optional(),
     hidden: z.boolean().optional(),
     locked: z.boolean().optional(),
+    groupId: z.string().min(1).max(128).optional(),
   })
   .strict();
 
