@@ -15,6 +15,7 @@ import { parseWireframe } from "./src/studio/prototype/model.ts";
 import { parsePaintDoc } from "./src/studio/paint/paint-model.ts";
 import { freeStem, listedStem, pngPath, prototypesDir, sanitizeStem, wireframePath } from "./src/server/wireframes.ts";
 import { freePaintStem, listedPaintStem, paintDir, paintJsonPath, paintPngPath, sanitizePaintStem } from "./src/server/paint.ts";
+import { loadHugeiconsByNames } from "./src/server/hugeicons.ts";
 
 const say = (lang: Lang, en: string, ru: string) => (lang === "ru" ? ru : en);
 
@@ -196,6 +197,21 @@ export default function plugin(bb: BbPluginApi) {
     screenshotBody ??= readFile(require.resolve("modern-screenshot/dist/index.js"));
     return new Response(new Uint8Array(await screenshotBody), {
       headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache", etag: `"${screenshotVersion}"`, "access-control-allow-origin": "*" },
+    });
+  });
+
+  // Prototype builder: Hugeicons SVG paths by name (batched POST). Keeps @hugeicons/core-free-icons off the app bundle.
+  bb.http.route("POST", "/prototype/hugeicons", async (context) => {
+    const body = (await context.req.json().catch(() => null)) as { names?: unknown } | null;
+    const raw = Array.isArray(body?.names) ? body.names : [];
+    const names = raw.filter((entry): entry is string => typeof entry === "string");
+    const icons = await loadHugeiconsByNames(names);
+    return new Response(JSON.stringify({ icons }), {
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "private, max-age=3600",
+        "access-control-allow-origin": "*",
+      },
     });
   });
 

@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "task_id": "prototype-icons-fix",
+  "task_sha256": "d0a90a71d6e1cd10a2c143c45cbd20c88137f71f0dca8cd64c6a339f3f71beb0",
+  "attempt": 1,
+  "provider_exit": 0,
+  "report": "complete",
+  "report_sha256": "91bf932391861574a67f0794dfd439237a23cc94ae5f18786551789ffad201e1",
+  "owns_check": "passed",
+  "verification": "passed",
+  "review": "not_required",
+  "accepted": true,
+  "accepted_at": "2026-10-17T18:16:48.247Z",
+  "model": "composer-2.5"
+}
