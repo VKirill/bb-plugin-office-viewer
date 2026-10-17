@@ -1,15 +1,44 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CATALOG, CATALOG_BY_TYPE, ELEMENT_TYPES, defaultElement, newWireframe, parseWireframe, snap } from "./model.ts";
+import {
+  CATALOG,
+  CATALOG_BY_TYPE,
+  ELEMENT_TYPES,
+  WIREFRAME_VERSION,
+  WIREFRAME_VERSION_LEGACY,
+  defaultElement,
+  getActivePage,
+  migrateWireframeV1,
+  newWireframe,
+  parseWireframe,
+  snap,
+} from "./model.ts";
 
-test("parseWireframe round-trips a valid document", () => {
+test("parseWireframe round-trips a valid v2 document", () => {
   const doc = newWireframe("Login");
   const button = defaultElement("Button", 16, 24);
-  doc.elements.push({ ...button, note: "Primary action" });
+  const page = getActivePage(doc);
+  page.elements.push({ ...button, note: "Primary action" });
   const again = parseWireframe(JSON.stringify(doc));
   assert.deepEqual(again, doc);
   assert.equal(again.format, "bb-wireframe");
-  assert.equal(again.version, 1);
+  assert.equal(again.version, WIREFRAME_VERSION);
+});
+
+test("parseWireframe migrates v1 to v2 with elements preserved", () => {
+  const button = defaultElement("Button", 8, 8);
+  const v1 = {
+    format: "bb-wireframe" as const,
+    version: WIREFRAME_VERSION_LEGACY as 1,
+    name: "Legacy",
+    canvas: { width: 1280, height: 800, background: "#ffffff" },
+    elements: [button],
+  };
+  const migrated = parseWireframe(v1);
+  assert.equal(migrated.version, WIREFRAME_VERSION);
+  assert.equal(migrated.pages.length, 1);
+  assert.deepEqual(getActivePage(migrated).elements, v1.elements);
+  assert.equal(migrateWireframeV1(v1).pages[0]!.elements.length, 1);
 });
 
 test("every type has catalog defaults and a numbered label", () => {
@@ -43,7 +72,7 @@ test("snap uses an 8px grid", () => {
 test("parseWireframe rejects a bad file", () => {
   assert.throws(() => parseWireframe("{"), SyntaxError);
   assert.throws(() => parseWireframe({ format: "other", version: 1, name: "A", canvas: { width: 100, height: 100, background: "#fff" }, elements: [] }));
-  assert.throws(() => parseWireframe({ ...newWireframe(), version: 2 }));
-  assert.throws(() => parseWireframe({ ...newWireframe(), elements: [{ id: "1", type: "Widget", label: "W", x: 0, y: 0, w: 8, h: 8, props: {} }] }));
-  assert.throws(() => parseWireframe({ ...newWireframe(), elements: [{ id: "1", type: "Button", label: "B", x: 0, y: 0, w: 0, h: 8, props: {} }] }));
+  assert.throws(() => parseWireframe({ ...newWireframe(), version: 99 }));
+  assert.throws(() => parseWireframe({ ...newWireframe(), pages: [{ ...getActivePage(newWireframe()), elements: [{ id: "1", type: "Widget", label: "W", x: 0, y: 0, w: 8, h: 8, props: {} }] }] }));
+  assert.throws(() => parseWireframe({ ...newWireframe(), pages: [{ ...getActivePage(newWireframe()), elements: [{ id: "1", type: "Button", label: "B", x: 0, y: 0, w: 0, h: 8, props: {} }] }] }));
 });

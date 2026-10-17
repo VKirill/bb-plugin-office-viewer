@@ -1,8 +1,9 @@
-// Wireframe document: A2UI-style elements, 8px snap, parse/create helpers.
+// Wireframe document: pages (v2), 8px snap, parse/create helpers.
 import { z } from "zod";
 
 export const WIREFRAME_FORMAT = "bb-wireframe" as const;
-export const WIREFRAME_VERSION = 1;
+export const WIREFRAME_VERSION = 2;
+export const WIREFRAME_VERSION_LEGACY = 1;
 export const SNAP = 8;
 
 export const ELEMENT_TYPES = [
@@ -71,14 +72,26 @@ export type WireframeElement = {
   h: number;
   props: Record<string, PropValue>;
   note?: string;
+  hidden?: boolean;
+  locked?: boolean;
+};
+
+export type WireframeCanvas = { width: number; height: number; background: string };
+
+export type WireframePage = {
+  id: string;
+  name: string;
+  canvas: WireframeCanvas;
+  elements: WireframeElement[];
+  notes?: string;
 };
 
 export type Wireframe = {
   format: typeof WIREFRAME_FORMAT;
   version: typeof WIREFRAME_VERSION;
   name: string;
-  canvas: { width: number; height: number; background: string };
-  elements: WireframeElement[];
+  pages: WireframePage[];
+  activePageId: string;
 };
 
 export type CatalogEntry = {
@@ -162,29 +175,59 @@ const elementSchema = z
     h: z.number().positive().max(8192),
     props: z.record(z.string(), propValueSchema),
     note: z.string().max(4000).optional(),
+    hidden: z.boolean().optional(),
+    locked: z.boolean().optional(),
   })
   .strict();
 
-const wireframeSchema = z
+const canvasSchema = z
+  .object({
+    width: z.number().int().min(1).max(8192),
+    height: z.number().int().min(1).max(8192),
+    background: z.string().min(1).max(64),
+  })
+  .strict();
+
+const pageSchema = z
+  .object({
+    id: z.string().min(1).max(128),
+    name: z.string().min(1).max(200),
+    canvas: canvasSchema,
+    elements: z.array(elementSchema).max(2000),
+    notes: z.string().max(8000).optional(),
+  })
+  .strict();
+
+const wireframeV2Schema = z
   .object({
     format: z.literal(WIREFRAME_FORMAT),
     version: z.literal(WIREFRAME_VERSION),
     name: z.string().min(1).max(200),
-    canvas: z
-      .object({
-        width: z.number().int().min(1).max(8192),
-        height: z.number().int().min(1).max(8192),
-        background: z.string().min(1).max(64),
-      })
-      .strict(),
+    pages: z.array(pageSchema).min(1).max(200),
+    activePageId: z.string().min(1).max(128),
+  })
+  .strict()
+  .refine((doc) => doc.pages.some((page) => page.id === doc.activePageId), { message: "activePageId must match a page" });
+
+const wireframeV1Schema = z
+  .object({
+    format: z.literal(WIREFRAME_FORMAT),
+    version: z.literal(WIREFRAME_VERSION_LEGACY),
+    name: z.string().min(1).max(200),
+    canvas: canvasSchema,
     elements: z.array(elementSchema).max(2000),
   })
   .strict();
 
 let nextId = 0;
+let nextPageId = 0;
 
 export function newElementId(): string {
   return `el_${Date.now().toString(36)}_${(++nextId).toString(36)}`;
+}
+
+export function newPageId(): string {
+  return `pg_${Date.now().toString(36)}_${(++nextPageId).toString(36)}`;
 }
 
 export function snap(v: number, grid = SNAP): number {
@@ -196,6 +239,13 @@ export function nextLabel(type: ElementType, existing: readonly { label: string 
   let n = 1;
   while (used.has(`${type} ${n}`)) n += 1;
   return `${type} ${n}`;
+}
+
+export function nextPageName(pages: readonly { name: string }[]): string {
+  const used = new Set(pages.map((page) => page.name));
+  let n = 1;
+  while (used.has(`Page ${n}`)) n += 1;
+  return `Page ${n}`;
 }
 
 export function defaultElement(type: ElementType, x: number, y: number, existing: readonly WireframeElement[] = []): WireframeElement {
@@ -212,19 +262,54 @@ export function defaultElement(type: ElementType, x: number, y: number, existing
   };
 }
 
+export function newPage(name?: string, canvas: WireframeCanvas = { ...CANVAS_PRESETS.desktop, background: "#ffffff" }): WireframePage {
+  return { id: newPageId(), name: name ?? "Page 1", canvas, elements: [] };
+}
+
 export function newWireframe(name = "Untitled"): Wireframe {
+  const page = newPage("Page 1");
   return {
     format: WIREFRAME_FORMAT,
     version: WIREFRAME_VERSION,
     name,
-    canvas: { ...CANVAS_PRESETS.desktop, background: "#ffffff" },
-    elements: [],
+    pages: [page],
+    activePageId: page.id,
+  };
+}
+
+export function getActivePage(doc: Wireframe): WireframePage {
+  return doc.pages.find((page) => page.id === doc.activePageId) ?? doc.pages[0]!;
+}
+
+export function updateActivePage(doc: Wireframe, update: (page: WireframePage) => WireframePage): Wireframe {
+  return {
+    ...doc,
+    pages: doc.pages.map((page) => (page.id === doc.activePageId ? update(page) : page)),
+  };
+}
+
+export function setActivePageId(doc: Wireframe, pageId: string): Wireframe {
+  if (!doc.pages.some((page) => page.id === pageId)) return doc;
+  return { ...doc, activePageId: pageId };
+}
+
+export function migrateWireframeV1(v1: z.infer<typeof wireframeV1Schema>): Wireframe {
+  const page = newPage("Page 1", v1.canvas);
+  return {
+    format: WIREFRAME_FORMAT,
+    version: WIREFRAME_VERSION,
+    name: v1.name,
+    activePageId: page.id,
+    pages: [{ ...page, elements: v1.elements }],
   };
 }
 
 export function parseWireframe(input: unknown): Wireframe {
   const raw = typeof input === "string" ? JSON.parse(input) : input;
-  return wireframeSchema.parse(raw);
+  if (typeof raw === "object" && raw !== null && (raw as { version?: number }).version === WIREFRAME_VERSION_LEGACY) {
+    return migrateWireframeV1(wireframeV1Schema.parse(raw));
+  }
+  return wireframeV2Schema.parse(raw);
 }
 
 export function cloneWireframe(doc: Wireframe): Wireframe {
