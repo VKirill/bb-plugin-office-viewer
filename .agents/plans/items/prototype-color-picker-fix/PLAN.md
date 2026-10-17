@@ -14,3 +14,6 @@ Fix the shared colour picker (wherever prototype-inspector-native put it — com
 5. Tests for the pure helpers: effective default colour per element type, hex/rgba/hsv conversions, «transparent» → «Нет» display.
 
 - Completed and accepted in Lane Pilot run `lprun_38203a8bf69c43f294a012b07bded797` (task `prototype-color-picker-fix`).
+
+## Completion
+- [x] Prototype colour picker: fix and polish.

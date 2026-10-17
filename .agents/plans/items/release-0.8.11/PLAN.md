@@ -22,3 +22,6 @@ The installed source range is `^0.8.1` — stay in 0.8.x.
 Nothing else changes.
 
 - Completed and accepted in Lane Pilot run `lprun_38203a8bf69c43f294a012b07bded797` (task `release-0.8.11`).
+
+## Completion
+- [x] Release 0.8.11.

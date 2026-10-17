@@ -13,3 +13,6 @@ Do, for all three tools (Prototype, Paint, Slides) and the launcher:
 5. Tests (node:test, .ts): session store get/set/serialise with caps, debounce/flush helper with fake timers, restore precedence (memory > localStorage > file list newest).
 
 - Completed and accepted in Lane Pilot run `lprun_38203a8bf69c43f294a012b07bded797` (task `studio-autosave-restore`).
+
+## Completion
+- [x] Office Studio: keep work when the panel is hidden and reopened (autosave + restore).

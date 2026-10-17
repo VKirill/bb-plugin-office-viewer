@@ -10,3 +10,6 @@ Fix across the whole Style tab (it is ≈260 px wide, can be wider):
 5. Verify visually at panel widths 240, 280 and 360 px in light and dark (take screenshots of the Style tab with a Button selected in a quick local harness or Storybook-like page if available, save to the task report folder) — no control overlaps another.
 
 - Completed and accepted in Lane Pilot run `lprun_38203a8bf69c43f294a012b07bded797` (task `prototype-style-layout`).
+
+## Completion
+- [x] Prototype Style panel: layout polish — no overlapping controls.

@@ -10,3 +10,6 @@ Do:
 3. Report the root cause in one sentence.
 
 - Completed and accepted in Lane Pilot run `lprun_38203a8bf69c43f294a012b07bded797` (task `prototype-style-apply-fix`).
+
+## Completion
+- [x] Fix: opacity from the Style panel does not change the element on the canvas.

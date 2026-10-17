@@ -9,3 +9,6 @@ Fix:
 4. Disabled state when nothing (or for distribute, fewer than 3 elements) is selected: 40 % opacity, no hover.
 
 - Completed and accepted in Lane Pilot run `lprun_38203a8bf69c43f294a012b07bded797` (task `prototype-align-icons`).
+
+## Completion
+- [x] Prototype: proper alignment icons and tooltips.

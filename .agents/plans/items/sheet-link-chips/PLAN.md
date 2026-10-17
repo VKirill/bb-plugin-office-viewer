@@ -10,3 +10,6 @@ Steps:
 ## History
 ### 2026-10-17
 - Completed and accepted in Lane Pilot run `lprun_38203a8bf69c43f294a012b07bded797` (task `sheet-link-chips`); follow-up icon and friendly-name fixes are tracked in the sibling plan.
+
+## Completion
+- [x] Spreadsheet link chips.

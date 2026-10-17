@@ -24,3 +24,6 @@ Owner: «добавил прямоугольник, зажал Shift — он с
 Pure functions in `src/studio/prototype/canvas-math.ts` (extend): `drawRect(start, current, {shift, alt})`, `resizeBox(box, handle, delta, {shift, alt, locked})`, `constrainMove(delta, shift)`, `snapAngle(angle, shift)`; tests for each modifier combination incl. negative drags (dragging up-left).
 
 - Completed and accepted in Lane Pilot run `lprun_38203a8bf69c43f294a012b07bded797` (task `prototype-modifier-keys`).
+
+## Completion
+- [x] Prototype: modifier keys like Figma / Axure / Photoshop.
