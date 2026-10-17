@@ -120,9 +120,45 @@ export function stylePatchToInline(patch: StylePatch): Record<string, string | n
   if (patch.fill) out.background = patch.fill;
   if (patch.color) out.color = patch.color;
   if (patch.stroke) out.borderColor = patch.stroke;
-  if (typeof patch.strokeWidth === "number") out.borderWidth = patch.strokeWidth;
+  if (typeof patch.strokeWidth === "number") {
+    out.borderWidth = patch.strokeWidth;
+    if (patch.strokeWidth > 0) out.borderStyle = "solid";
+  }
   if (typeof patch.radius === "number") out.borderRadius = patch.radius;
   if (typeof patch.opacity === "number") out.opacity = patch.opacity;
+  if (typeof patch.fontSize === "number") out.fontSize = patch.fontSize;
+  if (patch.fontWeight !== undefined) out.fontWeight = patch.fontWeight;
+  if (patch.textAlign) out.textAlign = patch.textAlign;
+  if (patch.shadow) out.boxShadow = "0 2px 8px color-mix(in oklab, var(--foreground) 25%, transparent)";
+  return out;
+}
+
+/** Canvas / export / slides: element.style (+ padding prop) as CSS for the element box. */
+export function wireframeElementBoxStyle(
+  el: WireframeElement,
+  target: StyleTarget = "base",
+): Record<string, string | number> {
+  const inline = stylePatchToInline(resolveStylePatch(el, target));
+  const padding = typeof el.props.padding === "number" ? el.props.padding : undefined;
+  if (padding !== undefined) {
+    inline.padding = padding;
+    inline.boxSizing = "border-box";
+  }
+  return inline;
+}
+
+/** Inner face overrides from style (no opacity — applied on the element box). */
+export function elementFaceStyleOverrides(el: WireframeElement, target: StyleTarget = "base"): Record<string, string | number> {
+  const patch = resolveStylePatch(el, target);
+  const out: Record<string, string | number> = {};
+  if (patch.fill) out.background = patch.fill;
+  if (patch.color) out.color = patch.color;
+  if (patch.stroke) out.borderColor = patch.stroke;
+  if (typeof patch.strokeWidth === "number") {
+    out.borderWidth = patch.strokeWidth;
+    if (patch.strokeWidth > 0) out.borderStyle = "solid";
+  }
+  if (typeof patch.radius === "number") out.borderRadius = patch.radius;
   if (typeof patch.fontSize === "number") out.fontSize = patch.fontSize;
   if (patch.fontWeight !== undefined) out.fontWeight = patch.fontWeight;
   if (patch.textAlign) out.textAlign = patch.textAlign;
