@@ -15,6 +15,8 @@ import { parseWireframe } from "./src/studio/prototype/model.ts";
 import { parsePaintDoc } from "./src/studio/paint/paint-model.ts";
 import { freeStem, listedStem, pngPath, prototypesDir, sanitizeStem, wireframePath } from "./src/server/wireframes.ts";
 import { freePaintStem, listedPaintStem, paintDir, paintJsonPath, paintPngPath, sanitizePaintStem } from "./src/server/paint.ts";
+import { parseSlidesDeck } from "./src/studio/slides/model.ts";
+import { freeSlidesStem, listedSlidesStem, slidesDir, slidesJsonPath, slidesPngPath, sanitizeSlidesStem } from "./src/server/slides.ts";
 import { loadHugeiconsByNames } from "./src/server/hugeicons.ts";
 
 const say = (lang: Lang, en: string, ru: string) => (lang === "ru" ? ru : en);
@@ -133,6 +135,27 @@ export const rpcContract = defineRpcContract({
     output: z.object({ names: z.array(z.string()) }).strict(),
   },
   loadPaint: {
+    input: z.object({ threadId: z.string().min(1).max(256), name: z.string().min(1).max(255), locale: z.enum(["en", "ru"]).optional() }).strict(),
+    output: z.object({ json: z.string(), absPath: z.string() }).strict(),
+  },
+  saveSlides: {
+    input: z
+      .object({
+        threadId: z.string().min(1).max(256),
+        name: z.string().min(1).max(255),
+        json: z.string().min(2).max(8 * 1024 * 1024),
+        pngBase64: z.string().min(1).max(60 * 1024 * 1024),
+        overwrite: z.boolean(),
+        locale: z.enum(["en", "ru"]).optional(),
+      })
+      .strict(),
+    output: z.object({ name: z.string(), jsonPath: z.string(), pngPath: z.string() }).strict(),
+  },
+  listSlides: {
+    input: z.object({ threadId: z.string().min(1).max(256), locale: z.enum(["en", "ru"]).optional() }).strict(),
+    output: z.object({ names: z.array(z.string()) }).strict(),
+  },
+  loadSlides: {
     input: z.object({ threadId: z.string().min(1).max(256), name: z.string().min(1).max(255), locale: z.enum(["en", "ru"]).optional() }).strict(),
     output: z.object({ json: z.string(), absPath: z.string() }).strict(),
   },
@@ -414,6 +437,52 @@ export default function plugin(bb: BbPluginApi) {
       if (!("content" in file)) throw new Error(say(locale, "The server returned no file content.", "Сервер не вернул содержимое файла."));
       const json = file.contentEncoding === "base64" ? Buffer.from(file.content, "base64").toString("utf8") : file.content;
       parsePaintDoc(json);
+      return { json, absPath };
+    },
+    saveSlides: async ({ threadId, name, json, pngBase64, overwrite, locale = "en" }) => {
+      parseSlidesDeck(json);
+      const stemWanted = sanitizeSlidesStem(name, locale);
+      const storage = await sdk.threads.storageLocation({ threadId });
+      const dir = slidesDir(storage.storageRootPath, locale);
+      let stem = stemWanted;
+      if (!overwrite) {
+        const probes = [stemWanted, ...Array.from({ length: 98 }, (_, i) => `${stemWanted}-${i + 2}`)].map((candidate) => slidesJsonPath(dir, candidate, locale));
+        const { existence } = await bb.sdk.hosts.pathsExist({ hostId: storage.hostId, paths: probes });
+        stem = freeSlidesStem(dir, stemWanted, existence, locale);
+      }
+      const jsonAbs = slidesJsonPath(dir, stem, locale);
+      const pngAbs = slidesPngPath(dir, stem, locale);
+      const hostName = (await bb.sdk.hosts.get({ hostId: storage.hostId }).catch(() => null))?.name || storage.hostId;
+      await bb.sdk.files
+        .write({ hostId: storage.hostId, path: jsonAbs, content: json, contentEncoding: "utf8", createParents: true })
+        .catch((error: unknown) => { throw describe(error, hostName, jsonAbs, locale); });
+      await bb.sdk.files
+        .write({ hostId: storage.hostId, path: pngAbs, content: pngBase64, contentEncoding: "base64", createParents: true })
+        .catch((error: unknown) => { throw describe(error, hostName, pngAbs, locale); });
+      bb.log.info(`wrote slides ${storage.hostId}:${jsonAbs}`);
+      return { name: stem, jsonPath: jsonAbs, pngPath: pngAbs };
+    },
+    listSlides: async ({ threadId, locale = "en" }) => {
+      const storage = await sdk.threads.storageLocation({ threadId });
+      const dir = slidesDir(storage.storageRootPath, locale);
+      const listed = await bb.sdk.files.list({ hostId: storage.hostId, path: dir, limit: 5000, includeHidden: false }).catch(() => ({ files: [] as { name?: string; path: string }[] }));
+      const names = listed.files
+        .map((file) => listedSlidesStem(file.name ?? file.path))
+        .filter((stem): stem is string => stem !== null);
+      names.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+      return { names };
+    },
+    loadSlides: async ({ threadId, name, locale = "en" }) => {
+      const stem = sanitizeSlidesStem(name, locale);
+      const storage = await sdk.threads.storageLocation({ threadId });
+      const absPath = slidesJsonPath(slidesDir(storage.storageRootPath, locale), stem, locale);
+      const hostName = (await bb.sdk.hosts.get({ hostId: storage.hostId }).catch(() => null))?.name || storage.hostId;
+      const file = await bb.sdk.files
+        .read({ hostId: storage.hostId, path: absPath })
+        .catch((error: unknown) => { throw describe(error, hostName, absPath, locale); });
+      if (!("content" in file)) throw new Error(say(locale, "The server returned no file content.", "Сервер не вернул содержимое файла."));
+      const json = file.contentEncoding === "base64" ? Buffer.from(file.content, "base64").toString("utf8") : file.content;
+      parseSlidesDeck(json);
       return { json, absPath };
     },
   });
