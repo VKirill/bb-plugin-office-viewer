@@ -14,6 +14,8 @@ import { fetchPublic } from "./src/server/web.ts";
 import { parseWireframe } from "./src/studio/prototype/model.ts";
 import { parsePaintDoc } from "./src/studio/paint/paint-model.ts";
 import { freeStem, listedStem, pngPath, prototypesDir, sanitizeStem, wireframePath } from "./src/server/wireframes.ts";
+import { appendWireframeHistorySnapshot, readHistoryIndex } from "./src/server/wireframe-history-store.ts";
+import { historySnapshotPath, wireframeHistoryReasons } from "./src/server/wireframe-history.ts";
 import { freePaintStem, listedPaintStem, paintDir, paintJsonPath, paintPngPath, sanitizePaintStem } from "./src/server/paint.ts";
 import { parseSlidesDeck } from "./src/studio/slides/model.ts";
 import { freeSlidesStem, listedSlidesStem, slidesDir, slidesJsonPath, slidesPngPath, sanitizeSlidesStem } from "./src/server/slides.ts";
@@ -104,9 +106,54 @@ export const rpcContract = defineRpcContract({
         pngBase64: z.string().min(1).max(60 * 1024 * 1024).optional(),
         overwrite: z.boolean(),
         locale: z.enum(["en", "ru"]).optional(),
+        snapshotReason: z.enum(wireframeHistoryReasons).optional(),
       })
       .strict(),
     output: z.object({ name: z.string(), jsonPath: z.string(), pngPath: z.string() }).strict(),
+  },
+  listWireframeHistory: {
+    input: z.object({ threadId: z.string().min(1).max(256), name: z.string().min(1).max(255), locale: z.enum(["en", "ru"]).optional() }).strict(),
+    output: z
+      .object({
+        snapshots: z.array(
+          z.object({ id: z.string(), createdAt: z.number(), reason: z.enum(wireframeHistoryReasons) }).strict(),
+        ),
+      })
+      .strict(),
+  },
+  loadWireframeHistory: {
+    input: z
+      .object({
+        threadId: z.string().min(1).max(256),
+        name: z.string().min(1).max(255),
+        snapshotId: z.string().min(1).max(128),
+        locale: z.enum(["en", "ru"]).optional(),
+      })
+      .strict(),
+    output: z.object({ json: z.string(), readOnly: z.literal(true) }).strict(),
+  },
+  restoreWireframeHistory: {
+    input: z
+      .object({
+        threadId: z.string().min(1).max(256),
+        name: z.string().min(1).max(255),
+        snapshotId: z.string().min(1).max(128),
+        locale: z.enum(["en", "ru"]).optional(),
+      })
+      .strict(),
+    output: z.object({ name: z.string(), jsonPath: z.string() }).strict(),
+  },
+  appendWireframeSnapshot: {
+    input: z
+      .object({
+        threadId: z.string().min(1).max(256),
+        name: z.string().min(1).max(255),
+        json: z.string().min(2).max(8 * 1024 * 1024),
+        reason: z.enum(wireframeHistoryReasons),
+        locale: z.enum(["en", "ru"]).optional(),
+      })
+      .strict(),
+    output: z.object({ snapshotId: z.string() }).strict(),
   },
   listWireframes: {
     input: z.object({ threadId: z.string().min(1).max(256), locale: z.enum(["en", "ru"]).optional() }).strict(),
@@ -347,7 +394,7 @@ export default function plugin(bb: BbPluginApi) {
       bb.log.info(`saved ${edits.length} edit(s) to ${where.hostId}:${where.absPath}`);
       return { outcome: "written" as const, sha256: result.sha256, sizeBytes: next.byteLength };
     },
-    saveWireframe: async ({ threadId, name, json, pngBase64, overwrite, locale = "en" }) => {
+    saveWireframe: async ({ threadId, name, json, pngBase64, overwrite, locale = "en", snapshotReason }) => {
       parseWireframe(json);
       const stemWanted = sanitizeStem(name, locale);
       const storage = await sdk.threads.storageLocation({ threadId });
@@ -369,8 +416,61 @@ export default function plugin(bb: BbPluginApi) {
           .write({ hostId: storage.hostId, path: pngAbs, content: pngBase64, contentEncoding: "base64", createParents: true })
           .catch((error: unknown) => { throw describe(error, hostName, pngAbs, locale); });
       }
+      if (snapshotReason) {
+        await appendWireframeHistorySnapshot(bb.sdk.files, storage.hostId, dir, stem, json, snapshotReason, locale).catch((error: unknown) => {
+          bb.log.warn(`wireframe history snapshot failed: ${error instanceof Error ? error.message : String(error)}`);
+        });
+      }
       bb.log.info(`wrote wireframe ${storage.hostId}:${jsonAbs}`);
       return { name: stem, jsonPath: jsonAbs, pngPath: pngAbs };
+    },
+    listWireframeHistory: async ({ threadId, name, locale = "en" }) => {
+      const stem = sanitizeStem(name, locale);
+      const storage = await sdk.threads.storageLocation({ threadId });
+      const dir = prototypesDir(storage.storageRootPath, locale);
+      const index = await readHistoryIndex(bb.sdk.files, storage.hostId, dir, stem, locale);
+      return { snapshots: index.entries };
+    },
+    loadWireframeHistory: async ({ threadId, name, snapshotId, locale = "en" }) => {
+      const stem = sanitizeStem(name, locale);
+      const storage = await sdk.threads.storageLocation({ threadId });
+      const dir = prototypesDir(storage.storageRootPath, locale);
+      const absPath = historySnapshotPath(dir, stem, snapshotId, locale);
+      const hostName = (await bb.sdk.hosts.get({ hostId: storage.hostId }).catch(() => null))?.name || storage.hostId;
+      const file = await bb.sdk.files
+        .read({ hostId: storage.hostId, path: absPath })
+        .catch((error: unknown) => { throw describe(error, hostName, absPath, locale); });
+      if (!("content" in file)) throw new Error(say(locale, "The server returned no file content.", "Сервер не вернул содержимое файла."));
+      const json = file.contentEncoding === "base64" ? Buffer.from(file.content, "base64").toString("utf8") : file.content;
+      parseWireframe(json);
+      return { json, readOnly: true as const };
+    },
+    restoreWireframeHistory: async ({ threadId, name, snapshotId, locale = "en" }) => {
+      const stem = sanitizeStem(name, locale);
+      const storage = await sdk.threads.storageLocation({ threadId });
+      const dir = prototypesDir(storage.storageRootPath, locale);
+      const snapPath = historySnapshotPath(dir, stem, snapshotId, locale);
+      const jsonAbs = wireframePath(dir, stem, locale);
+      const hostName = (await bb.sdk.hosts.get({ hostId: storage.hostId }).catch(() => null))?.name || storage.hostId;
+      const file = await bb.sdk.files
+        .read({ hostId: storage.hostId, path: snapPath })
+        .catch((error: unknown) => { throw describe(error, hostName, snapPath, locale); });
+      if (!("content" in file)) throw new Error(say(locale, "The server returned no file content.", "Сервер не вернул содержимое файла."));
+      const json = file.contentEncoding === "base64" ? Buffer.from(file.content, "base64").toString("utf8") : file.content;
+      parseWireframe(json);
+      await bb.sdk.files
+        .write({ hostId: storage.hostId, path: jsonAbs, content: json, contentEncoding: "utf8", createParents: true })
+        .catch((error: unknown) => { throw describe(error, hostName, jsonAbs, locale); });
+      await appendWireframeHistorySnapshot(bb.sdk.files, storage.hostId, dir, stem, json, "save", locale).catch(() => {});
+      return { name: stem, jsonPath: jsonAbs };
+    },
+    appendWireframeSnapshot: async ({ threadId, name, json, reason, locale = "en" }) => {
+      parseWireframe(json);
+      const stem = sanitizeStem(name, locale);
+      const storage = await sdk.threads.storageLocation({ threadId });
+      const dir = prototypesDir(storage.storageRootPath, locale);
+      const snapshotId = await appendWireframeHistorySnapshot(bb.sdk.files, storage.hostId, dir, stem, json, reason, locale);
+      return { snapshotId };
     },
     listWireframes: async ({ threadId, locale = "en" }) => {
       const storage = await sdk.threads.storageLocation({ threadId });

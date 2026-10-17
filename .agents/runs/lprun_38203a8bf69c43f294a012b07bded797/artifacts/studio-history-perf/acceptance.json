@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "task_id": "studio-history-perf",
+  "task_sha256": "7b7cd59ae57104e5e01e9f71d0319e758325deefc0b3ae84bb96e404f78a8868",
+  "attempt": 1,
+  "provider_exit": 0,
+  "report": "complete",
+  "report_sha256": "934e8a58800aad4d56cbb212a3ff01436f9c6df0720879324b19e69b3e48d46e",
+  "owns_check": "passed",
+  "verification": "passed",
+  "review": "not_required",
+  "accepted": true,
+  "accepted_at": "2026-10-17T23:52:13.509Z",
+  "model": "composer-2.5"
+}
