@@ -18,6 +18,7 @@ import {
   CANVAS_PRESETS,
   SNAP,
   cloneWireframe,
+  defaultElement,
   newElementId,
   newWireframe,
   parseWireframe,
@@ -46,6 +47,9 @@ import {
   type InlineTarget,
 } from "./editing";
 import { alignElements, distributeElements, type AlignEdge, type DistributeAxis } from "./align";
+import { ICON_DRAG_PREFIX, iconDisplayLabel } from "./icons";
+import { IconsLibraryPanel } from "./icons-library";
+import { IconInspector, readIconColor, readIconSize } from "./icon-inspector";
 
 const MAX_HISTORY = 60;
 const MIN_SIZE = SNAP;
@@ -129,7 +133,6 @@ const FIELDS: Partial<Record<ElementType, Field[]>> = {
   ],
   Image: [{ key: "alt", kind: "text", label: "protoPropAlt" }],
   Avatar: [{ key: "initials", kind: "text", label: "protoPropInitials" }],
-  Icon: [{ key: "name", kind: "text", label: "protoPropName" }],
   Badge: [{ key: "text", kind: "text", label: "protoPropText" }],
   Table: [
     { key: "columns", kind: "number", label: "protoPropColumns" },
@@ -264,6 +267,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [badges, setBadges] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [query, setQuery] = useState("");
+  const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements");
   const [collapsed, setCollapsed] = useState<Partial<Record<PaletteGroup, boolean>>>({});
   const [busy, setBusy] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
@@ -332,6 +336,22 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
     const spec = CATALOG_BY_TYPE[tile.type];
     const el = placeOnCanvas(
       elementFromTile(tile, x ?? (doc.canvas.width - spec.w) / 2, y ?? (doc.canvas.height - spec.h) / 2, doc.elements),
+      doc.canvas,
+    );
+    replace([...doc.elements, el]);
+    setSelected([el.id]);
+  };
+
+  const addIconFromLibrary = (iconName: string, x?: number, y?: number) => {
+    const size = 24;
+    const el = placeOnCanvas(
+      {
+        ...defaultElement("Icon", x ?? (doc.canvas.width - size) / 2, y ?? (doc.canvas.height - size) / 2, doc.elements),
+        props: { name: iconName, size, color: "foreground" },
+        label: iconDisplayLabel(iconName),
+        w: size,
+        h: size,
+      },
       doc.canvas,
     );
     replace([...doc.elements, el]);
@@ -503,9 +523,16 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
 
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    const tile = PALETTE_BY_ID[event.dataTransfer.getData("text/plain")];
-    if (!tile) return;
+    const raw = event.dataTransfer.getData("text/plain");
     const p = boardPoint(event);
+    if (raw.startsWith(ICON_DRAG_PREFIX)) {
+      const iconName = raw.slice(ICON_DRAG_PREFIX.length);
+      if (!iconName) return;
+      addIconFromLibrary(iconName, p.x - 12, p.y - 12);
+      return;
+    }
+    const tile = PALETTE_BY_ID[raw];
+    if (!tile) return;
     const spec = CATALOG_BY_TYPE[tile.type];
     addTile(tile, p.x - spec.w / 2, p.y - spec.h / 2);
   };
@@ -904,9 +931,29 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-72 shrink-0 flex-col border-r border-border bg-background">
           <div className="border-b border-border p-2">
-            <div className="mb-1 text-xs font-medium text-muted-foreground">{t("protoPalette")}</div>
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("protoSearch")} className="h-8" />
+            <div className="mb-2 flex gap-1 rounded-md border border-border p-0.5">
+              <button
+                type="button"
+                className={cn("flex-1 rounded px-2 py-1 text-xs font-medium", paletteView === "elements" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
+                onClick={() => setPaletteView("elements")}
+              >
+                {t("protoPalette")}
+              </button>
+              <button
+                type="button"
+                className={cn("flex-1 rounded px-2 py-1 text-xs font-medium", paletteView === "icons" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
+                onClick={() => setPaletteView("icons")}
+              >
+                {t("protoPaletteIcons")}
+              </button>
+            </div>
+            {paletteView === "elements" ? (
+              <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("protoSearch")} className="h-8" />
+            ) : null}
           </div>
+          {paletteView === "icons" ? (
+            <IconsLibraryPanel onPick={(iconName) => addIconFromLibrary(iconName)} />
+          ) : (
           <div className="min-h-0 flex-1 overflow-auto p-2">
             {GROUPS.map((group) => {
               const items = filtered.filter((tile) => tileGroup(tile) === group.id);
@@ -934,6 +981,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
               );
             })}
           </div>
+          )}
         </aside>
 
         <div ref={canvasPaneRef} className="min-w-0 flex-1 overflow-auto bg-muted/40 p-4" onClick={() => setMenu(null)}>
@@ -1045,6 +1093,16 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
                 <span className="text-xs text-muted-foreground">{t("protoLabel")}</span>
                 <Input value={inspect.label} onChange={(event) => updateOne({ label: event.target.value || inspect.type })} />
               </label>
+              {inspect.type === "Icon" ? (
+                <IconInspector
+                  name={typeof inspect.props.name === "string" ? inspect.props.name : "Star"}
+                  size={readIconSize(inspect.props)}
+                  color={readIconColor(inspect.props)}
+                  onName={(iconName) => updateOne({ props: { ...inspect.props, name: iconName }, label: iconDisplayLabel(iconName) })}
+                  onSize={(value) => updateOne({ props: { ...inspect.props, size: value }, w: value, h: value })}
+                  onColor={(value) => setProp("color", value)}
+                />
+              ) : null}
               {(FIELDS[inspect.type] ?? []).map((field) => (
                 <FieldEditor key={field.key} field={field} value={inspect.props[field.key]} onChange={(value) => setProp(field.key, value)} />
               ))}
