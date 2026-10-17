@@ -578,8 +578,16 @@ const en = {
   protoAlignTop: "Align top",
   protoAlignMiddle: "Align middle",
   protoAlignBottom: "Align bottom",
+  protoAlignLeftShortcut: "{alt}{mod}L",
+  protoAlignCenterShortcut: "{alt}{mod}C",
+  protoAlignRightShortcut: "{alt}{mod}R",
+  protoAlignTopShortcut: "{alt}{mod}T",
+  protoAlignMiddleShortcut: "{alt}{mod}M",
+  protoAlignBottomShortcut: "{alt}{mod}B",
   protoDistributeH: "Distribute horizontally",
   protoDistributeV: "Distribute vertically",
+  protoDistributeHShortcut: "{alt}{mod}H",
+  protoDistributeVShortcut: "{alt}{mod}J",
   protoLockAspect: "Lock aspect ratio",
   protoStyleSectionGeometry: "Geometry",
   protoStyleSectionConstraints: "Constraints",
@@ -1215,8 +1223,16 @@ const ru: Record<I18nKey, string> = {
   protoAlignTop: "По верхнему краю",
   protoAlignMiddle: "По середине",
   protoAlignBottom: "По нижнему краю",
+  protoAlignLeftShortcut: "{alt}{mod}L",
+  protoAlignCenterShortcut: "{alt}{mod}C",
+  protoAlignRightShortcut: "{alt}{mod}R",
+  protoAlignTopShortcut: "{alt}{mod}T",
+  protoAlignMiddleShortcut: "{alt}{mod}M",
+  protoAlignBottomShortcut: "{alt}{mod}B",
   protoDistributeH: "Распределить по горизонтали",
   protoDistributeV: "Распределить по вертикали",
+  protoDistributeHShortcut: "{alt}{mod}H",
+  protoDistributeVShortcut: "{alt}{mod}J",
   protoLockAspect: "Сохранять пропорции",
   protoStyleSectionGeometry: "Геометрия",
   protoStyleSectionConstraints: "Ограничения",
@@ -1325,7 +1341,11 @@ export function studioT(key: I18nKey, vars: Record<string, string | number> = {}
 }
 
 const MOD = /Mac|iPhone|iPad/i.test(globalThis.navigator?.platform ?? globalThis.navigator?.userAgent ?? "") ? "⌘" : "Ctrl";
+const ALT = /Mac|iPhone|iPad/i.test(globalThis.navigator?.platform ?? globalThis.navigator?.userAgent ?? "") ? "⌥" : "Alt+";
 
 export function t(key: I18nKey, vars: Record<string, string | number> = {}, locale: Locale = detectLocale()): string {
-  return (locale === "ru" ? ru : en)[key].replace(/\{mod\}/g, MOD).replace(/\{(\w+)\}/g, (match, name: string) => (name in vars ? String(vars[name]) : match));
+  return (locale === "ru" ? ru : en)[key]
+    .replace(/\{mod\}/g, MOD)
+    .replace(/\{alt\}/g, ALT)
+    .replace(/\{(\w+)\}/g, (match, name: string) => (name in vars ? String(vars[name]) : match));
 }
