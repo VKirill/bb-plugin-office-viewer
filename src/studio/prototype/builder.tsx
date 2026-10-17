@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { DragEvent, KeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
+import type { DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useComposer, useRpc } from "@get-bb/plugin-sdk/app";
 import type { domToBlob } from "modern-screenshot";
 import { toast } from "sonner";
@@ -29,6 +29,22 @@ import {
   type WireframeElement,
 } from "./model";
 import { PALETTE_BY_ID, PALETTE_TILES, elementFromTile, previewElement, tileGroup, tileMatchesQuery, type PaletteTile } from "./palette";
+import {
+  addChoiceSibling,
+  applyInlineDraft,
+  checkRadio,
+  draftUnchanged,
+  enterOnListItem,
+  itemIndexAt,
+  itemListKey,
+  readDraft,
+  removeEmptyListItem,
+  simpleEditKey,
+  stringList,
+  toggleCheckbox,
+  type InlineEdit,
+  type InlineTarget,
+} from "./editing";
 
 const MAX_HISTORY = 60;
 const MIN_SIZE = SNAP;
@@ -174,6 +190,32 @@ function placeOnCanvas(el: WireframeElement, canvas: Wireframe["canvas"]): Wiref
   };
 }
 
+function editOverlayBox(el: WireframeElement, target: InlineTarget): { left: number; top: number; width: number; height: number } {
+  if (target.kind === "item") {
+    if (el.type === "List") {
+      const n = Math.max(1, stringList(el, "items").length);
+      const h = el.h / n;
+      return { left: 16, top: target.index * h, width: Math.max(8, el.w - 20), height: h };
+    }
+    if (el.type === "Nav" || el.type === "Tabs") {
+      const n = Math.max(1, stringList(el, target.key).length);
+      const w = el.w / n;
+      return { left: target.index * w, top: 0, width: w, height: el.h };
+    }
+    return { left: 8, top: 4, width: Math.max(8, el.w - 32), height: Math.max(8, el.h - 8) };
+  }
+  if (el.type === "Radio" || el.type === "Checkbox") {
+    return { left: 24, top: 2, width: Math.max(8, el.w - 28), height: Math.max(8, el.h - 4) };
+  }
+  if (el.type === "Card" || el.type === "Modal") {
+    return { left: 10, top: 8, width: Math.max(8, el.w - 20), height: 24 };
+  }
+  if (el.type === "Header") {
+    return { left: 16, top: 8, width: Math.max(8, el.w - 32), height: Math.max(8, el.h - 16) };
+  }
+  return { left: 4, top: 4, width: Math.max(8, el.w - 8), height: Math.max(8, el.h - 8) };
+}
+
 function noteNumbers(elements: readonly WireframeElement[]): Map<string, number> {
   const map = new Map<string, number>();
   let n = 0;
@@ -207,6 +249,22 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [savedNames, setSavedNames] = useState<string[]>([]);
   const [openedStem, setOpenedStem] = useState<string | null>(null);
   const [saveName, setSaveName] = useState("Untitled");
+  const [edit, setEdit] = useState<InlineEdit | null>(null);
+  const editRef = useRef<InlineEdit | null>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
+  const skipBlur = useRef(false);
+  editRef.current = edit;
+  const editFocusKey = edit
+    ? edit.target.kind === "item"
+      ? `${edit.id}:${edit.target.key}:${edit.target.index}`
+      : `${edit.id}:${edit.target.key}`
+    : "";
+
+  useEffect(() => {
+    if (!editFocusKey) return;
+    editInputRef.current?.focus();
+    editInputRef.current?.select();
+  }, [editFocusKey]);
 
   const commit = useCallback((next: Wireframe) => {
     setLive(null);
@@ -233,6 +291,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
 
   const selectedEls = view.elements.filter((el) => selected.includes(el.id));
   const one = selectedEls.length === 1 ? selectedEls[0] : null;
+  const inspect = one && edit?.id === one.id ? applyInlineDraft(one, edit) : one;
   const notes = useMemo(() => noteNumbers(view.elements), [view.elements]);
 
   const updateOne = (patch: Partial<WireframeElement>) => {
@@ -242,6 +301,11 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
 
   const setProp = (key: string, value: PropValue) => {
     if (!one) return;
+    if (one.type === "Radio" && key === "checked") {
+      const next = doc.elements.map((el) => (el.id === one.id ? { ...el, props: { ...el.props, checked: value } } : el));
+      replace(value === true ? checkRadio(next, one.id) : next);
+      return;
+    }
     updateOne({ props: { ...one.props, [key]: value } });
   };
 
@@ -296,6 +360,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
 
   const onBoardPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
+    if ((event.target as HTMLElement).closest("input")) return;
     const handle = (event.target as HTMLElement).dataset.handle as Handle | undefined;
     const id = (event.target as HTMLElement).closest("[data-el]")?.getAttribute("data-el");
     const p = boardPoint(event);
@@ -338,9 +403,22 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
     });
   };
 
-  const onBoardPointerUp = () => {
+  const onBoardPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
     const current = drag.current;
     drag.current = null;
+    if (current?.kind === "move") {
+      const p = boardPoint(event);
+      if (snap(p.x - current.ox) === 0 && snap(p.y - current.oy) === 0) {
+        const el = doc.elements.find((item) => current.ids[0] === item.id);
+        if (el && event.detail === 1 && (el.type === "Radio" || el.type === "Checkbox") && p.x - el.x < 28) {
+          setLive(null);
+          replace(el.type === "Radio" ? checkRadio(doc.elements, el.id) : toggleCheckbox(doc.elements, el.id));
+          return;
+        }
+        setLive(null);
+        return;
+      }
+    }
     if (!current || !live) {
       setLive(null);
       return;
@@ -442,6 +520,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
       commit(next);
       setOpenedStem(name);
       setSelected([]);
+      setEdit(null);
       setOpenOpen(false);
       toast.success(t("protoOpened", { name }));
     } catch (cause) {
@@ -451,8 +530,97 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
     }
   };
 
+  const beginEdit = (el: WireframeElement, next: InlineEdit) => {
+    setSelected([el.id]);
+    setEdit(next);
+  };
+
+  const applyEdit = (current: InlineEdit, elements: WireframeElement[]): WireframeElement[] => {
+    return elements.map((el) => (el.id === current.id && !draftUnchanged(el, current) ? applyInlineDraft(el, current) : el));
+  };
+
+  const closeEdit = (next: InlineEdit | null = null) => {
+    skipBlur.current = true;
+    setEdit(next);
+    requestAnimationFrame(() => {
+      skipBlur.current = false;
+    });
+  };
+
+  const commitEdit = () => {
+    const current = editRef.current;
+    if (!current) return;
+    const el = doc.elements.find((item) => item.id === current.id);
+    if (!el || draftUnchanged(el, current)) {
+      closeEdit(null);
+      return;
+    }
+    replace(applyEdit(current, doc.elements));
+    closeEdit(null);
+  };
+
+  const onInlineKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    event.stopPropagation();
+    const current = editRef.current;
+    if (!current) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeEdit(null);
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const el = doc.elements.find((item) => item.id === current.id);
+      if (!el) {
+        closeEdit(null);
+        return;
+      }
+      if (el.type === "Radio" || el.type === "Checkbox") {
+        const result = addChoiceSibling(applyEdit(current, doc.elements), el.id, current.draft);
+        replace(result.elements);
+        closeEdit(result.edit);
+        setSelected([result.edit.id]);
+        return;
+      }
+      if (current.target.kind === "item") {
+        const result = enterOnListItem(applyInlineDraft(el, current), current.target.key, current.target.index, current.draft);
+        replace(doc.elements.map((item) => (item.id === el.id ? result.element : item)));
+        closeEdit({ id: el.id, target: { kind: "item", key: current.target.key, index: result.nextIndex }, draft: "" });
+        return;
+      }
+      commitEdit();
+      return;
+    }
+    if (event.key === "Backspace" && current.target.kind === "item" && current.draft === "") {
+      event.preventDefault();
+      const el = doc.elements.find((item) => item.id === current.id);
+      if (!el) return;
+      const result = removeEmptyListItem(el, current.target.key, current.target.index);
+      replace(doc.elements.map((item) => (item.id === el.id ? result.element : item)));
+      if (result.nextIndex === null) closeEdit(null);
+      else closeEdit({ id: el.id, target: { kind: "item", key: current.target.key, index: result.nextIndex }, draft: readDraft(result.element, { kind: "item", key: current.target.key, index: result.nextIndex }) });
+    }
+  };
+
+  const onBoardDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const id = (event.target as HTMLElement).closest("[data-el]")?.getAttribute("data-el");
+    const el = view.elements.find((item) => item.id === id);
+    if (!el) return;
+    event.preventDefault();
+    const localX = boardPoint(event).x - el.x;
+    const localY = boardPoint(event).y - el.y;
+    const listKey = itemListKey(el.type);
+    if (listKey) {
+      const index = itemIndexAt(el, localX, localY);
+      beginEdit(el, { id: el.id, target: { kind: "item", key: listKey, index }, draft: readDraft(el, { kind: "item", key: listKey, index }) });
+      return;
+    }
+    const key = simpleEditKey(el.type);
+    if (key) beginEdit(el, { id: el.id, target: { kind: "prop", key }, draft: readDraft(el, { kind: "prop", key }) });
+  };
+
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest("input, textarea, [role=dialog]")) return;
+    if (edit || (event.target as HTMLElement).closest("input, textarea, [role=dialog]")) return;
     const mod = event.metaKey || event.ctrlKey;
     const key = event.key.toLowerCase();
     if (mod && key === "z") {
@@ -512,7 +680,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
       onKeyDown={onKeyDown}
     >
       <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border px-2 py-1">
-        <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => { commit(newWireframe()); setOpenedStem(null); setSelected([]); }}>
+        <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => { commit(newWireframe()); setOpenedStem(null); setSelected([]); setEdit(null); }}>
           {t("protoNew")}
         </Button>
         <Button
@@ -660,6 +828,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
               onPointerMove={onBoardPointerMove}
               onPointerUp={onBoardPointerUp}
               onPointerCancel={onBoardPointerUp}
+              onDoubleClick={onBoardDoubleClick}
               onDragOver={(event) => event.preventDefault()}
               onDrop={onDrop}
             >
@@ -684,7 +853,9 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
                     className={cn("absolute overflow-visible", active && "z-10")}
                     style={{ left: el.x, top: el.y, width: el.w, height: el.h }}
                   >
-                    <div className="size-full overflow-hidden">{<ElementFace el={el} />}</div>
+                    <div className="size-full overflow-hidden">
+                      <ElementFace el={edit?.id === el.id ? applyInlineDraft(el, edit) : el} />
+                    </div>
                     {badges ? (
                       <span className="absolute -top-2 left-0 z-10 max-w-[140%] truncate rounded-full bg-foreground px-1.5 py-px text-[10px] leading-4 text-background">
                         {el.type} · {el.label}
@@ -694,6 +865,21 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
                       <span className="absolute -right-2 -top-2 z-10 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] text-destructive-foreground">
                         {mark}
                       </span>
+                    ) : null}
+                    {edit?.id === el.id ? (
+                      <input
+                        ref={editInputRef}
+                        data-proto-skip
+                        className="absolute z-20 border border-blue-500 bg-background px-1 text-sm outline-none"
+                        style={editOverlayBox(el, edit.target)}
+                        value={edit.draft}
+                        onChange={(event) => setEdit({ ...edit, draft: event.target.value })}
+                        onKeyDown={onInlineKeyDown}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onBlur={() => {
+                          if (!skipBlur.current) commitEdit();
+                        }}
+                      />
                     ) : null}
                     {active ? (
                       <div data-proto-skip className="pointer-events-none absolute inset-0 border-2 border-blue-500">
@@ -718,24 +904,24 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
 
         <aside className="flex w-64 shrink-0 flex-col gap-3 overflow-auto border-l border-border p-3 text-sm">
           <div className="text-xs font-medium text-muted-foreground">{t("protoInspector")}</div>
-          {one ? (
+          {inspect ? (
             <>
               <label className="grid gap-1">
                 <span className="text-xs text-muted-foreground">{t("protoLabel")}</span>
-                <Input value={one.label} onChange={(event) => updateOne({ label: event.target.value || one.type })} />
+                <Input value={inspect.label} onChange={(event) => updateOne({ label: event.target.value || inspect.type })} />
               </label>
-              {(FIELDS[one.type] ?? []).map((field) => (
-                <FieldEditor key={field.key} field={field} value={one.props[field.key]} onChange={(value) => setProp(field.key, value)} />
+              {(FIELDS[inspect.type] ?? []).map((field) => (
+                <FieldEditor key={field.key} field={field} value={inspect.props[field.key]} onChange={(value) => setProp(field.key, value)} />
               ))}
               <div className="grid grid-cols-2 gap-2">
-                <NumField label={t("protoX")} value={one.x} onChange={(value) => updateOne({ x: snap(value) })} />
-                <NumField label={t("protoY")} value={one.y} onChange={(value) => updateOne({ y: snap(value) })} />
-                <NumField label={t("protoW")} value={one.w} onChange={(value) => updateOne({ w: Math.max(MIN_SIZE, snap(value)) })} />
-                <NumField label={t("protoH")} value={one.h} onChange={(value) => updateOne({ h: Math.max(MIN_SIZE, snap(value)) })} />
+                <NumField label={t("protoX")} value={inspect.x} onChange={(value) => updateOne({ x: snap(value) })} />
+                <NumField label={t("protoY")} value={inspect.y} onChange={(value) => updateOne({ y: snap(value) })} />
+                <NumField label={t("protoW")} value={inspect.w} onChange={(value) => updateOne({ w: Math.max(MIN_SIZE, snap(value)) })} />
+                <NumField label={t("protoH")} value={inspect.h} onChange={(value) => updateOne({ h: Math.max(MIN_SIZE, snap(value)) })} />
               </div>
               <label className="grid gap-1">
                 <span className="text-xs text-muted-foreground">{t("protoNote")}</span>
-                <Textarea value={one.note ?? ""} onChange={(event) => updateOne({ note: event.target.value || undefined })} />
+                <Textarea value={inspect.note ?? ""} onChange={(event) => updateOne({ note: event.target.value || undefined })} />
               </label>
             </>
           ) : (
