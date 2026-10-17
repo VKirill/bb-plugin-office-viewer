@@ -2,9 +2,9 @@
 title: Office Viewer architecture
 type: architecture
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-17
 status: active
-confidence: medium
+confidence: low
 tags: [office-viewer, architecture, bb-plugin]
 sources:
   - app.tsx
@@ -17,11 +17,13 @@ sources:
   - src/pdf/pdf.tsx
   - src/spreadsheet/engine.ts
   - src/spreadsheet/xlsx-patch.ts
+  - src/html/html.tsx
+  - src/html/capture.ts
 ---
 
 # Office Viewer architecture
 
-TL;DR: BB hosts a React plugin app and a plugin server; registered file openers call server RPC to resolve/read/write files on the machine that owns them (`app.tsx:14-52`; `server.ts:114-132`).
+TL;DR: BB hosts a React plugin app and a plugin server; registered file openers call server RPC to resolve/read/write files on the machine that owns them (`app.tsx:14-52`; `server.ts:125-126`; `server.ts:154-178`).
 
 ## System Context
 
@@ -43,7 +45,7 @@ C4Container
   Person(user, "BB user", "Opens files")
   System_Boundary(plugin, "Office Viewer plugin") {
     Container(app, "React app", "TypeScript, React", "File opener UI and parsers")
-    Container(server, "Plugin server", "BB Plugin SDK", "RPC, PDF.js routes, file resolution")
+    Container(server, "Plugin server", "BB Plugin SDK", "RPC, asset routes, file resolution")
   }
   System_Ext(bb, "BB host", "Plugin slots, RPC transport, composer")
   System_Ext(files, "BB file services", "Host files, previews, writes")
@@ -53,7 +55,7 @@ C4Container
   Rel(server, files, "Reads, previews, writes")
 ```
 
-The UI registers five file opener slots and an optional experimental image-editor slot (`app.tsx:14-52`). The server registers two GET routes for PDF.js assets and one typed RPC contract (`server.ts:39-79`; `server.ts:114-132`).
+The UI registers five file opener slots and an optional experimental image-editor slot (`app.tsx:14-52`). The server registers GET routes for PDF.js and screenshot assets plus one typed RPC contract (`server.ts:129-153`; `server.ts:154-178`).
 
 ## Building Blocks
 

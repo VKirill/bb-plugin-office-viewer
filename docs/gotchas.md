@@ -2,9 +2,9 @@
 title: Office Viewer gotchas
 type: gotchas
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-17
 status: active
-confidence: medium
+confidence: low
 tags: [gotchas, limitations, file-handling]
 sources:
   - src/server/locate.ts
@@ -17,6 +17,7 @@ sources:
   - src/slides/slides.tsx
   - src/word/document.tsx
   - app.tsx
+  - src/spreadsheet/opener.tsx
 ---
 
 # Office Viewer gotchas
@@ -35,7 +36,7 @@ TL;DR: The sharp edges come from file ownership context, format-specific edit pa
 
 **Problem:** The server checks the opened SHA-256 before patching and also passes it into the write (`server.ts:210-231`).
 **Risk:** If another writer changes the file, the plugin returns `conflict` rather than replacing the newer version.
-**Workaround:** Handle the conflict by reloading or applying edits to the latest content (`server.ts:217-231`).
+**Workaround:** The spreadsheet UI offers a reload path that discards local edits and an overwrite path that reapplies edits to the latest content (`src/spreadsheet/opener.tsx:103-162`; `server.ts:240-264`).
 
 ## High
 
@@ -63,7 +64,7 @@ TL;DR: The sharp edges come from file ownership context, format-specific edit pa
 
 **Problem:** The app registers the slot only when `experimental_vkImageEditor` exists (`app.tsx:45-51`).
 **Risk:** BB image-preview editing is unavailable without that optional function.
-**Workaround:** Use the regular file opener's image editor (`src/media/media.tsx:161-168`).
+**Workaround:** Open the image through the regular file opener to use its editor; the Browser image-preview slot only provides an editor when BB exposes that optional slot (`app.tsx:45-51`; `src/media/media.tsx:161-168`).
 
 ### Presentation parsing has explicit legacy behavior
 

@@ -2,7 +2,7 @@
 title: Word and PowerPoint documents
 type: component
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-17
 status: active
 confidence: medium
 tags: [word, powerpoint, documents]
@@ -14,6 +14,7 @@ sources:
   - src/shared/quote.ts
   - server.ts
   - app.tsx
+  - src/slides/pptx-text.ts
 ---
 
 # Word and PowerPoint documents
@@ -41,8 +42,8 @@ The Word opener presents Word documents as pages or extracted legacy text; the s
 
 ## Business rules
 
-- Word and PowerPoint viewers are read-only; the UI offers original download and chat quote actions (`src/word/document.tsx:148-170`; `src/slides/slides.tsx:120-149`).
-- Word quote content includes selected text and source context through `formatBlockquote` (`src/shared/quote.ts:3-10`). Slide quotes include slide text and numbering (`src/slides/pptx.ts:481-498`).
+- The Word opener exposes download and quote actions alongside rendering or extracted text; the slide opener loads and renders a deck and exposes its slide quote action (`src/word/document.tsx:148-173`; `src/slides/slides.tsx:120-149`). Neither opener passes document edits to a write RPC (`src/word/document.tsx:148-173`; `src/slides/slides.tsx:120-149`).
+- Word quotes include selected text and source context through `formatBlockquote` (`src/shared/quote.ts:3-10`). `slideMarkdown` emits the title in bold, then outline text with nested bullet indentation and Markdown tables; slide numbering is added by the caller (`src/slides/pptx.ts:481-498`; `src/slides/slides.tsx:290-315`).
 - Legacy Word extraction preserves Unicode punctuation by passing `filterUnicode: false` (`server.ts:154-165`).
 - PowerPoint parsing is for Open XML extensions only; legacy binary files are not parsed (`src/slides/slides.tsx:19-22`).
 
@@ -54,12 +55,13 @@ The Word opener presents Word documents as pages or extracted legacy text; the s
 | `WORD_EXTENSIONS` | `src/word/document.tsx:21-22` | Word extension registration. |
 | `SlidesOpener` | `src/slides/slides.tsx:83-160` | PowerPoint navigation and presentation UI. |
 | `parsePptx`, `slideMarkdown` | `src/slides/pptx.ts:401-498` | Parse a presentation and extract slide quote text. |
+| `buildBody` | `src/slides/pptx-text.ts:147-215` | Resolve inherited paragraph and run formatting, bullets, and text from a slide text body. |
 | `SlideView`, `ScaledSlide` | `src/slides/slide-view.tsx:140-159` | Draw a slide at native or scaled width. |
 | RPC `docText` | `server.ts:45-50`; `server.ts:142-165` | Extract text from legacy Word files. |
 
 ## Package shape
 
-`src/word/` renders Word documents and search; `src/slides/` parses XML, models presentation structures and renders slides (`src/word/document.tsx:1-4`; `src/slides/slides.tsx:1-3`). Both use shared localization, formatting and quote helpers (`src/shared/quote.ts:3-10`).
+`src/word/` renders Word documents and search; `src/slides/` parses XML, models presentation structures and renders slides. Within the slide parser, `Pkg` caches parsed XML and creates blob URLs for supported image parts (`src/word/document.tsx:1-4`; `src/slides/slides.tsx:1-3`; `src/slides/pptx.ts:49-84`). Both viewers use shared localization, formatting and quote helpers (`src/shared/quote.ts:3-10`).
 
 ## Internal model
 
