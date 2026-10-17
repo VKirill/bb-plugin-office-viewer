@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.7 — 2026-10-17
+
+### Changed
+
+- Spreadsheets: a cell with a link is sky-blue underlined text again, as before 0.8.6. Cmd/Ctrl+click still opens it.
+
 ## 0.8.6 — 2026-10-17
 
 ### Changed
