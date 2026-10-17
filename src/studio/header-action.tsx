@@ -1,8 +1,8 @@
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
 import { t } from "../shared/i18n";
-import { STUDIO_ICON, STUDIO_PANEL } from "./studio-panel";
+import { OfficeStudioMark } from "./logos";
+import { STUDIO_PANEL } from "./studio-panel";
 
 export function StudioHeaderAction({ threadId }: { threadId: string }) {
   const navigate = useBbNavigate();
@@ -19,7 +19,7 @@ export function StudioHeaderAction({ threadId }: { threadId: string }) {
           if (!opened) console.warn("Office Studio panel did not open");
         }}
       >
-        <Icon name={STUDIO_ICON} className="size-4" aria-hidden="true" />
+        <OfficeStudioMark className="size-4" />
       </Button>
     </span>
   );
