@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "task_id": "prototype-style-layout",
+  "task_sha256": "d80ebc297cc574adb6f7a8136bb3f62c83805307bd402f7f10e260d52e3d675d",
+  "attempt": 1,
+  "provider_exit": 0,
+  "report": "complete",
+  "report_sha256": "532981dbe47979354c71a9671958936249d63c2eb3d8d90daa221130cdfc92dc",
+  "owns_check": "passed",
+  "verification": "passed",
+  "review": "not_required",
+  "accepted": true,
+  "accepted_at": "2026-10-17T20:04:46.694Z",
+  "model": "composer-2.5"
+}
