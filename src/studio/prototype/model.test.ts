@@ -3,15 +3,19 @@ import { test } from "node:test";
 import {
   CATALOG,
   CATALOG_BY_TYPE,
+  CANVAS_PRESETS,
   ELEMENT_TYPES,
   WIREFRAME_VERSION,
   WIREFRAME_VERSION_LEGACY,
   defaultElement,
+  findCanvasPreset,
   getActivePage,
+  isCustomCanvasSize,
   migrateWireframeV1,
   newWireframe,
   parseWireframe,
   snap,
+  swapCanvasOrientation,
 } from "./model.ts";
 
 test("parseWireframe round-trips a valid v2 document", () => {
@@ -67,6 +71,14 @@ test("snap uses an 8px grid", () => {
   assert.equal(snap(12), 16);
   assert.equal(snap(13), 16);
   assert.equal(snap(20, 10), 20);
+});
+
+test("canvas presets match legacy sizes and orientation swap", () => {
+  assert.equal(findCanvasPreset(CANVAS_PRESETS.desktop.width, CANVAS_PRESETS.desktop.height)?.id, "desktop");
+  assert.equal(isCustomCanvasSize(900, 600), true);
+  const swapped = swapCanvasOrientation(CANVAS_PRESETS.phone);
+  assert.equal(swapped.width, snap(CANVAS_PRESETS.phone.height));
+  assert.equal(swapped.height, snap(CANVAS_PRESETS.phone.width));
 });
 
 test("parseWireframe rejects a bad file", () => {
