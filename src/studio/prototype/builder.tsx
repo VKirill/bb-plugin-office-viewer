@@ -924,7 +924,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
                     {t(group.label)}
                   </button>
                   {open ? (
-                    <div className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1">
                       {items.map((tile) => (
                         <PaletteTileButton key={tile.id} tile={tile} onAdd={() => addTile(tile)} />
                       ))}
@@ -977,19 +977,27 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
                   <div
                     key={el.id}
                     data-el={el.id}
-                    className={cn("absolute overflow-visible", active && "z-10")}
+                    className={cn(
+                      "absolute overflow-visible outline outline-1 outline-transparent hover:outline-primary",
+                      active && "z-10 outline-2 outline-primary hover:outline-primary",
+                    )}
                     style={{ left: el.x, top: el.y, width: el.w, height: el.h }}
                   >
                     <div className="size-full overflow-hidden">
                       <ElementFace el={edit?.id === el.id ? applyInlineDraft(el, edit) : el} />
                     </div>
                     {badges ? (
-                      <span className="absolute -top-2 left-0 z-10 max-w-[140%] truncate rounded-full bg-foreground px-1.5 py-px text-[10px] leading-4 text-background">
+                      <span
+                        className={cn(
+                          "pointer-events-none absolute bottom-full left-0 mb-0.5 max-w-full truncate rounded-sm px-1 text-[9px] leading-3",
+                          active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                        )}
+                      >
                         {el.type} · {el.label}
                       </span>
                     ) : null}
                     {mark !== undefined ? (
-                      <span className="absolute -right-2 -top-2 z-10 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] text-destructive-foreground">
+                      <span className="pointer-events-none absolute bottom-full right-0 mb-0.5 flex size-3.5 items-center justify-center rounded-full bg-destructive text-[9px] leading-none text-destructive-foreground">
                         {mark}
                       </span>
                     ) : null}
@@ -997,7 +1005,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
                       <input
                         ref={editInputRef}
                         data-proto-skip
-                        className="absolute z-20 border border-blue-500 bg-background px-1 text-sm outline-none"
+                        className="absolute z-20 border border-primary bg-background px-1 text-sm outline-none"
                         style={editOverlayBox(el, edit.target)}
                         value={edit.draft}
                         onChange={(event) => setEdit({ ...edit, draft: event.target.value })}
@@ -1009,13 +1017,13 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
                       />
                     ) : null}
                     {active ? (
-                      <div data-proto-skip className="pointer-events-none absolute inset-0 border-2 border-blue-500">
+                      <div data-proto-skip className="pointer-events-none absolute inset-0">
                         {one?.id === el.id
                           ? HANDLES.map((handle) => (
                               <span
                                 key={handle}
                                 data-handle={handle}
-                                className={cn("pointer-events-auto absolute size-2.5 rounded-sm border border-blue-500 bg-background", HANDLE_CLASS[handle])}
+                                className={cn("pointer-events-auto absolute size-2.5 rounded-sm border border-primary bg-background", HANDLE_CLASS[handle])}
                               />
                             ))
                           : null}
@@ -1190,16 +1198,16 @@ function PaletteTileButton({ tile, onAdd }: { tile: PaletteTile; onAdd: () => vo
         if (previewRef.current) event.dataTransfer.setDragImage(previewRef.current, boxW / 2, boxH / 2);
       }}
       onClick={onAdd}
-      className="flex cursor-grab flex-col overflow-hidden rounded-md border border-border bg-card text-left text-foreground hover:bg-state-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:cursor-grabbing"
+      className="flex cursor-grab flex-col overflow-hidden rounded-lg px-1 pb-1 pt-1 text-left text-foreground hover:bg-state-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:bg-state-active active:cursor-grabbing"
     >
-      <div ref={previewRef} className="flex h-11 items-center justify-center overflow-hidden bg-background">
+      <div ref={previewRef} className="flex h-11 items-center justify-center overflow-hidden">
         <div className="relative" style={{ width: el.w * scale, height: el.h * scale }}>
           <div className="pointer-events-none" style={{ width: el.w, height: el.h, transform: `scale(${scale})`, transformOrigin: "top left" }}>
             <ElementFace el={el} />
           </div>
         </div>
       </div>
-      <span className="truncate border-t border-border px-1 py-1 text-[11px] leading-4 text-foreground">{t(tile.labelKey)}</span>
+      <span className="line-clamp-2 min-h-7 px-0.5 text-center text-[10px] leading-3 text-muted-foreground">{t(tile.labelKey)}</span>
     </button>
   );
 }
