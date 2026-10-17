@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.9 — 2026-10-17
+
+### Changed
+
+- Prototype palette: a grid of tiles with a live preview of each element and its name, grouped and collapsible, with variants (primary and link buttons, headings 1–3, image placeholder).
+- Prototype toolbar: compact icon buttons with tooltips and shortcuts, a File menu, align and distribute, a device switch, a zoom menu with fit, and a primary «В чат» button with a choice of screenshot, file or both.
+
+### Added
+
+- Prototype: double-click edits text right on the canvas; Enter on a radio or checkbox adds the next one below (radios form a group), and Enter in lists, menus, tabs and dropdowns adds the next item.
+
 ## 0.8.8 — 2026-10-17
 
 ### Added
