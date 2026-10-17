@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { ConnectorsLayer } from "../prototype/connector-layer";
 import { ElementFace } from "../prototype/elements";
+import { isConnector } from "../prototype/connectors";
 import { WireframeElementFrame } from "../prototype/wireframe-element-frame";
 import type { SlidesDeck } from "./model";
 import { getActiveSlide } from "./model";
@@ -61,12 +63,13 @@ export function SlidesPresenter({
           }}
         >
           {slide.elements
-            .filter((el) => !el.hidden)
+            .filter((el) => !el.hidden && !isConnector(el))
             .map((el) => (
               <WireframeElementFrame key={el.id} el={el} className="absolute overflow-hidden">
                 <ElementFace el={el} />
               </WireframeElementFrame>
             ))}
+          <ConnectorsLayer elements={slide.elements} selected={[]} connectorTool={false} hoverElementId={null} draftLine={null} />
         </div>
       </div>
     </div>

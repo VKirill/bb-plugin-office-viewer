@@ -58,6 +58,7 @@ export const ELEMENT_TYPES = [
   "Sticky",
   "Marker",
   "Shape",
+  "Connector",
 ] as const;
 
 export type ElementType = (typeof ELEMENT_TYPES)[number];
@@ -228,6 +229,29 @@ export const CATALOG: readonly CatalogEntry[] = [
   { type: "Sticky", group: "markup", w: 144, h: 120, props: { color: "yellow", text: "Note" } },
   { type: "Marker", group: "markup", w: 32, h: 32, props: { shape: "circle", text: "1", color: "red" } },
   { type: "Shape", group: "flow", w: 120, h: 72, props: { shape: "rectangle", text: "Process", fill: "#ffffff", stroke: "#333333" } },
+  {
+    type: "Connector",
+    group: "flow",
+    w: 8,
+    h: 8,
+    props: {
+      fromId: "",
+      fromAnchor: "auto",
+      toId: "",
+      toAnchor: "auto",
+      startX: 0,
+      startY: 0,
+      endX: 80,
+      endY: 0,
+      bendX: 0,
+      bendY: 0,
+      routing: "elbow",
+      startArrow: "none",
+      endArrow: "arrow",
+      dashed: false,
+      label: "",
+    },
+  },
 ];
 
 export const CATALOG_BY_TYPE: Record<ElementType, CatalogEntry> = Object.fromEntries(CATALOG.map((entry) => [entry.type, entry])) as Record<ElementType, CatalogEntry>;

@@ -155,4 +155,11 @@ export const INSPECTOR_FIELDS: Partial<Record<ElementType, Field[]>> = {
     { key: "fill", kind: "text", label: "protoPropFillColor" },
     { key: "stroke", kind: "text", label: "protoPropStroke" },
   ],
+  Connector: [
+    { key: "routing", kind: "select", label: "protoPropRouting", options: ["straight", "elbow", "curved"] },
+    { key: "startArrow", kind: "select", label: "protoPropStartArrow", options: ["none", "arrow", "dot"] },
+    { key: "endArrow", kind: "select", label: "protoPropEndArrow", options: ["none", "arrow", "dot"] },
+    { key: "dashed", kind: "boolean", label: "protoPropDashed" },
+    { key: "label", kind: "text", label: "protoPropText" },
+  ],
 };
