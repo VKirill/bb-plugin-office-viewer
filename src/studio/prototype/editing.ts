@@ -1,7 +1,7 @@
 // Pure inline-edit helpers: draft apply, Enter adds the next radio/item, radio groups.
 import { defaultElement, type ElementType, type WireframeElement } from "./model.ts";
 
-export type ItemKey = "items" | "options";
+export type ItemKey = "items" | "options" | "states";
 
 export type InlineTarget = { kind: "prop"; key: string } | { kind: "item"; key: ItemKey; index: number };
 
@@ -22,6 +22,16 @@ const SIMPLE_KEY: Partial<Record<ElementType, string>> = {
   Modal: "title",
   Checkbox: "text",
   Radio: "text",
+  Box: "text",
+  Ellipse: "text",
+  Placeholder: "text",
+  Label: "text",
+  Paragraph: "text",
+  Sticky: "text",
+  Shape: "text",
+  Alert: "title",
+  Tooltip: "text",
+  SearchField: "placeholder",
 };
 
 const LIST_KEY: Partial<Record<ElementType, ItemKey>> = {
@@ -29,7 +39,17 @@ const LIST_KEY: Partial<Record<ElementType, ItemKey>> = {
   Nav: "items",
   Tabs: "items",
   ChoicePicker: "options",
+  ListBox: "items",
+  Menu: "items",
+  Breadcrumbs: "items",
+  Tree: "items",
+  DynamicPanel: "states",
 };
+
+function textOrientation(el: WireframeElement): string {
+  const value = el.props.orientation;
+  return typeof value === "string" ? value : "horizontal";
+}
 
 let nextGroup = 0;
 
@@ -72,6 +92,8 @@ export function applyInlineDraft(el: WireframeElement, edit: InlineEdit): Wirefr
   const props = { ...el.props, [edit.target.key]: items };
   if (el.type === "Tabs" && el.props.active === previous) props.active = edit.draft;
   if (el.type === "ChoicePicker" && el.props.value === previous) props.value = edit.draft;
+  if (el.type === "DynamicPanel" && el.props.active === previous) props.active = edit.draft;
+  if (el.type === "ListBox" && el.props.selected === previous) props.selected = edit.draft;
   return { ...el, props };
 }
 
@@ -141,7 +163,8 @@ export function itemIndexAt(el: WireframeElement, localX: number, localY: number
     const found = items.indexOf(value);
     return found >= 0 ? found : 0;
   }
-  const horizontal = el.type === "Nav" || el.type === "Tabs";
+  const horizontal =
+    el.type === "Nav" || el.type === "Tabs" || (el.type === "Menu" && textOrientation(el) !== "vertical");
   const span = horizontal ? el.w / items.length : el.h / items.length;
   const along = horizontal ? localX : localY;
   return Math.max(0, Math.min(items.length - 1, Math.floor(along / Math.max(1, span))));

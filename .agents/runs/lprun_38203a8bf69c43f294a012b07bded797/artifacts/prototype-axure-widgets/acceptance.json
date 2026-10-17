@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "task_id": "prototype-axure-widgets",
+  "task_sha256": "077cadc6fa9f6537b6f58c1f8e107b6c26720e7e76877abfe5960b90373be12f",
+  "attempt": 1,
+  "provider_exit": 0,
+  "report": "complete",
+  "report_sha256": "b0fde1f229aeb86780e0db50f08e68f2d56afe4888d84429576205dc3ea032eb",
+  "owns_check": "passed",
+  "verification": "passed",
+  "review": "not_required",
+  "accepted": true,
+  "accepted_at": "2026-10-17T17:50:07.244Z",
+  "model": "composer-2.5"
+}
