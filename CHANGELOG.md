@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.13 — 2026-10-17
+
+### Added
+
+- Prototype: draw shapes by dragging — R rectangle, O ellipse, L line, T text, F text field; a click still places the default size; Esc leaves the tool.
+- Modifier keys as in Figma, Axure and Photoshop: ⇧ Shift keeps proportions (square, circle, 45° lines) when drawing and resizing and locks moves to an axis; ⌥ Alt draws and resizes from the centre and Alt-drag duplicates; Space moves the shape being drawn; ⌘/Ctrl turns snapping off; ⇧ rotates in 15° steps; Esc cancels a drag.
+- A hint near the cursor names the active modifier, and «?» opens the keyboard shortcuts sheet.
+
 ## 0.8.12 — 2026-10-17
 
 ### Added
