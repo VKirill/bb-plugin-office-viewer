@@ -77,3 +77,4 @@ graph LR
 - [x] `prototype-inspector-axure` — Style tab, properties, radio group combo, list editor, table editing, notes
 - [x] pictograms swap (design-lead set)
 - [ ] later: interactions (event → case → action) + preview player, connectors for Flow, components (masters), Sample UI / form patterns
+- `lprun_38203a8bf69c43f294a012b07bded797`: accepted the listed Paint, prototype, Slides, autosave/restore, settings and release tasks through 0.8.12; spreadsheet links remain underlined after the 0.8.7 revert. Only the Studio live check and v2 component/state work remain.
