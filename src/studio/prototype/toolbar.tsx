@@ -49,6 +49,7 @@ export function PrototypeToolbar({
   onToggleConnectorTool,
   onPreview,
   onHistory,
+  onGenerate,
 }: {
   barRef: React.RefObject<HTMLDivElement | null>;
   menu: ToolbarMenu | null;
@@ -84,6 +85,7 @@ export function PrototypeToolbar({
   onToggleConnectorTool?: () => void;
   onPreview?: () => void;
   onHistory?: () => void;
+  onGenerate?: () => void;
 }) {
   const t = useT();
   return (
@@ -218,6 +220,12 @@ export function PrototypeToolbar({
           <TagGlyph />
         </ToolBtn>
         <AutosaveLabel status={autosaveStatus} />
+        {onGenerate ? (
+          <Button type="button" variant="outline" size="sm" className="h-8 gap-1" disabled={busy} onClick={onGenerate}>
+            <Icon name="Bot" className="size-4" />
+            {t("protoAgentGenerateToolbar")}
+          </Button>
+        ) : null}
         <div className="relative ml-auto" data-toolbar-menu>
           <Button type="button" variant="default" size="sm" className="h-8 gap-1" disabled={busy} aria-expanded={menu === "send"} onClick={() => toggleMenu("send")}>
             {t("sendToChat")}

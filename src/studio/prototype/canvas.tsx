@@ -62,6 +62,7 @@ export function PrototypeCanvas({
   onCommitEdit,
   skipBlur,
   onPaneClick,
+  resolveAsset,
 }: {
   canvasPaneRef: RefObject<HTMLDivElement | null>;
   boardRef: RefObject<HTMLDivElement | null>;
@@ -111,6 +112,7 @@ export function PrototypeCanvas({
   onCommitEdit: () => void;
   skipBlur: React.MutableRefObject<boolean>;
   onPaneClick: () => void;
+  resolveAsset?: (src: string) => string | undefined;
 }) {
   const t = useT();
   const placed =
@@ -268,7 +270,12 @@ export function PrototypeCanvas({
                       style={{ left: absX, top: absY, width: el.w, height: el.h, ...wireframeElementBoxStyle(el, "base") }}
                     >
                       <div className="size-full overflow-hidden">
-                        <ElementFace el={edit?.id === el.id ? applyInlineDraft(el, edit) : el} allElements={elements} components={components} />
+                        <ElementFace
+                          el={edit?.id === el.id ? applyInlineDraft(el, edit) : el}
+                          allElements={elements}
+                          components={components}
+                          resolveAsset={resolveAsset}
+                        />
                       </div>
                       {badges ? (
                         <span className={cn("pointer-events-none absolute bottom-full left-0 mb-0.5 max-w-full truncate rounded-sm px-1 text-[9px] leading-3", active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
