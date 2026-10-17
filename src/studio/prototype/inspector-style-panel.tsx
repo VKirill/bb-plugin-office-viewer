@@ -43,6 +43,9 @@ const FONT_WEIGHTS: { value: string; labelKey: I18nKey }[] = [
   { value: "700", labelKey: "protoFontWeightBold" },
 ];
 
+const FIELD_SELECT_CLASS =
+  "h-8 min-w-0 w-full max-w-full rounded-md border border-input bg-transparent px-2 text-xs";
+
 export function InspectorStylePanel({
   inspect,
   selection,
@@ -108,7 +111,7 @@ export function InspectorStylePanel({
 
   return (
     <TooltipProvider delayDuration={400}>
-    <div className="space-y-2 text-xs">
+    <div className="min-w-0 space-y-2 text-xs">
       {multi ? <div className="text-muted-foreground">{t("protoMultiSelection", { count: selection.length })}</div> : null}
       {!multi && inspect ? (
         <label className="grid gap-1">
@@ -120,10 +123,10 @@ export function InspectorStylePanel({
       <InspectorAlignRow selectionCount={selection.length} applyAlign={applyAlign} applyDistribute={applyDistribute} />
 
       <CollapseSection title={t("protoStyleSectionGeometry")} open={openSections.geometry} onToggle={() => toggleSection("geometry")}>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid min-w-0 grid-cols-2 gap-2">
           <ScrubField prefix="X" value={inspect?.x ?? 0} mixed={multi && new Set(selection.map((el) => el.x)).size > 1} onChange={(value) => updateMany((el) => (selection.some((s) => s.id === el.id) ? { ...el, x: snap(value) } : el))} />
           <ScrubField prefix="Y" value={inspect?.y ?? 0} mixed={multi && new Set(selection.map((el) => el.y)).size > 1} onChange={(value) => updateMany((el) => (selection.some((s) => s.id === el.id) ? { ...el, y: snap(value) } : el))} />
-          <div className="col-span-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <div className="col-span-2 grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1">
             <ScrubField
               prefix="W"
               value={inspect?.w ?? 0}
@@ -214,23 +217,19 @@ export function InspectorStylePanel({
       </CollapseSection>
 
       <CollapseSection title={t("protoStyleSectionText")} open={openSections.text} onToggle={() => toggleSection("text")}>
-        <label className="mb-2 grid gap-1">
+        <label className="mb-2 grid min-w-0 gap-1">
           <span className="text-muted-foreground">{t("protoFontFamily")}</span>
-          <select
-            className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
-            value={fontFamily}
-            onChange={(event) => setProp("fontFamily", event.target.value)}
-          >
+          <select className={FIELD_SELECT_CLASS} value={fontFamily} onChange={(event) => setProp("fontFamily", event.target.value)}>
             {FONT_FAMILIES.map((font) => (
               <option key={font.id} value={font.id} style={{ fontFamily: font.css }}>{t(font.labelKey)}</option>
             ))}
           </select>
         </label>
-        <div className="mb-2 grid grid-cols-2 gap-2">
-          <label className="grid gap-1">
-            <span className="text-muted-foreground">{t("protoPropFontWeight")}</span>
+        <div className="mb-2 grid min-w-0 grid-cols-2 gap-2">
+          <label className="grid min-w-0 gap-1">
+            <span className="truncate text-muted-foreground">{t("protoPropFontWeight")}</span>
             <select
-              className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
+              className={FIELD_SELECT_CLASS}
               value={String(mixedStyleValue(selection, styleTarget, "fontWeight") ?? "400")}
               onChange={(event) => applyStyleField("fontWeight", event.target.value)}
             >
@@ -239,10 +238,10 @@ export function InspectorStylePanel({
               ))}
             </select>
           </label>
-          <label className="grid gap-1">
-            <span className="text-muted-foreground">{t("protoPropFontSize")}</span>
+          <label className="grid min-w-0 gap-1">
+            <span className="truncate text-muted-foreground">{t("protoPropFontSize")}</span>
             <select
-              className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
+              className={FIELD_SELECT_CLASS}
               value={String(mixedStyleValue(selection, styleTarget, "fontSize") ?? 14)}
               onChange={(event) => applyStyleField("fontSize", Number(event.target.value))}
             >
@@ -252,25 +251,67 @@ export function InspectorStylePanel({
             </select>
           </label>
         </div>
-        <ScrubField prefix={t("protoLineHeight")} value={Math.round(lineHeight * 100)} mixed={false} onChange={(value) => setProp("lineHeight", value / 100)} />
-        <div className="mt-2 flex flex-wrap gap-1">
-          {(["left", "center", "right"] as const).map((align) => (
-            <span key={align} title={t(align === "left" ? "protoTextAlignLeft" : align === "center" ? "protoTextAlignCenter" : "protoTextAlignRight")} className="inline-flex">
-              <Button type="button" variant="ghost" size="icon" className="size-7" aria-pressed={mixedStyleValue(selection, styleTarget, "textAlign") === align} aria-label={t(align === "left" ? "protoTextAlignLeft" : align === "center" ? "protoTextAlignCenter" : "protoTextAlignRight")} onClick={() => applyStyleField("textAlign", align)}>
-                <TextAlignIcon align={align} />
-              </Button>
-            </span>
-          ))}
-          {(["top", "middle", "bottom"] as const).map((align) => (
-            <span key={align} title={t(align === "top" ? "protoVerticalAlignTop" : align === "middle" ? "protoVerticalAlignMiddle" : "protoVerticalAlignBottom")} className="inline-flex">
-              <Button type="button" variant="ghost" size="icon" className="size-7" aria-pressed={verticalAlign === align} aria-label={t(align === "top" ? "protoVerticalAlignTop" : align === "middle" ? "protoVerticalAlignMiddle" : "protoVerticalAlignBottom")} onClick={() => setProp("verticalAlign", align)}>
-                <VerticalAlignIcon align={align} />
-              </Button>
-            </span>
-          ))}
-          <span title={t("protoTextBold")} className="inline-flex"><Button type="button" variant="ghost" size="icon" className="size-7 font-bold" aria-pressed={mixedStyleValue(selection, styleTarget, "fontWeight") === "700" || mixedStyleValue(selection, styleTarget, "fontWeight") === 700} aria-label={t("protoTextBold")} onClick={() => applyStyleField("fontWeight", mixedStyleValue(selection, styleTarget, "fontWeight") === 700 ? 400 : 700)}>B</Button></span>
-          <span title={t("protoTextItalic")} className="inline-flex"><Button type="button" variant="ghost" size="icon" className="size-7 italic" aria-pressed={italic} aria-label={t("protoTextItalic")} onClick={() => setProp("italic", !italic)}>I</Button></span>
-          <span title={t("protoTextUnderline")} className="inline-flex"><Button type="button" variant="ghost" size="icon" className="size-7 underline" aria-pressed={underline} aria-label={t("protoTextUnderline")} onClick={() => setProp("underline", !underline)}>U</Button></span>
+        <label className="mb-2 grid min-w-0 gap-1">
+          <span className="text-muted-foreground">{t("protoLineHeight")}</span>
+          <ScrubField
+            prefix="%"
+            value={Math.round(lineHeight * 100)}
+            mixed={false}
+            onChange={(value) => setProp("lineHeight", value / 100)}
+          />
+        </label>
+        <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
+          <IconToggleGroup>
+            {(
+              [
+                ["left", "protoTextAlignLeft", "TextAlignLeft"],
+                ["center", "protoTextAlignCenter", "TextAlignCenter"],
+                ["right", "protoTextAlignRight", "TextAlignRight"],
+              ] as const
+            ).map(([align, labelKey, icon]) => (
+              <IconTooltipButton
+                key={align}
+                label={t(labelKey)}
+                pressed={mixedStyleValue(selection, styleTarget, "textAlign") === align}
+                onClick={() => applyStyleField("textAlign", align)}
+              >
+                <Icon name={icon} className="size-4" />
+              </IconTooltipButton>
+            ))}
+          </IconToggleGroup>
+          <IconToggleGroup>
+            {(
+              [
+                ["top", "protoVerticalAlignTop", "LayoutAlignTop"],
+                ["middle", "protoVerticalAlignMiddle", "AlignVerticalCenter"],
+                ["bottom", "protoVerticalAlignBottom", "LayoutAlignBottom"],
+              ] as const
+            ).map(([align, labelKey, icon]) => (
+              <IconTooltipButton
+                key={align}
+                label={t(labelKey)}
+                pressed={verticalAlign === align}
+                onClick={() => setProp("verticalAlign", align)}
+              >
+                <Icon name={icon} className="size-4" />
+              </IconTooltipButton>
+            ))}
+          </IconToggleGroup>
+          <IconToggleGroup>
+            <IconTooltipButton
+              label={t("protoTextBold")}
+              pressed={mixedStyleValue(selection, styleTarget, "fontWeight") === "700" || mixedStyleValue(selection, styleTarget, "fontWeight") === 700}
+              onClick={() => applyStyleField("fontWeight", mixedStyleValue(selection, styleTarget, "fontWeight") === 700 ? 400 : 700)}
+            >
+              <span className="text-sm font-bold leading-none">B</span>
+            </IconTooltipButton>
+            <IconTooltipButton label={t("protoTextItalic")} pressed={italic} onClick={() => setProp("italic", !italic)}>
+              <span className="text-sm italic leading-none">I</span>
+            </IconTooltipButton>
+            <IconTooltipButton label={t("protoTextUnderline")} pressed={underline} onClick={() => setProp("underline", !underline)}>
+              <span className="text-sm underline leading-none">U</span>
+            </IconTooltipButton>
+          </IconToggleGroup>
         </div>
         <InspectorColourPicker
           label={t("protoPropColor")}
@@ -337,16 +378,32 @@ function CollapseSection({ title, open, onToggle, children }: { title: string; o
         <Icon name="ChevronDown" className={cn("size-3.5 shrink-0", !open && "-rotate-90")} />
         {title}
       </button>
-      {open ? <div className="space-y-2 border-t border-border p-2">{children}</div> : null}
+      {open ? <div className="min-w-0 space-y-2 border-t border-border p-2">{children}</div> : null}
     </div>
   );
 }
 
-function ScrubField({ prefix, value, mixed, onChange }: { prefix: string; value: number; mixed?: boolean; onChange: (value: number) => void }) {
+function IconToggleGroup({ children }: { children: ReactNode }) {
+  return <div className="inline-flex max-w-full shrink-0 flex-wrap gap-0.5 rounded-md border border-border p-0.5">{children}</div>;
+}
+
+function ScrubField({
+  prefix,
+  suffix,
+  value,
+  mixed,
+  onChange,
+}: {
+  prefix: string;
+  suffix?: string;
+  value: number;
+  mixed?: boolean;
+  onChange: (value: number) => void;
+}) {
   return (
-    <label className="flex items-center gap-1 rounded border border-input px-1">
+    <label className="flex min-w-0 items-center gap-1 rounded border border-input px-1">
       <span
-        className="cursor-ew-resize select-none text-muted-foreground"
+        className="shrink-0 cursor-ew-resize select-none text-muted-foreground"
         onPointerDown={(event) => {
           event.preventDefault();
           const startY = event.clientY;
@@ -369,16 +426,7 @@ function ScrubField({ prefix, value, mixed, onChange }: { prefix: string; value:
         placeholder={mixed ? "—" : undefined}
         onChange={(event) => onChange(Number(event.target.value))}
       />
+      {suffix ? <span className="shrink-0 pr-1 text-muted-foreground">{suffix}</span> : null}
     </label>
   );
-}
-
-function TextAlignIcon({ align }: { align: "left" | "center" | "right" }) {
-  const d = align === "left" ? "M2 4h10M2 8h6M2 12h8" : align === "center" ? "M3 4h10M5 8h6M4 12h8" : "M4 4h10M8 8h6M6 12h8";
-  return <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden><path d={d} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>;
-}
-
-function VerticalAlignIcon({ align }: { align: "top" | "middle" | "bottom" }) {
-  const d = align === "top" ? "M4 2v10M8 4v6M12 6v4" : align === "middle" ? "M4 5v6M8 3v10M12 5v6" : "M4 8v4M8 10v2M12 6v6";
-  return <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden><path d={d} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>;
 }
