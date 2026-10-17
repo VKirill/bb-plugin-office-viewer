@@ -212,6 +212,15 @@ const en = {
   siteOpenDevices: "See this page on devices",
   siteBrowser: "Browser",
   siteBackToBrowser: "Back to the page in BB's Browser",
+  studio: "Office Studio",
+  studioPrototype: "Prototype",
+  studioPrototypeDesc: "Axure-like interface builder",
+  studioPaint: "Paint",
+  studioPaintDesc: "Drawing with a brush",
+  studioSlides: "Slides",
+  studioSlidesDesc: "Coming soon",
+  studioSoon: "soon",
+  studioBack: "Back to tools",
 };
 
 export type I18nKey = keyof typeof en;
@@ -428,6 +437,15 @@ const ru: Record<I18nKey, string> = {
   siteOpenDevices: "Посмотреть страницу на устройствах",
   siteBrowser: "В браузер",
   siteBackToBrowser: "Вернуться к странице в браузере BB",
+  studio: "Office Studio",
+  studioPrototype: "Прототип",
+  studioPrototypeDesc: "Конструктор интерфейсов в духе Axure",
+  studioPaint: "Рисование",
+  studioPaintDesc: "Рисунок кистью",
+  studioSlides: "Слайды",
+  studioSlidesDesc: "Скоро будет",
+  studioSoon: "скоро",
+  studioBack: "К инструментам",
 };
 
 export type Locale = "en" | "ru";
