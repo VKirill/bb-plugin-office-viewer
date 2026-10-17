@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 import { useT } from "../../shared/i18n";
 import { elementFaceStyleOverrides, resolveStylePatch, readTable } from "./inspector-model";
 import type { CSSProperties } from "react";
-import type { PropValue, WireframeElement } from "./model";
+import { instanceChildrenForRender } from "./components";
+import type { PropValue, WireframeComponent, WireframeElement } from "./model";
 import { NestedContent } from "./nested-content";
 import { isFlowShape, shapePath } from "./shapes";
 
@@ -68,7 +69,15 @@ function markerBg(color: string): string {
 }
 
 /** Looks like the real control; the canvas wrapper owns pointer events. */
-export function ElementFace({ el, allElements = [] }: { el: WireframeElement; allElements?: readonly WireframeElement[] }) {
+export function ElementFace({
+  el,
+  allElements = [],
+  components = [],
+}: {
+  el: WireframeElement;
+  allElements?: readonly WireframeElement[];
+  components?: readonly WireframeComponent[];
+}) {
   const t = useT();
   const p = el.props;
   switch (el.type) {
@@ -483,6 +492,23 @@ export function ElementFace({ el, allElements = [] }: { el: WireframeElement; al
       return (
         <div className={cn(inert, "flex items-center justify-center rounded-full text-[10px] font-semibold text-white")} style={{ background: bg }}>
           {label}
+        </div>
+      );
+    }
+    case "Instance": {
+      const componentId = typeof p.componentId === "string" ? p.componentId : "";
+      const component = components.find((item) => item.id === componentId);
+      if (!component) {
+        return <div className={cn(inert, "flex size-full items-center justify-center border border-dashed border-border text-[10px] text-muted-foreground")}>{t("protoInstanceMissing")}</div>;
+      }
+      const children = instanceChildrenForRender(el, component);
+      return (
+        <div className={cn(inert, "relative size-full overflow-hidden")}>
+          {children.map((child) => (
+            <div key={child.id} className="absolute overflow-hidden" style={{ left: child.x, top: child.y, width: child.w, height: child.h }}>
+              <ElementFace el={child} allElements={children} components={components} />
+            </div>
+          ))}
         </div>
       );
     }

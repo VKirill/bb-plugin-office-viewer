@@ -36,6 +36,10 @@ const MENU_LABEL_KEYS: Record<MenuActionId, I18nKey> = {
   insertIcon: "protoCtxInsertIcon",
   selectAll: "protoCtxSelectAll",
   components: "protoCtxComponents",
+  createComponent: "protoCtxCreateComponent",
+  editComponent: "protoCtxEditComponent",
+  detachInstance: "protoCtxDetachInstance",
+  deleteComponent: "protoCtxDeleteComponent",
 };
 
 export function PrototypeContextMenu({

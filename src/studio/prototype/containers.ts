@@ -7,7 +7,8 @@ export type EditScope =
   | { kind: "page" }
   | { kind: "panel"; panelId: string; state: string }
   | { kind: "container"; containerId: string }
-  | { kind: "group"; groupId: string };
+  | { kind: "group"; groupId: string }
+  | { kind: "component"; componentId: string; instanceId?: string };
 
 export type OutlineNode = {
   id: string;
@@ -327,7 +328,7 @@ export function orphanChildren(elements: readonly WireframeElement[], deletedIds
 }
 
 export function scopeParent(scope: EditScope): ElementParent | null {
-  if (scope.kind === "page") return null;
+  if (scope.kind === "page" || scope.kind === "component") return null;
   if (scope.kind === "panel") return { id: scope.panelId, state: scope.state };
   if (scope.kind === "container") return { id: scope.containerId };
   return null;
@@ -335,12 +336,14 @@ export function scopeParent(scope: EditScope): ElementParent | null {
 
 export function elementsInScope(elements: readonly WireframeElement[], scope: EditScope): WireframeElement[] {
   if (scope.kind === "page") return rootElements(elements);
+  if (scope.kind === "component") return [];
   if (scope.kind === "group") return elements.filter((el) => el.groupId === scope.groupId);
   if (scope.kind === "container") return childrenOf(elements, scope.containerId);
   return childrenOf(elements, scope.panelId, scope.state);
 }
 
 export function boardElements(elements: readonly WireframeElement[], scope: EditScope): BoardElement[] {
+  if (scope.kind === "component") return [];
   const inScope = elementsInScope(elements, scope);
   if (scope.kind === "page") {
     return inScope.map((el) => ({ element: el, absX: el.x, absY: el.y }));
@@ -362,6 +365,18 @@ export function attachToScope(
   absY: number,
   elements: readonly WireframeElement[],
 ): WireframeElement {
+  if (scope.kind === "component") {
+    let ox = SNAP * 2;
+    let oy = SNAP * 2;
+    if (scope.instanceId) {
+      const inst = elements.find((item) => item.id === scope.instanceId);
+      if (inst) {
+        ox = inst.x;
+        oy = inst.y;
+      }
+    }
+    return { ...el, x: snap(absX - ox), y: snap(absY - oy), parentId: undefined, parentState: undefined, groupId: undefined };
+  }
   if (scope.kind === "group") {
     return { ...el, x: snap(absX), y: snap(absY), groupId: scope.groupId, parentId: undefined, parentState: undefined };
   }
@@ -374,6 +389,11 @@ export function attachToScope(
 }
 
 export function enterScopeForElement(el: WireframeElement, elements: readonly WireframeElement[]): EditScope | null {
+  if (el.type === "Instance") {
+    const componentId = el.props.componentId;
+    if (typeof componentId === "string" && componentId) return { kind: "component", componentId, instanceId: el.id };
+    return null;
+  }
   if (el.type === "DynamicPanel") return { kind: "panel", panelId: el.id, state: activePanelState(el) };
   if (el.type === "Container" || el.type === "Repeater") return { kind: "container", containerId: el.id };
   if (el.groupId) return { kind: "group", groupId: el.groupId };

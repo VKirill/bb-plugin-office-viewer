@@ -35,9 +35,10 @@ import {
 import { clickSelection, expandToGroups } from "./canvas-math";
 import { flattenOutline, outlineTree } from "./containers";
 import type { MenuTarget } from "./menus";
-import type { PaletteGroup, WireframeElement, WireframePage } from "./model";
+import { COMPONENT_DRAG_PREFIX } from "./components";
+import type { PaletteGroup, WireframeComponent, WireframeElement, WireframePage } from "./model";
 
-export type PaletteLibraryView = "elements" | "templates" | "icons";
+export type PaletteLibraryView = "elements" | "templates" | "icons" | "components";
 
 export type LeftTopTab = "pages" | "outline";
 
@@ -73,6 +74,10 @@ export function PrototypeLeftPane({
   onAddTile,
   onAddTemplate,
   onAddIcon,
+  components,
+  filteredComponents,
+  onEditComponent,
+  onComponentContextMenu,
 }: {
   topTab: LeftTopTab;
   setTopTab: (tab: LeftTopTab) => void;
@@ -105,6 +110,10 @@ export function PrototypeLeftPane({
   onAddTile: (tile: PaletteTile) => void;
   onAddTemplate: (templateId: string) => void;
   onAddIcon: (name: string) => void;
+  components: readonly WireframeComponent[];
+  filteredComponents: readonly WireframeComponent[];
+  onEditComponent: (componentId: string) => void;
+  onComponentContextMenu: (componentId: string, event: ReactMouseEvent) => void;
 }) {
   const t = useT();
   const [pageEdit, setPageEdit] = useState<string | null>(null);
@@ -373,10 +382,36 @@ export function PrototypeLeftPane({
             <button type="button" className={cn("flex-1 rounded px-1 py-1 text-[11px] font-medium", paletteView === "elements" ? "bg-muted" : "text-muted-foreground")} onClick={() => setPaletteView("elements")}>{t("protoPalette")}</button>
             <button type="button" className={cn("flex-1 rounded px-1 py-1 text-[11px] font-medium", paletteView === "templates" ? "bg-muted" : "text-muted-foreground")} onClick={() => setPaletteView("templates")}>{t("protoPaletteTemplates")}</button>
             <button type="button" className={cn("flex-1 rounded px-1 py-1 text-[11px] font-medium", paletteView === "icons" ? "bg-muted" : "text-muted-foreground")} onClick={() => setPaletteView("icons")}>{t("protoPaletteIcons")}</button>
+            <button type="button" className={cn("flex-1 rounded px-1 py-1 text-[11px] font-medium", paletteView === "components" ? "bg-muted" : "text-muted-foreground")} onClick={() => setPaletteView("components")}>{t("protoPaletteComponents")}</button>
           </div>
           {paletteView === "elements" ? <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("protoSearch")} className="mb-2 h-8" /> : null}
           {paletteView === "templates" ? <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("protoSearchTemplates")} className="mb-2 h-8" /> : null}
-        {paletteView === "icons" ? (
+          {paletteView === "components" ? <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("protoComponentSearch")} className="mb-2 h-8" /> : null}
+        {paletteView === "components" ? (
+          <div className="min-h-0 flex-1 overflow-auto">
+            {filteredComponents.length === 0 ? (
+              <div className="text-xs text-muted-foreground">{components.length ? t("protoSearch") : t("protoInstanceMissing")}</div>
+            ) : (
+              <ul className="space-y-1">
+                {filteredComponents.map((component) => (
+                  <li key={component.id}>
+                    <button
+                      type="button"
+                      draggable
+                      onDragStart={(event: DragEvent) => event.dataTransfer.setData("text/plain", `${COMPONENT_DRAG_PREFIX}${component.id}`)}
+                      onDoubleClick={() => onEditComponent(component.id)}
+                      onContextMenu={(event) => onComponentContextMenu(component.id, event)}
+                      className="flex w-full cursor-grab flex-col rounded-md border border-border px-2 py-1.5 text-left hover:bg-state-hover"
+                    >
+                      <span className="text-xs font-medium">{component.name}</span>
+                      <span className="text-[10px] text-muted-foreground">{component.w}×{component.h}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : paletteView === "icons" ? (
           <IconsLibraryPanel
             className="min-h-0 flex-1"
             onPick={onAddIcon}

@@ -22,7 +22,9 @@ import { PrototypeOverlayCloseButton } from "./shell";
 import { collectDocumentColours } from "./inspector-colour";
 import { RepeaterDataGrid } from "./repeater-data-grid";
 import { SNAP, snap, type PropValue, type WireframeCanvas, type WireframeElement } from "./model";
+import { listInstanceOverrides } from "./components";
 import { normalizeRepeaterData, repeaterColumns } from "./containers";
+import type { WireframeComponent } from "./model";
 
 export type InspectorTab = "style" | "properties" | "notes";
 
@@ -46,6 +48,10 @@ export function PrototypeInspector({
   onRadioChecked,
   applyAlign,
   applyDistribute,
+  components = [],
+  onInstanceOverride,
+  onInstanceResetOverrides,
+  onInstanceClearOverride,
 }: {
   tab: InspectorTab;
   setTab: (tab: InspectorTab) => void;
@@ -66,6 +72,10 @@ export function PrototypeInspector({
   onRadioChecked: (checked: boolean) => void;
   applyAlign: (edge: AlignEdge) => void;
   applyDistribute: (axis: DistributeAxis) => void;
+  components?: readonly WireframeComponent[];
+  onInstanceOverride?: (masterElementId: string, propKey: string, value: string) => void;
+  onInstanceResetOverrides?: () => void;
+  onInstanceClearOverride?: (masterElementId: string, propKey: string) => void;
 }) {
   const t = useT();
   const [styleTarget, setStyleTarget] = useState<StyleTarget>("base");
@@ -75,6 +85,11 @@ export function PrototypeInspector({
   const groups = useMemo(() => radioGroupOptions(elements), [elements]);
   const documentColours = useMemo(() => collectDocumentColours(canvas, elements), [canvas, elements]);
   const multi = selection.length > 1;
+  const instanceComponent =
+    inspect?.type === "Instance" && typeof inspect.props.componentId === "string"
+      ? components.find((item) => item.id === inspect.props.componentId) ?? null
+      : null;
+  const instanceOverrides = inspect && instanceComponent ? listInstanceOverrides(inspect, instanceComponent) : [];
 
   const applyStyleField = (key: keyof StylePatch, value: PropValue | undefined) => {
     if (!selection.length) return;
@@ -182,6 +197,37 @@ export function PrototypeInspector({
               .map((field) => (
                 <FieldEditor key={field.key} field={field} value={inspect.props[field.key]} onChange={(value) => setProp(field.key, value)} />
               ))}
+            {inspect.type === "Instance" && instanceComponent && instanceOverrides.length ? (
+              <div className="mb-3 grid gap-2 border-b border-border pb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">{t("protoInstanceOverrides")}</span>
+                  {onInstanceResetOverrides ? (
+                    <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={onInstanceResetOverrides}>
+                      {t("protoInstanceResetOverrides")}
+                    </Button>
+                  ) : null}
+                </div>
+                {instanceOverrides.map((row) => {
+                  const overridden = row.value !== row.masterValue;
+                  return (
+                    <label key={`${row.elementId}:${row.propKey}`} className="grid gap-1">
+                      <span className="text-[11px] text-muted-foreground">{row.elementLabel} · {row.propKey}</span>
+                      <div className="flex gap-1">
+                        <Input
+                          value={row.value}
+                          onChange={(event) => onInstanceOverride?.(row.elementId, row.propKey, event.target.value)}
+                        />
+                        {overridden && onInstanceClearOverride ? (
+                          <Button type="button" size="sm" variant="ghost" className="shrink-0" onClick={() => onInstanceClearOverride(row.elementId, row.propKey)}>
+                            {t("protoInstanceResetOne")}
+                          </Button>
+                        ) : null}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : null}
             {inspect.type === "Table" ? <InspectorTableEditor el={inspect} onChange={onReplaceElement} /> : null}
             {inspect.type === "Repeater" ? (
               <div className="mt-3 space-y-2">
