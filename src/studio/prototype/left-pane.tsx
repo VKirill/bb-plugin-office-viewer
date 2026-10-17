@@ -3,10 +3,10 @@ import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { t } from "../../shared/i18n";
-import { ElementFace } from "./elements";
 import { IconsLibraryPanel } from "./icons-library";
 import { PALETTE_GROUPS } from "./inspector-fields";
-import { PALETTE_TILES, previewElement, tileGroup, tileMatchesQuery, type PaletteTile } from "./palette";
+import { tileGroup, tileMatchesQuery, type PaletteTile } from "./palette";
+import { Pictogram } from "./pictograms";
 import type { PaletteGroup, WireframeElement, WireframePage } from "./model";
 
 export type LeftTopTab = "pages" | "outline";
@@ -210,10 +210,8 @@ export function PrototypeLeftPane({
 
 function PaletteTileButton({ tile, onAdd, label }: { tile: PaletteTile; onAdd: () => void; label: string }) {
   const previewRef = useRef<HTMLDivElement>(null);
-  const el = previewElement(tile);
-  const boxW = 64;
-  const boxH = 44;
-  const scale = Math.min(boxW / el.w, boxH / el.h, 1);
+  const boxW = 40;
+  const boxH = 40;
   return (
     <button
       type="button"
@@ -224,16 +222,12 @@ function PaletteTileButton({ tile, onAdd, label }: { tile: PaletteTile; onAdd: (
         if (previewRef.current) event.dataTransfer.setDragImage(previewRef.current, boxW / 2, boxH / 2);
       }}
       onClick={onAdd}
-      className="flex cursor-grab flex-col overflow-hidden rounded-lg px-1 pb-1 pt-1 hover:bg-state-hover"
+      className="flex cursor-grab flex-col rounded-lg px-1 pb-1 pt-1 hover:bg-state-hover"
     >
-      <div ref={previewRef} className="flex h-11 items-center justify-center overflow-hidden">
-        <div className="relative" style={{ width: el.w * scale, height: el.h * scale }}>
-          <div className="pointer-events-none" style={{ width: el.w, height: el.h, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-            <ElementFace el={el} />
-          </div>
-        </div>
+      <div ref={previewRef} className="flex h-11 items-center justify-center text-foreground">
+        <Pictogram id={tile.pictogram} className="size-10" />
       </div>
-      <span className="line-clamp-2 min-h-7 text-center text-[10px] leading-3 text-muted-foreground">{label}</span>
+      <span className="min-h-7 whitespace-normal text-balance text-center text-[10px] leading-3 text-muted-foreground">{label}</span>
     </button>
   );
 }

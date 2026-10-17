@@ -1,0 +1,76 @@
+import { FLOW_SHAPES } from "./shapes.ts";
+
+const STATIC_IDS = [
+  "box-1",
+  "box-2",
+  "box-3",
+  "ellipse",
+  "placeholder",
+  "label",
+  "paragraph",
+  "line-h",
+  "line-v",
+  "container",
+  "card",
+  "modal",
+  "divider",
+  "heading-1",
+  "heading-2",
+  "heading-3",
+  "text",
+  "button-outline",
+  "button-primary",
+  "button-link",
+  "image",
+  "dynamic-panel",
+  "repeater-table",
+  "repeater-cards",
+  "hotspot",
+  "inline-frame",
+  "snapshot",
+  "textfield",
+  "textarea",
+  "choice",
+  "checkbox",
+  "radio",
+  "switch",
+  "slider",
+  "listbox",
+  "search-field",
+  "date-picker",
+  "file-upload",
+  "nav",
+  "tabs",
+  "list",
+  "table",
+  "tree",
+  "menu-h",
+  "menu-v",
+  "breadcrumbs",
+  "pagination",
+  "header",
+  "avatar",
+  "icon",
+  "badge",
+  "progress",
+  "alert",
+  "tooltip",
+  "arrow-h",
+  "arrow-v",
+  "sticky-1",
+  "sticky-2",
+  "sticky-3",
+  "sticky-4",
+  "marker-circle",
+  "marker-drop",
+] as const;
+
+const FLOW_IDS = FLOW_SHAPES.map((shape) => `flow-${shape}`);
+
+export const PICTOGRAM_IDS = Object.freeze([...STATIC_IDS, ...FLOW_IDS]) as readonly string[];
+
+export type PictogramId = (typeof STATIC_IDS)[number] | `flow-${(typeof FLOW_SHAPES)[number]}`;
+
+export function hasPictogram(id: string): boolean {
+  return PICTOGRAM_IDS.includes(id);
+}
