@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useT } from "../../shared/i18n";
-import { readTable } from "./inspector-model";
+import { elementFaceStyleOverrides, resolveStylePatch, readTable } from "./inspector-model";
+import type { CSSProperties } from "react";
 import type { PropValue, WireframeElement } from "./model";
 import { isFlowShape, shapePath } from "./shapes";
 
@@ -38,6 +39,10 @@ function variantOf(value: PropValue | undefined): ButtonVariant {
 }
 
 const inert = "pointer-events-none h-full w-full";
+
+function faceStyle(el: WireframeElement, extra?: CSSProperties): CSSProperties {
+  return { ...elementFaceStyleOverrides(el), ...extra };
+}
 
 function boxFill(fill: string, custom?: string): string {
   if (fill === "custom" && custom) return custom;
@@ -79,11 +84,11 @@ export function ElementFace({ el }: { el: WireframeElement }) {
         </div>
       );
     case "Text":
-      return <div className={cn(inert, "px-1 text-sm text-foreground")}>{text(p, "text", "Text")}</div>;
+      return <div className={cn(inert, "px-1 text-sm")} style={faceStyle(el)}>{text(p, "text", "Text")}</div>;
     case "Heading": {
       const level = Math.min(3, Math.max(1, Math.round(num(p, "level", 1))));
       const size = level === 1 ? "text-2xl" : level === 2 ? "text-xl" : "text-lg";
-      return <div className={cn(inert, size, "px-1 font-semibold")}>{text(p, "text", "Heading")}</div>;
+      return <div className={cn(inert, size, "px-1 font-semibold")} style={faceStyle(el)}>{text(p, "text", "Heading")}</div>;
     }
     case "Button":
       return (
@@ -234,15 +239,19 @@ export function ElementFace({ el }: { el: WireframeElement }) {
     case "Divider":
       return <div className={cn(inert, "flex items-center")}><div className="h-px w-full bg-border" /></div>;
     case "Container":
-      return <div className={cn(inert, "border border-dashed border-border bg-muted/20")} />;
+      return <div className={cn(inert, "border border-dashed border-border bg-muted/20")} style={faceStyle(el)} />;
     case "Box": {
       const radius = num(p, "radius", 0);
       const fill = text(p, "fill", "none");
       const custom = text(p, "fillColor", "");
+      const patch = resolveStylePatch(el, "base");
       return (
         <div
           className={cn(inert, "flex items-center justify-center border border-foreground/70 px-2 text-center text-xs")}
-          style={{ borderRadius: radius, background: boxFill(fill, custom) }}
+          style={faceStyle(el, {
+            borderRadius: typeof patch.radius === "number" ? patch.radius : radius,
+            background: patch.fill ?? boxFill(fill, custom),
+          })}
         >
           {text(p, "text", "")}
         </div>
@@ -252,7 +261,9 @@ export function ElementFace({ el }: { el: WireframeElement }) {
       return (
         <div
           className={cn(inert, "flex items-center justify-center rounded-full border border-foreground/70 px-2 text-center text-xs")}
-          style={{ background: boxFill(text(p, "fill", "light")) }}
+          style={faceStyle(el, {
+            background: resolveStylePatch(el, "base").fill ?? boxFill(text(p, "fill", "light")),
+          })}
         >
           {text(p, "text", "")}
         </div>
@@ -270,9 +281,9 @@ export function ElementFace({ el }: { el: WireframeElement }) {
         </div>
       );
     case "Label":
-      return <div className={cn(inert, "px-1 text-xs text-muted-foreground")}>{text(p, "text", "Label")}</div>;
+      return <div className={cn(inert, "px-1 text-xs text-muted-foreground")} style={faceStyle(el)}>{text(p, "text", "Label")}</div>;
     case "Paragraph":
-      return <div className={cn(inert, "whitespace-pre-wrap px-1 text-sm leading-snug")}>{text(p, "text", "Paragraph")}</div>;
+      return <div className={cn(inert, "whitespace-pre-wrap px-1 text-sm leading-snug")} style={faceStyle(el)}>{text(p, "text", "Paragraph")}</div>;
     case "Line": {
       const vertical = text(p, "orientation", "horizontal") === "vertical";
       const stroke = text(p, "stroke", "#333333");
@@ -504,10 +515,14 @@ export function ElementFace({ el }: { el: WireframeElement }) {
       const raw = text(p, "shape", "rectangle");
       const shape = isFlowShape(raw) ? raw : "rectangle";
       const d = shapePath(shape, el.w, el.h);
+      const patch = resolveStylePatch(el, "base");
+      const fill = patch.fill ?? text(p, "fill", "#ffffff");
+      const stroke = patch.stroke ?? text(p, "stroke", "#333333");
+      const strokeWidth = typeof patch.strokeWidth === "number" ? patch.strokeWidth : 1.5;
       return (
-        <div className={cn(inert, "relative flex items-center justify-center")}>
+        <div className={cn(inert, "relative flex items-center justify-center")} style={faceStyle(el)}>
           <svg className="absolute inset-0 size-full" viewBox={`0 0 ${el.w} ${el.h}`} preserveAspectRatio="none">
-            <path d={d} fill={text(p, "fill", "#ffffff")} stroke={text(p, "stroke", "#333333")} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+            <path d={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} vectorEffect="non-scaling-stroke" />
           </svg>
           <span className="relative z-[1] max-w-full px-1 text-center text-xs leading-tight">{text(p, "text", "")}</span>
         </div>

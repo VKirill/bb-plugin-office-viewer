@@ -13,6 +13,7 @@ import {
   tableCellNav,
   writeStringList,
   writeTable,
+  wireframeElementBoxStyle,
 } from "./inspector-model.ts";
 
 test("mergeStylePatch keeps unrelated fields on element", () => {
@@ -28,6 +29,16 @@ test("mixed style value detects differences", () => {
   const b = mergeStylePatch(defaultElement("Box", 8, 0), "base", { fill: "#222" });
   assert.equal(mixedStyleValue([a, b], "base", "fill"), "mixed");
   assert.equal(mixedStyleValue([a, a], "base", "fill"), "#111");
+});
+
+test("wireframeElementBoxStyle maps element.style opacity for canvas", () => {
+  const el = mergeStylePatch(defaultElement("Box", 0, 0), "base", { opacity: 0.1, fill: "#336699" });
+  const css = wireframeElementBoxStyle(el);
+  assert.equal(css.opacity, 0.1);
+  assert.equal(css.background, "#336699");
+  const padded = mergeStylePatch({ ...el, props: { ...el.props, padding: 12 } }, "base", {});
+  assert.equal(wireframeElementBoxStyle(padded).padding, 12);
+  assert.equal(wireframeElementBoxStyle(padded).boxSizing, "border-box");
 });
 
 test("applyStyleToElements updates selection only", () => {

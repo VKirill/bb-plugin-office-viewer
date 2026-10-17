@@ -26,6 +26,7 @@ import { SlideBoard, slidePngBase64 } from "./slide-board";
 import { SlidesPresenter, presentStartIndex } from "./presenter";
 import { deckToPptxBlob } from "./pptx-export";
 import { ElementFace } from "../prototype/elements";
+import { WireframeElementFrame } from "../prototype/wireframe-element-frame";
 import { cn } from "@/lib/utils";
 
 type SendKind = "both" | "png" | "pptx";
@@ -269,9 +270,9 @@ export function SlidesEditor({ threadId }: { threadId: string }) {
                   {slide.elements
                     .filter((el) => !el.hidden)
                     .map((el) => (
-                      <div key={el.id} className="absolute overflow-hidden" style={{ left: el.x, top: el.y, width: el.w, height: el.h }}>
+                      <WireframeElementFrame key={el.id} el={el} className="absolute overflow-hidden">
                         <ElementFace el={el} />
-                      </div>
+                      </WireframeElementFrame>
                     ))}
                 </div>
               </div>

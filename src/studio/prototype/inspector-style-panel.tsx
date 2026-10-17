@@ -13,8 +13,7 @@ import { InspectorColourPicker } from "./inspector-colour-picker";
 import {
   STYLE_EFFECTS,
   mixedStyleValue,
-  resolveStylePatch,
-  stylePatchToInline,
+  wireframeElementBoxStyle,
   type StylePatch,
   type StyleTarget,
 } from "./inspector-model";
@@ -97,7 +96,6 @@ export function InspectorStylePanel({
   }
 
   const previewEl = inspect ? { ...inspect, ...(selection[0] ?? inspect) } : null;
-  const previewPatch = previewEl ? resolveStylePatch(previewEl, styleTarget) : {};
   const rotation = typeof inspect?.props.rotation === "number" ? inspect.props.rotation : 0;
   const fontFamily = typeof inspect?.props.fontFamily === "string" ? inspect.props.fontFamily : "system";
   const lineHeight = typeof inspect?.props.lineHeight === "number" ? inspect.props.lineHeight : 1.4;
@@ -198,7 +196,7 @@ export function InspectorStylePanel({
         {previewEl ? (
           <div className="mt-2 rounded border border-border bg-muted/30 p-2" style={{ minHeight: 48 }}>
             <div className="relative mx-auto" style={{ width: Math.min(120, previewEl.w), height: Math.min(80, previewEl.h) }}>
-              <div className="absolute inset-0 overflow-hidden" style={stylePatchToInline(previewPatch)}>
+              <div className="absolute inset-0 overflow-hidden" style={wireframeElementBoxStyle(previewEl, styleTarget)}>
                 <ElementFace el={previewEl} />
               </div>
             </div>
