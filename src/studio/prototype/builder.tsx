@@ -1,18 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useComposer, useRpc } from "@get-bb/plugin-sdk/app";
-import type { domToBlob } from "modern-screenshot";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Icon, type IconName } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 import type { rpcContract } from "../../../server";
-import { SCREENSHOT_LIBRARY } from "../../html/capture";
-import { detectLocale, t, type I18nKey } from "../../shared/i18n";
-import { ElementFace } from "./elements";
+import { detectLocale, t } from "../../shared/i18n";
 import {
   CATALOG_BY_TYPE,
   CANVAS_PRESETS,
@@ -23,13 +17,23 @@ import {
   newWireframe,
   parseWireframe,
   snap,
-  type ElementType,
   type PaletteGroup,
   type PropValue,
   type Wireframe,
   type WireframeElement,
+  getActivePage,
+  updateActivePage,
+  setActivePageId,
+  newPage,
+  nextPageName,
 } from "./model";
-import { PALETTE_BY_ID, PALETTE_TILES, elementFromTile, previewElement, tileGroup, tileMatchesQuery, type PaletteTile } from "./palette";
+import { PrototypeShell, PrototypeStyleBar } from "./shell";
+import { PrototypeToolbar, type ToolbarMenu } from "./toolbar";
+import { PrototypeLeftPane, type LeftTopTab } from "./left-pane";
+import { PrototypeCanvas } from "./canvas";
+import { PrototypeInspector, type InspectorTab } from "./inspector";
+import { blobToBase64, loadScreenshotLibrary, noteNumbers, placeOnCanvas, resized, selectionBounds, type Handle } from "./builder-geometry";
+import { PALETTE_BY_ID, PALETTE_TILES, elementFromTile, tileMatchesQuery, type PaletteTile } from "./palette";
 import {
   addChoiceSibling,
   applyInlineDraft,
@@ -44,309 +48,21 @@ import {
   stringList,
   toggleCheckbox,
   type InlineEdit,
-  type InlineTarget,
 } from "./editing";
 import { alignElements, distributeElements, type AlignEdge, type DistributeAxis } from "./align";
-import { FLOW_SHAPES } from "./shapes";
 import { ICON_DRAG_PREFIX, iconDisplayLabel } from "./icons";
-import { IconsLibraryPanel } from "./icons-library";
-import { IconInspector, readIconColor, readIconSize } from "./icon-inspector";
 
 const MAX_HISTORY = 60;
-const MIN_SIZE = SNAP;
-const HANDLES = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
-type Handle = (typeof HANDLES)[number];
-type SendKind = "both" | "png" | "json";
-type ToolbarMenu = "file" | "send" | "zoom" | "more";
-const ZOOM_PRESETS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2] as const;
-const DEVICE_ICON: Record<keyof typeof CANVAS_PRESETS, IconName> = {
-  desktop: "Laptop",
-  tablet: "AppWindow",
-  phone: "Smartphone",
-};
-const DEVICE_LABEL: Record<keyof typeof CANVAS_PRESETS, I18nKey> = {
-  desktop: "protoDesktop",
-  tablet: "protoTablet",
-  phone: "protoPhone",
-};
-const ALIGN_TOOLS: { kind: AlignEdge; label: I18nKey }[] = [
-  { kind: "left", label: "protoAlignLeft" },
-  { kind: "center", label: "protoAlignCenter" },
-  { kind: "right", label: "protoAlignRight" },
-  { kind: "top", label: "protoAlignTop" },
-  { kind: "middle", label: "protoAlignMiddle" },
-  { kind: "bottom", label: "protoAlignBottom" },
-];
-type FieldKind = "text" | "textarea" | "number" | "boolean" | "list" | "select";
-type Field = { key: string; kind: FieldKind; label: I18nKey; options?: string[] };
-
-const GROUPS: { id: PaletteGroup; label: I18nKey }[] = [
-  { id: "common", label: "protoGroupCommon" },
-  { id: "dynamic", label: "protoGroupDynamic" },
-  { id: "forms", label: "protoGroupForms" },
-  { id: "menus", label: "protoGroupMenus" },
-  { id: "content", label: "protoGroupContent" },
-  { id: "markup", label: "protoGroupMarkup" },
-  { id: "flow", label: "protoGroupFlow" },
-];
-
-const FIELDS: Partial<Record<ElementType, Field[]>> = {
-  Header: [{ key: "text", kind: "text", label: "protoPropText" }],
-  Nav: [{ key: "items", kind: "list", label: "protoPropItems" }],
-  Text: [{ key: "text", kind: "textarea", label: "protoPropText" }],
-  Heading: [
-    { key: "text", kind: "text", label: "protoPropText" },
-    { key: "level", kind: "number", label: "protoPropLevel" },
-  ],
-  Button: [
-    { key: "text", kind: "text", label: "protoPropText" },
-    { key: "variant", kind: "select", label: "protoPropVariant", options: ["default", "secondary", "outline", "ghost", "destructive"] },
-  ],
-  TextField: [
-    { key: "placeholder", kind: "text", label: "protoPropPlaceholder" },
-    { key: "value", kind: "text", label: "protoPropValue" },
-  ],
-  TextArea: [
-    { key: "placeholder", kind: "text", label: "protoPropPlaceholder" },
-    { key: "value", kind: "textarea", label: "protoPropValue" },
-  ],
-  ChoicePicker: [
-    { key: "options", kind: "list", label: "protoPropOptions" },
-    { key: "value", kind: "text", label: "protoPropValue" },
-  ],
-  Checkbox: [
-    { key: "text", kind: "text", label: "protoPropText" },
-    { key: "checked", kind: "boolean", label: "protoPropChecked" },
-  ],
-  Radio: [
-    { key: "text", kind: "text", label: "protoPropText" },
-    { key: "checked", kind: "boolean", label: "protoPropChecked" },
-  ],
-  Switch: [
-    { key: "text", kind: "text", label: "protoPropText" },
-    { key: "checked", kind: "boolean", label: "protoPropChecked" },
-  ],
-  Slider: [
-    { key: "value", kind: "number", label: "protoPropValue" },
-    { key: "min", kind: "number", label: "protoPropMin" },
-    { key: "max", kind: "number", label: "protoPropMax" },
-  ],
-  Card: [
-    { key: "title", kind: "text", label: "protoPropTitle" },
-    { key: "text", kind: "textarea", label: "protoPropText" },
-  ],
-  Image: [{ key: "alt", kind: "text", label: "protoPropAlt" }],
-  Avatar: [{ key: "initials", kind: "text", label: "protoPropInitials" }],
-  Badge: [{ key: "text", kind: "text", label: "protoPropText" }],
-  Table: [
-    { key: "columns", kind: "number", label: "protoPropColumns" },
-    { key: "rows", kind: "number", label: "protoPropRows" },
-  ],
-  List: [{ key: "items", kind: "list", label: "protoPropItems" }],
-  Tabs: [
-    { key: "items", kind: "list", label: "protoPropItems" },
-    { key: "active", kind: "text", label: "protoPropActive" },
-  ],
-  Modal: [
-    { key: "title", kind: "text", label: "protoPropTitle" },
-    { key: "text", kind: "textarea", label: "protoPropText" },
-  ],
-  Box: [
-    { key: "text", kind: "text", label: "protoPropText" },
-    { key: "fill", kind: "select", label: "protoPropFill", options: ["none", "light", "dark", "custom"] },
-    { key: "fillColor", kind: "text", label: "protoPropFillColor" },
-    { key: "radius", kind: "number", label: "protoPropRadius" },
-  ],
-  Ellipse: [
-    { key: "text", kind: "text", label: "protoPropText" },
-    { key: "fill", kind: "select", label: "protoPropFill", options: ["none", "light", "dark"] },
-  ],
-  Placeholder: [{ key: "text", kind: "text", label: "protoPropText" }],
-  Label: [{ key: "text", kind: "text", label: "protoPropText" }],
-  Paragraph: [{ key: "text", kind: "textarea", label: "protoPropText" }],
-  Line: [
-    { key: "orientation", kind: "select", label: "protoPropOrientation", options: ["horizontal", "vertical"] },
-    { key: "stroke", kind: "text", label: "protoPropStroke" },
-    { key: "dashed", kind: "boolean", label: "protoPropDashed" },
-  ],
-  DynamicPanel: [
-    { key: "states", kind: "list", label: "protoPropStates" },
-    { key: "active", kind: "text", label: "protoPropActive" },
-  ],
-  Repeater: [
-    { key: "layout", kind: "select", label: "protoPropLayout", options: ["table", "cards"] },
-    { key: "columns", kind: "list", label: "protoPropColumnsList" },
-    { key: "rows", kind: "number", label: "protoPropRows" },
-  ],
-  HotSpot: [{ key: "note", kind: "text", label: "protoNote" }],
-  InlineFrame: [{ key: "url", kind: "text", label: "protoPropUrl" }],
-  Snapshot: [{ key: "target", kind: "text", label: "protoPropTarget" }],
-  ListBox: [
-    { key: "items", kind: "list", label: "protoPropItems" },
-    { key: "selected", kind: "text", label: "protoPropSelected" },
-  ],
-  SearchField: [
-    { key: "placeholder", kind: "text", label: "protoPropPlaceholder" },
-    { key: "value", kind: "text", label: "protoPropValue" },
-  ],
-  DatePicker: [{ key: "placeholder", kind: "text", label: "protoPropPlaceholder" }],
-  FileUpload: [{ key: "text", kind: "text", label: "protoPropText" }],
-  Tree: [{ key: "items", kind: "list", label: "protoPropItems" }],
-  Menu: [
-    { key: "orientation", kind: "select", label: "protoPropOrientation", options: ["horizontal", "vertical"] },
-    { key: "items", kind: "list", label: "protoPropItems" },
-  ],
-  Breadcrumbs: [{ key: "items", kind: "list", label: "protoPropItems" }],
-  Pagination: [
-    { key: "pages", kind: "number", label: "protoPropPages" },
-    { key: "current", kind: "number", label: "protoPropCurrent" },
-  ],
-  Progress: [{ key: "value", kind: "number", label: "protoPropValue" }],
-  Alert: [
-    { key: "variant", kind: "select", label: "protoPropVariant", options: ["info", "success", "warning", "error"] },
-    { key: "title", kind: "text", label: "protoPropTitle" },
-    { key: "text", kind: "textarea", label: "protoPropText" },
-  ],
-  Tooltip: [
-    { key: "text", kind: "text", label: "protoPropText" },
-    { key: "placement", kind: "select", label: "protoPropPlacement", options: ["top", "bottom", "left", "right"] },
-  ],
-  Arrow: [
-    { key: "orientation", kind: "select", label: "protoPropOrientation", options: ["horizontal", "vertical"] },
-    { key: "stroke", kind: "text", label: "protoPropStroke" },
-  ],
-  Sticky: [
-    { key: "color", kind: "select", label: "protoPropColor", options: ["yellow", "blue", "green", "pink"] },
-    { key: "text", kind: "textarea", label: "protoPropText" },
-  ],
-  Marker: [
-    { key: "shape", kind: "select", label: "protoPropMarkerShape", options: ["circle", "drop"] },
-    { key: "text", kind: "text", label: "protoPropText" },
-    { key: "color", kind: "select", label: "protoPropColor", options: ["red", "blue", "green", "orange"] },
-  ],
-  Shape: [
-    { key: "shape", kind: "select", label: "protoPropFlowShape", options: [...FLOW_SHAPES] },
-    { key: "text", kind: "text", label: "protoPropText" },
-    { key: "fill", kind: "text", label: "protoPropFillColor" },
-    { key: "stroke", kind: "text", label: "protoPropStroke" },
-  ],
-};
-
-const HANDLE_CLASS: Record<Handle, string> = {
-  n: "left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 cursor-n-resize",
-  s: "bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 cursor-s-resize",
-  e: "right-0 top-1/2 -translate-y-1/2 translate-x-1/2 cursor-e-resize",
-  w: "left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-w-resize",
-  ne: "right-0 top-0 -translate-y-1/2 translate-x-1/2 cursor-ne-resize",
-  nw: "left-0 top-0 -translate-x-1/2 -translate-y-1/2 cursor-nw-resize",
-  se: "bottom-0 right-0 translate-x-1/2 translate-y-1/2 cursor-se-resize",
-  sw: "bottom-0 left-0 -translate-x-1/2 translate-y-1/2 cursor-sw-resize",
-};
 
 type Drag =
   | { kind: "move"; ids: string[]; ox: number; oy: number; orig: Record<string, { x: number; y: number }> }
   | { kind: "resize"; id: string; handle: Handle; orig: WireframeElement };
+type SendKind = "both" | "png" | "json";
 
-type Library = { domToBlob: typeof domToBlob };
-let library: Promise<Library> | null = null;
-
-function loadLibrary() {
-  const scope = globalThis as { modernScreenshot?: Library };
-  library ??= new Promise<Library>((resolve, reject) => {
-    if (scope.modernScreenshot) return resolve(scope.modernScreenshot);
-    const script = document.createElement("script");
-    script.src = SCREENSHOT_LIBRARY;
-    script.onload = () => (scope.modernScreenshot ? resolve(scope.modernScreenshot) : reject(new Error("modern-screenshot did not load")));
-    script.onerror = () => reject(new Error("modern-screenshot did not load"));
-    document.head.append(script);
-  });
-  library.catch(() => {
-    library = null;
-  });
-  return library;
-}
-
-async function blobToBase64(blob: Blob): Promise<string> {
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(binary);
-}
-
-function resized(el: WireframeElement, handle: Handle, x: number, y: number): WireframeElement {
-  let left = el.x;
-  let top = el.y;
-  let right = el.x + el.w;
-  let bottom = el.y + el.h;
-  if (handle.includes("w")) left = Math.min(snap(x), right - MIN_SIZE);
-  if (handle.includes("e")) right = Math.max(snap(x), left + MIN_SIZE);
-  if (handle.includes("n")) top = Math.min(snap(y), bottom - MIN_SIZE);
-  if (handle.includes("s")) bottom = Math.max(snap(y), top + MIN_SIZE);
-  return { ...el, x: left, y: top, w: Math.max(MIN_SIZE, snap(right - left)), h: Math.max(MIN_SIZE, snap(bottom - top)) };
-}
-
-function placeOnCanvas(el: WireframeElement, canvas: Wireframe["canvas"]): WireframeElement {
-  const w = Math.min(el.w, canvas.width);
-  const h = Math.min(el.h, canvas.height);
-  return {
-    ...el,
-    w,
-    h,
-    x: snap(Math.max(0, Math.min(el.x, canvas.width - w))),
-    y: snap(Math.max(0, Math.min(el.y, canvas.height - h))),
-  };
-}
-
-function editOverlayBox(el: WireframeElement, target: InlineTarget): { left: number; top: number; width: number; height: number } {
-  if (target.kind === "item") {
-    if (el.type === "List") {
-      const n = Math.max(1, stringList(el, "items").length);
-      const h = el.h / n;
-      return { left: 16, top: target.index * h, width: Math.max(8, el.w - 20), height: h };
-    }
-    if (el.type === "Nav" || el.type === "Tabs" || el.type === "Menu" || el.type === "Breadcrumbs") {
-      const n = Math.max(1, stringList(el, target.key).length);
-      const orientation = el.props.orientation;
-      const horizontal = el.type !== "Menu" || (typeof orientation === "string" ? orientation : "horizontal") !== "vertical";
-      if (horizontal) {
-        const w = el.w / n;
-        return { left: target.index * w, top: 0, width: w, height: el.h };
-      }
-      const h = el.h / n;
-      return { left: 0, top: target.index * h, width: el.w, height: h };
-    }
-    if (el.type === "ListBox" || el.type === "Tree") {
-      const n = Math.max(1, stringList(el, "items").length);
-      const h = el.h / n;
-      return { left: 4, top: target.index * h, width: Math.max(8, el.w - 8), height: h };
-    }
-    if (el.type === "DynamicPanel" && target.key === "states") {
-      const n = Math.max(1, stringList(el, "states").length);
-      const h = (el.h - 24) / n;
-      return { left: 8, top: 24 + target.index * h, width: Math.max(8, el.w - 16), height: h };
-    }
-    return { left: 8, top: 4, width: Math.max(8, el.w - 32), height: Math.max(8, el.h - 8) };
-  }
-  if (el.type === "Radio" || el.type === "Checkbox") {
-    return { left: 24, top: 2, width: Math.max(8, el.w - 28), height: Math.max(8, el.h - 4) };
-  }
-  if (el.type === "Card" || el.type === "Modal") {
-    return { left: 10, top: 8, width: Math.max(8, el.w - 20), height: 24 };
-  }
-  if (el.type === "Header") {
-    return { left: 16, top: 8, width: Math.max(8, el.w - 32), height: Math.max(8, el.h - 16) };
-  }
-  return { left: 4, top: 4, width: Math.max(8, el.w - 8), height: Math.max(8, el.h - 8) };
-}
-
-function noteNumbers(elements: readonly WireframeElement[]): Map<string, number> {
-  const map = new Map<string, number>();
-  let n = 0;
-  for (const el of elements) {
-    if (el.note?.trim()) map.set(el.id, ++n);
-  }
-  return map;
-}
+function pageElements(doc: Wireframe) { return getActivePage(doc).elements; }
+function pageCanvas(doc: Wireframe) { return getActivePage(doc).canvas; }
+function patchElements(doc: Wireframe, elements: WireframeElement[]) { return updateActivePage(doc, (p) => ({ ...p, elements })); }
+function patchCanvas(doc: Wireframe, patch: Partial<Wireframe["pages"][0]["canvas"]>) { return updateActivePage(doc, (p) => ({ ...p, canvas: { ...p.canvas, ...patch } })); }
 
 export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const rpc = useRpc<typeof rpcContract>();
@@ -366,13 +82,22 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [badges, setBadges] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [query, setQuery] = useState("");
-  const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements");
+  
+  const [leftTab, setLeftTab] = useState<LeftTopTab>("pages");
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("style");
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
+  const [leftOverlay, setLeftOverlay] = useState(false);
+  const [rightOverlay, setRightOverlay] = useState(false);
+  const [openTabIds, setOpenTabIds] = useState<string[]>(() => [getActivePage(doc).id]);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const [compact, setCompact] = useState(false);
+const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements");
   const [collapsed, setCollapsed] = useState<Partial<Record<PaletteGroup, boolean>>>({ flow: true });
   const [busy, setBusy] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const [openOpen, setOpenOpen] = useState(false);
   const [menu, setMenu] = useState<ToolbarMenu | null>(null);
-  const [narrow, setNarrow] = useState(false);
   const [savedNames, setSavedNames] = useState<string[]>([]);
   const [openedStem, setOpenedStem] = useState<string | null>(null);
   const [saveName, setSaveName] = useState("Untitled");
@@ -399,10 +124,10 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   }, [doc.name]);
 
   useEffect(() => {
-    const el = barRef.current;
+    const el = shellRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
-      setNarrow((entries[0]?.contentRect.width ?? el.clientWidth) < 720);
+      setCompact((entries[0]?.contentRect.width ?? el.clientWidth) < 900);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -429,15 +154,15 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const undo = () => setTimeline((s) => ({ ...s, index: Math.max(0, s.index - 1) }));
   const redo = () => setTimeline((s) => ({ ...s, index: Math.min(s.history.length - 1, s.index + 1) }));
 
-  const replace = (elements: WireframeElement[]) => commit({ ...doc, elements });
+  const replace = (elements: WireframeElement[]) => commit(patchElements(doc, elements));
 
   const addTile = (tile: PaletteTile, x?: number, y?: number) => {
     const spec = CATALOG_BY_TYPE[tile.type];
     const el = placeOnCanvas(
-      elementFromTile(tile, x ?? (doc.canvas.width - spec.w) / 2, y ?? (doc.canvas.height - spec.h) / 2, doc.elements),
-      doc.canvas,
+      elementFromTile(tile, x ?? (pageCanvas(doc).width - spec.w) / 2, y ?? (pageCanvas(doc).height - spec.h) / 2, pageElements(doc)),
+      pageCanvas(doc),
     );
-    replace([...doc.elements, el]);
+    replace([...pageElements(doc), el]);
     setSelected([el.id]);
   };
 
@@ -445,32 +170,32 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
     const size = 24;
     const el = placeOnCanvas(
       {
-        ...defaultElement("Icon", x ?? (doc.canvas.width - size) / 2, y ?? (doc.canvas.height - size) / 2, doc.elements),
+        ...defaultElement("Icon", x ?? (pageCanvas(doc).width - size) / 2, y ?? (pageCanvas(doc).height - size) / 2, pageElements(doc)),
         props: { name: iconName, size, color: "foreground" },
         label: iconDisplayLabel(iconName),
         w: size,
         h: size,
       },
-      doc.canvas,
+      pageCanvas(doc),
     );
-    replace([...doc.elements, el]);
+    replace([...pageElements(doc), el]);
     setSelected([el.id]);
   };
 
-  const selectedEls = view.elements.filter((el) => selected.includes(el.id));
+  const selectedEls = pageElements(view).filter((el) => selected.includes(el.id));
   const one = selectedEls.length === 1 ? selectedEls[0] : null;
   const inspect = one && edit?.id === one.id ? applyInlineDraft(one, edit) : one;
-  const notes = useMemo(() => noteNumbers(view.elements), [view.elements]);
+  const notes = useMemo(() => noteNumbers(pageElements(view)), [pageElements(view)]);
 
   const updateOne = (patch: Partial<WireframeElement>) => {
     if (!one) return;
-    replace(doc.elements.map((el) => (el.id === one.id ? { ...el, ...patch } : el)));
+    replace(pageElements(doc).map((el) => (el.id === one.id ? { ...el, ...patch } : el)));
   };
 
   const setProp = (key: string, value: PropValue) => {
     if (!one) return;
     if (one.type === "Radio" && key === "checked") {
-      const next = doc.elements.map((el) => (el.id === one.id ? { ...el, props: { ...el.props, checked: value } } : el));
+      const next = pageElements(doc).map((el) => (el.id === one.id ? { ...el, props: { ...el.props, checked: value } } : el));
       replace(value === true ? checkRadio(next, one.id) : next);
       return;
     }
@@ -479,16 +204,16 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
 
   const removeSelected = () => {
     if (!selected.length) return;
-    replace(doc.elements.filter((el) => !selected.includes(el.id)));
+    replace(pageElements(doc).filter((el) => !selected.includes(el.id)));
     setSelected([]);
   };
 
   const duplicateSelected = () => {
     if (!selected.length) return;
-    const copies = doc.elements
+    const copies = pageElements(doc)
       .filter((el) => selected.includes(el.id))
-      .map((el) => placeOnCanvas({ ...structuredClone(el), id: newElementId(), x: el.x + SNAP * 2, y: el.y + SNAP * 2 }, doc.canvas));
-    replace([...doc.elements, ...copies]);
+      .map((el) => placeOnCanvas({ ...structuredClone(el), id: newElementId(), x: el.x + SNAP * 2, y: el.y + SNAP * 2 }, pageCanvas(doc)));
+    replace([...pageElements(doc), ...copies]);
     setSelected(copies.map((el) => el.id));
   };
 
@@ -499,10 +224,10 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const paste = () => {
     if (!clipboard.current.length) return;
     const copies = clipboard.current.map((el) =>
-      placeOnCanvas({ ...structuredClone(el), id: newElementId(), x: el.x + SNAP * 2, y: el.y + SNAP * 2 }, doc.canvas),
+      placeOnCanvas({ ...structuredClone(el), id: newElementId(), x: el.x + SNAP * 2, y: el.y + SNAP * 2 }, pageCanvas(doc)),
     );
     clipboard.current = copies;
-    replace([...doc.elements, ...copies]);
+    replace([...pageElements(doc), ...copies]);
     setSelected(copies.map((el) => el.id));
   };
 
@@ -514,19 +239,19 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
 
   const applyAlign = (edge: AlignEdge) => {
     if (!selected.length) return;
-    replace(alignElements(doc.elements, selected, edge, doc.canvas));
+    replace(alignElements(pageElements(doc), selected, edge, pageCanvas(doc)));
   };
 
   const applyDistribute = (axis: DistributeAxis) => {
     if (selected.length < 3) return;
-    replace(distributeElements(doc.elements, selected, axis));
+    replace(distributeElements(pageElements(doc), selected, axis));
   };
 
   const fitZoom = () => {
     const pane = canvasPaneRef.current;
     if (!pane) return;
     const pad = 32;
-    const next = Math.min((pane.clientWidth - pad) / doc.canvas.width, (pane.clientHeight - pad) / doc.canvas.height);
+    const next = Math.min((pane.clientWidth - pad) / pageCanvas(doc).width, (pane.clientHeight - pad) / pageCanvas(doc).height);
     setZoom(Math.max(0.25, Math.min(2, Math.round(next * 100) / 100)));
   };
 
@@ -534,7 +259,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
 
   const nudgeLayer = (delta: 1 | -1) => {
     if (!selected.length) return;
-    const next = [...doc.elements];
+    const next = [...pageElements(doc)];
     const ids = new Set(selected);
     const indexes = next.map((el, i) => (ids.has(el.id) ? i : -1)).filter((i) => i >= 0);
     const walk = delta === 1 ? [...indexes].reverse() : indexes;
@@ -564,10 +289,12 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
       return;
     }
     if (id) {
+      const target = pageElements(view).find((item) => item.id === id);
+      if (target?.locked) return;
       const ids = event.shiftKey ? (selected.includes(id) ? selected.filter((item) => item !== id) : [...selected, id]) : selected.includes(id) ? selected : [id];
       setSelected(ids);
       const orig: Record<string, { x: number; y: number }> = {};
-      for (const el of view.elements) if (ids.includes(el.id)) orig[el.id] = { x: el.x, y: el.y };
+      for (const el of pageElements(view)) if (ids.includes(el.id)) orig[el.id] = { x: el.x, y: el.y };
       drag.current = { kind: "move", ids, ox: p.x, oy: p.y, orig };
       event.currentTarget.setPointerCapture(event.pointerId);
       return;
@@ -582,19 +309,18 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
     if (current.kind === "move") {
       const dx = snap(p.x - current.ox);
       const dy = snap(p.y - current.oy);
-      setLive({
-        ...doc,
-        elements: doc.elements.map((el) => {
-          const from = current.orig[el.id];
-          return from ? { ...el, x: from.x + dx, y: from.y + dy } : el;
-        }),
-      });
+      setLive(
+        patchElements(
+          doc,
+          pageElements(doc).map((el) => {
+            const from = current.orig[el.id];
+            return from ? { ...el, x: from.x + dx, y: from.y + dy } : el;
+          }),
+        ),
+      );
       return;
     }
-    setLive({
-      ...doc,
-      elements: doc.elements.map((el) => (el.id === current.id ? resized(current.orig, current.handle, p.x, p.y) : el)),
-    });
+    setLive(patchElements(doc, pageElements(doc).map((el) => (el.id === current.id ? resized(current.orig, current.handle, p.x, p.y) : el))));
   };
 
   const onBoardPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -603,10 +329,10 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
     if (current?.kind === "move") {
       const p = boardPoint(event);
       if (snap(p.x - current.ox) === 0 && snap(p.y - current.oy) === 0) {
-        const el = doc.elements.find((item) => current.ids[0] === item.id);
+        const el = pageElements(doc).find((item) => current.ids[0] === item.id);
         if (el && event.detail === 1 && (el.type === "Radio" || el.type === "Checkbox") && p.x - el.x < 28) {
           setLive(null);
-          replace(el.type === "Radio" ? checkRadio(doc.elements, el.id) : toggleCheckbox(doc.elements, el.id));
+          replace(el.type === "Radio" ? checkRadio(pageElements(doc), el.id) : toggleCheckbox(pageElements(doc), el.id));
           return;
         }
         setLive(null);
@@ -639,7 +365,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const capturePng = async () => {
     const node = boardRef.current;
     if (!node) throw new Error(t("protoCaptureFailed"));
-    const lib = await loadLibrary();
+    const lib = await loadScreenshotLibrary();
     return lib.domToBlob(node, {
       scale: 2,
       type: "image/png",
@@ -722,6 +448,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
       setOpenedStem(name);
       setSelected([]);
       setEdit(null);
+      setOpenTabIds([getActivePage(next).id]);
       setOpenOpen(false);
       toast.success(t("protoOpened", { name }));
     } catch (cause) {
@@ -751,12 +478,12 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const commitEdit = () => {
     const current = editRef.current;
     if (!current) return;
-    const el = doc.elements.find((item) => item.id === current.id);
+    const el = pageElements(doc).find((item) => item.id === current.id);
     if (!el || draftUnchanged(el, current)) {
       closeEdit(null);
       return;
     }
-    replace(applyEdit(current, doc.elements));
+    replace(applyEdit(current, pageElements(doc)));
     closeEdit(null);
   };
 
@@ -771,13 +498,13 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
     }
     if (event.key === "Enter") {
       event.preventDefault();
-      const el = doc.elements.find((item) => item.id === current.id);
+      const el = pageElements(doc).find((item) => item.id === current.id);
       if (!el) {
         closeEdit(null);
         return;
       }
       if (el.type === "Radio" || el.type === "Checkbox") {
-        const result = addChoiceSibling(applyEdit(current, doc.elements), el.id, current.draft);
+        const result = addChoiceSibling(applyEdit(current, pageElements(doc)), el.id, current.draft);
         replace(result.elements);
         closeEdit(result.edit);
         setSelected([result.edit.id]);
@@ -785,7 +512,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
       }
       if (current.target.kind === "item") {
         const result = enterOnListItem(applyInlineDraft(el, current), current.target.key, current.target.index, current.draft);
-        replace(doc.elements.map((item) => (item.id === el.id ? result.element : item)));
+        replace(pageElements(doc).map((item) => (item.id === el.id ? result.element : item)));
         closeEdit({ id: el.id, target: { kind: "item", key: current.target.key, index: result.nextIndex }, draft: "" });
         return;
       }
@@ -794,10 +521,10 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
     }
     if (event.key === "Backspace" && current.target.kind === "item" && current.draft === "") {
       event.preventDefault();
-      const el = doc.elements.find((item) => item.id === current.id);
+      const el = pageElements(doc).find((item) => item.id === current.id);
       if (!el) return;
       const result = removeEmptyListItem(el, current.target.key, current.target.index);
-      replace(doc.elements.map((item) => (item.id === el.id ? result.element : item)));
+      replace(pageElements(doc).map((item) => (item.id === el.id ? result.element : item)));
       if (result.nextIndex === null) closeEdit(null);
       else closeEdit({ id: el.id, target: { kind: "item", key: current.target.key, index: result.nextIndex }, draft: readDraft(result.element, { kind: "item", key: current.target.key, index: result.nextIndex }) });
     }
@@ -805,7 +532,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
 
   const onBoardDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
     const id = (event.target as HTMLElement).closest("[data-el]")?.getAttribute("data-el");
-    const el = view.elements.find((item) => item.id === id);
+    const el = pageElements(view).find((item) => item.id === id);
     if (!el) return;
     event.preventDefault();
     const localX = boardPoint(event).x - el.x;
@@ -866,566 +593,237 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
       const step = event.shiftKey ? SNAP * 2 : SNAP;
       const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
       const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
-      replace(doc.elements.map((el) => (selected.includes(el.id) ? { ...el, x: el.x + dx, y: el.y + dy } : el)));
+      replace(pageElements(doc).map((el) => (selected.includes(el.id) ? { ...el, x: el.x + dx, y: el.y + dy } : el)));
     }
   };
 
-  const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(tile.labelKey, tile.labelParams ?? {})));
+  
+  const activePage = getActivePage(view);
+  const openTabs = doc.pages.filter((p) => openTabIds.includes(p.id));
+  const selectionBand = useMemo(() => {
+    const b = selectionBounds(pageElements(view), selected);
+    return b ? { left: b.left, top: b.top, right: b.right, bottom: b.bottom } : null;
+  }, [view, selected]);
 
-  return (
-    <div
-      ref={rootRef}
-      tabIndex={0}
-      data-thread-id={threadId}
-      className="flex h-full min-h-0 flex-col bg-background outline-none"
-      onKeyDown={onKeyDown}
-    >
-      <div ref={barRef} className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border px-2 py-1">
-        <div className="relative" data-toolbar-menu>
-          <Button type="button" variant="ghost" size="sm" className="h-8 gap-1" aria-expanded={menu === "file"} onClick={() => toggleMenu("file")}>
-            {t("protoFile")}
-            <Icon name="ChevronDown" className="size-3" />
-          </Button>
-          {menu === "file" ? (
-            <div className="absolute left-0 z-30 mt-1 w-44 rounded-md border border-border bg-background p-1 shadow-md">
-              <MenuItem onClick={() => { setMenu(null); commit(newWireframe()); setOpenedStem(null); setSelected([]); setEdit(null); }}>
-                {t("protoNew")}
-              </MenuItem>
-              <MenuItem onClick={() => { setMenu(null); setOpenOpen(true); void loadList(); }}>{t("protoOpen")}</MenuItem>
-              <MenuItem
-                disabled={busy}
-                onClick={() => {
-                  setMenu(null);
-                  setSaveName(openedStem ?? doc.name);
-                  setSaveOpen(true);
-                }}
-              >
-                {t("save")}
-              </MenuItem>
-            </div>
-          ) : null}
-        </div>
-        <Input
-          value={nameDraft}
-          aria-label={t("protoRename")}
-          className="h-8 w-32 min-w-16 max-w-40"
-          onChange={(event) => setNameDraft(event.target.value.replace(/[/\\]/g, ""))}
-          onBlur={commitName}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              (event.target as HTMLInputElement).blur();
-            }
-          }}
-        />
-        <Sep />
-        <ToolBtn tip={t("protoUndoTip")} disabled={index === 0} onClick={undo}>
-          <Icon name="ArrowTurnBackward" className="size-4" />
-        </ToolBtn>
-        <ToolBtn tip={t("protoRedoTip")} disabled={index >= history.length - 1} onClick={redo}>
-          <Icon name="ArrowTurnForward" className="size-4" />
-        </ToolBtn>
-        <ToolBtn tip={t("protoDuplicateTip")} disabled={!selected.length} onClick={duplicateSelected}>
-          <Icon name="Copy" className="size-4" />
-        </ToolBtn>
-        <ToolBtn tip={t("protoDeleteTip")} disabled={!selected.length} onClick={removeSelected}>
-          <Icon name="Trash2" className="size-4" />
-        </ToolBtn>
-        <ToolBtn tip={t("protoBringForward")} disabled={!selected.length} onClick={() => nudgeLayer(1)}>
-          <Icon name="ChevronsUp" className="size-4" />
-        </ToolBtn>
-        <ToolBtn tip={t("protoSendBackward")} disabled={!selected.length} onClick={() => nudgeLayer(-1)}>
-          <Icon name="ChevronsDown" className="size-4" />
-        </ToolBtn>
-        {narrow ? (
-          <>
-            <Sep />
-            <div className="relative" data-toolbar-menu>
-              <ToolBtn tip={t("protoMore")} pressed={menu === "more"} onClick={() => toggleMenu("more")}>
-                <Icon name="MoreHorizontal" className="size-4" />
-              </ToolBtn>
-              {menu === "more" ? (
-                <div className="absolute left-0 z-30 mt-1 w-56 rounded-md border border-border bg-background p-1 shadow-md">
-                  {ALIGN_TOOLS.map((item) => (
-                    <MenuItem key={item.kind} disabled={!selected.length} onClick={() => { setMenu(null); applyAlign(item.kind); }}>
-                      <AlignGlyph kind={item.kind} />
-                      {t(item.label)}
-                    </MenuItem>
-                  ))}
-                  <MenuItem disabled={selected.length < 3} onClick={() => { setMenu(null); applyDistribute("horizontal"); }}>
-                    <AlignGlyph kind="horizontal" />
-                    {t("protoDistributeH")}
-                  </MenuItem>
-                  <MenuItem disabled={selected.length < 3} onClick={() => { setMenu(null); applyDistribute("vertical"); }}>
-                    <AlignGlyph kind="vertical" />
-                    {t("protoDistributeV")}
-                  </MenuItem>
-                </div>
-              ) : null}
-            </div>
-          </>
-        ) : (
-          <>
-            <Sep />
-            {ALIGN_TOOLS.map((item) => (
-              <ToolBtn key={item.kind} tip={t(item.label)} disabled={!selected.length} onClick={() => applyAlign(item.kind)}>
-                <AlignGlyph kind={item.kind} />
-              </ToolBtn>
-            ))}
-            <ToolBtn tip={t("protoDistributeH")} disabled={selected.length < 3} onClick={() => applyDistribute("horizontal")}>
-              <AlignGlyph kind="horizontal" />
-            </ToolBtn>
-            <ToolBtn tip={t("protoDistributeV")} disabled={selected.length < 3} onClick={() => applyDistribute("vertical")}>
-              <AlignGlyph kind="vertical" />
-            </ToolBtn>
-          </>
-        )}
-        <Sep />
-        <div className="flex rounded-md border border-border">
-          {(Object.keys(CANVAS_PRESETS) as (keyof typeof CANVAS_PRESETS)[]).map((id) => (
-            <ToolBtn
-              key={id}
-              tip={t(DEVICE_LABEL[id])}
-              pressed={doc.canvas.width === CANVAS_PRESETS[id].width && doc.canvas.height === CANVAS_PRESETS[id].height}
-              onClick={() => commit({ ...doc, canvas: { ...doc.canvas, ...CANVAS_PRESETS[id] } })}
-            >
-              <Icon name={DEVICE_ICON[id]} className="size-4" />
-            </ToolBtn>
-          ))}
-        </div>
-        <div className="relative" data-toolbar-menu title={t("protoZoomMenu")}>
-          <Button type="button" variant="ghost" size="sm" className="h-8 min-w-14 gap-1 tabular-nums" aria-label={t("protoZoomMenu")} aria-expanded={menu === "zoom"} onClick={() => toggleMenu("zoom")}>
-            {Math.round(zoom * 100)}%
-            <Icon name="ChevronDown" className="size-3" />
-          </Button>
-          {menu === "zoom" ? (
-            <div className="absolute left-0 z-30 mt-1 w-36 rounded-md border border-border bg-background p-1 shadow-md">
-              {ZOOM_PRESETS.map((value) => (
-                <MenuItem key={value} onClick={() => { setMenu(null); setZoom(value); }}>
-                  {Math.round(value * 100)}%
-                </MenuItem>
-              ))}
-              <MenuItem onClick={() => { setMenu(null); fitZoom(); }}>{t("zoomFit")}</MenuItem>
-            </div>
-          ) : null}
-        </div>
-        <ToolBtn tip={t("protoBadges")} pressed={badges} onClick={() => setBadges((on) => !on)}>
-          <TagGlyph />
-        </ToolBtn>
-        <div className="relative ml-auto" data-toolbar-menu>
-          <Button type="button" variant="default" size="sm" className="h-8 gap-1" disabled={busy} aria-expanded={menu === "send"} onClick={() => toggleMenu("send")}>
-            {t("sendToChat")}
-            <Icon name="ChevronDown" className="size-3" />
-          </Button>
-          {menu === "send" ? (
-            <div className="absolute right-0 z-30 mt-1 w-48 rounded-md border border-border bg-background p-1 shadow-md">
-              <MenuItem onClick={() => void sendToChat("both")}>{t("protoSendBoth")}</MenuItem>
-              <MenuItem onClick={() => void sendToChat("png")}>{t("protoSendPng")}</MenuItem>
-              <MenuItem onClick={() => void sendToChat("json")}>{t("protoSendJson")}</MenuItem>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="flex min-h-0 flex-1">
-        <aside className="flex w-72 shrink-0 flex-col border-r border-border bg-background">
-          <div className="border-b border-border p-2">
-            <div className="mb-2 flex gap-1 rounded-md border border-border p-0.5">
-              <button
-                type="button"
-                className={cn("flex-1 rounded px-2 py-1 text-xs font-medium", paletteView === "elements" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
-                onClick={() => setPaletteView("elements")}
-              >
-                {t("protoPalette")}
-              </button>
-              <button
-                type="button"
-                className={cn("flex-1 rounded px-2 py-1 text-xs font-medium", paletteView === "icons" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
-                onClick={() => setPaletteView("icons")}
-              >
-                {t("protoPaletteIcons")}
-              </button>
-            </div>
-            {paletteView === "elements" ? (
-              <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("protoSearch")} className="h-8" />
-            ) : null}
-          </div>
-          {paletteView === "icons" ? (
-            <IconsLibraryPanel onPick={(iconName) => addIconFromLibrary(iconName)} />
-          ) : (
-          <div className="min-h-0 flex-1 overflow-auto p-2">
-            {GROUPS.map((group) => {
-              const items = filtered.filter((tile) => tileGroup(tile) === group.id);
-              if (!items.length) return null;
-              const open = query.trim() ? true : !collapsed[group.id];
-              return (
-                <div key={group.id} className="mb-3">
-                  <button
-                    type="button"
-                    className="mb-1 flex w-full items-center gap-1 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
-                    aria-expanded={open}
-                    onClick={() => setCollapsed((was) => ({ ...was, [group.id]: !was[group.id] }))}
-                  >
-                    <Icon name="ChevronDown" className={cn("size-3 shrink-0 transition-transform", !open && "-rotate-90")} />
-                    {t(group.label)}
-                  </button>
-                  {open ? (
-                    <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1">
-                      {items.map((tile) => (
-                        <PaletteTileButton key={tile.id} tile={tile} onAdd={() => addTile(tile)} label={t(tile.labelKey, tile.labelParams ?? {})} />
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-          )}
-        </aside>
-
-        <div ref={canvasPaneRef} className="min-w-0 flex-1 overflow-auto bg-muted/40 p-4" onClick={() => setMenu(null)}>
-          <div className="flex min-h-full min-w-full items-start justify-center">
-            <div style={{ width: view.canvas.width * zoom, height: view.canvas.height * zoom }}>
-            <div
-              ref={boardRef}
-              role="application"
-              aria-label={t("protoCanvas")}
-              className="relative shrink-0 shadow-sm"
-              style={{
-                width: view.canvas.width,
-                height: view.canvas.height,
-                background: view.canvas.background,
-                transform: `scale(${zoom})`,
-                transformOrigin: "top left",
-              }}
-              onPointerDown={onBoardPointerDown}
-              onPointerMove={onBoardPointerMove}
-              onPointerUp={onBoardPointerUp}
-              onPointerCancel={onBoardPointerUp}
-              onDoubleClick={onBoardDoubleClick}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={onDrop}
-            >
-              <div
-                data-proto-skip
-                className="pointer-events-none absolute inset-0"
-                style={{
-                  backgroundImage: "linear-gradient(to right, color-mix(in oklab, var(--border) 35%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklab, var(--border) 35%, transparent) 1px, transparent 1px)",
-                  backgroundSize: `${SNAP}px ${SNAP}px`,
-                }}
-              />
-              {view.elements.length === 0 ? (
-                <div data-proto-skip className="pointer-events-none absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">{t("protoEmptyCanvas")}</div>
-              ) : null}
-              {view.elements.map((el) => {
-                const active = selected.includes(el.id);
-                const mark = notes.get(el.id);
-                return (
-                  <div
-                    key={el.id}
-                    data-el={el.id}
-                    className={cn(
-                      "absolute overflow-visible outline outline-1 outline-transparent hover:outline-primary",
-                      active && "z-10 outline-2 outline-primary hover:outline-primary",
-                    )}
-                    style={{ left: el.x, top: el.y, width: el.w, height: el.h }}
-                  >
-                    <div className="size-full overflow-hidden">
-                      <ElementFace el={edit?.id === el.id ? applyInlineDraft(el, edit) : el} />
-                    </div>
-                    {badges ? (
-                      <span
-                        className={cn(
-                          "pointer-events-none absolute bottom-full left-0 mb-0.5 max-w-full truncate rounded-sm px-1 text-[9px] leading-3",
-                          active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
-                        )}
-                      >
-                        {el.type} · {el.label}
-                      </span>
-                    ) : null}
-                    {mark !== undefined ? (
-                      <span className="pointer-events-none absolute bottom-full right-0 mb-0.5 flex size-3.5 items-center justify-center rounded-full bg-destructive text-[9px] leading-none text-destructive-foreground">
-                        {mark}
-                      </span>
-                    ) : null}
-                    {edit?.id === el.id ? (
-                      <input
-                        ref={editInputRef}
-                        data-proto-skip
-                        className="absolute z-20 border border-primary bg-background px-1 text-sm outline-none"
-                        style={editOverlayBox(el, edit.target)}
-                        value={edit.draft}
-                        onChange={(event) => setEdit({ ...edit, draft: event.target.value })}
-                        onKeyDown={onInlineKeyDown}
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onBlur={() => {
-                          if (!skipBlur.current) commitEdit();
-                        }}
-                      />
-                    ) : null}
-                    {active ? (
-                      <div data-proto-skip className="pointer-events-none absolute inset-0">
-                        {one?.id === el.id
-                          ? HANDLES.map((handle) => (
-                              <span
-                                key={handle}
-                                data-handle={handle}
-                                className={cn("pointer-events-auto absolute size-2.5 rounded-sm border border-primary bg-background", HANDLE_CLASS[handle])}
-                              />
-                            ))
-                          : null}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-            </div>
-          </div>
-        </div>
-
-        <aside className="flex w-64 shrink-0 flex-col gap-3 overflow-auto border-l border-border p-3 text-sm">
-          <div className="text-xs font-medium text-muted-foreground">{t("protoInspector")}</div>
-          {inspect ? (
-            <>
-              <label className="grid gap-1">
-                <span className="text-xs text-muted-foreground">{t("protoLabel")}</span>
-                <Input value={inspect.label} onChange={(event) => updateOne({ label: event.target.value || inspect.type })} />
-              </label>
-              {inspect.type === "Icon" ? (
-                <IconInspector
-                  name={typeof inspect.props.name === "string" ? inspect.props.name : "Star"}
-                  size={readIconSize(inspect.props)}
-                  color={readIconColor(inspect.props)}
-                  onName={(iconName) => updateOne({ props: { ...inspect.props, name: iconName }, label: iconDisplayLabel(iconName) })}
-                  onSize={(value) => updateOne({ props: { ...inspect.props, size: value }, w: value, h: value })}
-                  onColor={(value) => setProp("color", value)}
-                />
-              ) : null}
-              {(FIELDS[inspect.type] ?? []).map((field) => (
-                <FieldEditor key={field.key} field={field} value={inspect.props[field.key]} onChange={(value) => setProp(field.key, value)} />
-              ))}
-              <div className="grid grid-cols-2 gap-2">
-                <NumField label={t("protoX")} value={inspect.x} onChange={(value) => updateOne({ x: snap(value) })} />
-                <NumField label={t("protoY")} value={inspect.y} onChange={(value) => updateOne({ y: snap(value) })} />
-                <NumField label={t("protoW")} value={inspect.w} onChange={(value) => updateOne({ w: Math.max(MIN_SIZE, snap(value)) })} />
-                <NumField label={t("protoH")} value={inspect.h} onChange={(value) => updateOne({ h: Math.max(MIN_SIZE, snap(value)) })} />
-              </div>
-              <label className="grid gap-1">
-                <span className="text-xs text-muted-foreground">{t("protoNote")}</span>
-                <Textarea value={inspect.note ?? ""} onChange={(event) => updateOne({ note: event.target.value || undefined })} />
-              </label>
-            </>
-          ) : (
-            <>
-              <div className="text-xs text-muted-foreground">{t("protoNoSelection")}</div>
-              <div className="grid grid-cols-2 gap-2">
-                <NumField label={t("protoW")} value={doc.canvas.width} onChange={(value) => commit({ ...doc, canvas: { ...doc.canvas, width: Math.max(SNAP, snap(value)) } })} />
-                <NumField label={t("protoH")} value={doc.canvas.height} onChange={(value) => commit({ ...doc, canvas: { ...doc.canvas, height: Math.max(SNAP, snap(value)) } })} />
-              </div>
-              <label className="grid gap-1">
-                <span className="text-xs text-muted-foreground">{t("protoBackground")}</span>
-                <Input value={doc.canvas.background} onChange={(event) => commit({ ...doc, canvas: { ...doc.canvas, background: event.target.value || "#ffffff" } })} />
-              </label>
-            </>
-          )}
-        </aside>
-      </div>
-
-      <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("save")}</DialogTitle>
-          </DialogHeader>
-          <label className="grid gap-1 text-sm">
-            <span className="text-xs text-muted-foreground">{t("fileName")}</span>
-            <Input value={saveName} onChange={(event) => setSaveName(event.target.value.replace(/[/\\]/g, ""))} />
-          </label>
-          <DialogFooter className="flex-wrap gap-2">
-            <Button variant="outline" disabled={busy} onClick={() => setSaveOpen(false)}>
-              {t("cancel")}
-            </Button>
-            {openedStem ? (
-              <Button variant="outline" disabled={busy} onClick={() => void save(true)}>
-                {t("protoOverwrite")}
-              </Button>
-            ) : null}
-            <Button disabled={busy || !saveName.trim()} onClick={() => void save(false)}>
-              {t("save")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={openOpen} onOpenChange={setOpenOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("protoOpen")}</DialogTitle>
-          </DialogHeader>
-          {savedNames.length === 0 ? (
-            <div className="text-sm text-muted-foreground">{t("protoNoSaved")}</div>
-          ) : (
-            <div className="flex max-h-64 flex-col gap-1 overflow-auto">
-              {savedNames.map((name) => (
-                <button key={name} type="button" className="rounded-md border border-border px-2 py-1.5 text-left text-sm hover:bg-state-hover" onClick={() => void loadOne(name)}>
-                  {name}
-                </button>
-              ))}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-function Sep() {
-  return <div className="mx-0.5 h-5 w-px bg-border" />;
-}
-
-function ToolBtn({
-  tip,
-  disabled,
-  pressed,
-  onClick,
-  children,
-}: {
-  tip: string;
-  disabled?: boolean;
-  pressed?: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <span title={tip} className="inline-flex">
-      <Button type="button" variant="ghost" size="icon" className="size-8" aria-label={tip} aria-pressed={pressed} disabled={disabled} onClick={onClick}>
-        {children}
-      </Button>
-    </span>
-  );
-}
-
-function MenuItem({ disabled, onClick, children }: { disabled?: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button type="button" disabled={disabled} className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-state-hover disabled:pointer-events-none disabled:opacity-50" onClick={onClick}>
-      {children}
-    </button>
-  );
-}
-
-function AlignGlyph({ kind }: { kind: AlignEdge | DistributeAxis }) {
-  const path: Record<AlignEdge | DistributeAxis, string> = {
-    left: "M3 3v10 M7 5h6 M7 8h4 M7 11h6",
-    center: "M8 3v10 M4 5h8 M5 8h6 M4 11h8",
-    right: "M13 3v10 M3 5h6 M5 8h4 M3 11h6",
-    top: "M3 3h10 M5 7v6 M8 7v4 M11 7v6",
-    middle: "M3 8h10 M5 4v8 M8 5v6 M11 4v8",
-    bottom: "M3 13h10 M5 3v6 M8 5v4 M11 3v6",
-    horizontal: "M2 8h3 M7 8h2 M11 8h3 M3 5v6 M8 5v6 M13 5v6",
-    vertical: "M8 2v3 M8 7v2 M8 11v3 M5 3h6 M5 8h6 M5 13h6",
+  const switchPage = (pageId: string) => {
+    commit(setActivePageId(doc, pageId));
+    setOpenTabIds((ids) => (ids.includes(pageId) ? ids : [...ids, pageId]));
+    setSelected([]);
+    setEdit(null);
   };
-  return (
-    <svg viewBox="0 0 16 16" className="size-4 shrink-0" aria-hidden>
-      <path d={path[kind]} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
 
-function TagGlyph() {
-  return (
-    <svg viewBox="0 0 16 16" className="size-4 shrink-0" aria-hidden>
-      <path d="M2.5 8.5 8.5 2.5h5v5L7.5 13.5z M11 5.5h.01" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
-  );
-}
+  const addPage = () => {
+    const page = newPage(nextPageName(doc.pages));
+    commit({ ...doc, pages: [...doc.pages, page], activePageId: page.id });
+    setOpenTabIds((ids) => [...ids, page.id]);
+    setSelected([]);
+  };
 
-function PaletteTileButton({ tile, onAdd, label }: { tile: PaletteTile; onAdd: () => void; label: string }) {
-  const previewRef = useRef<HTMLDivElement>(null);
-  const el = previewElement(tile);
-  const boxW = 64;
-  const boxH = 44;
-  const scale = Math.min(boxW / el.w, boxH / el.h, 1);
-  return (
-    <button
-      type="button"
-      title={tile.type}
-      draggable
-      onDragStart={(event) => {
-        event.dataTransfer.setData("text/plain", tile.id);
-        if (previewRef.current) event.dataTransfer.setDragImage(previewRef.current, boxW / 2, boxH / 2);
-      }}
-      onClick={onAdd}
-      className="flex cursor-grab flex-col overflow-hidden rounded-lg px-1 pb-1 pt-1 text-left text-foreground hover:bg-state-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:bg-state-active active:cursor-grabbing"
-    >
-      <div ref={previewRef} className="flex h-11 items-center justify-center overflow-hidden">
-        <div className="relative" style={{ width: el.w * scale, height: el.h * scale }}>
-          <div className="pointer-events-none" style={{ width: el.w, height: el.h, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-            <ElementFace el={el} />
-          </div>
-        </div>
-      </div>
-      <span className="line-clamp-2 min-h-7 px-0.5 text-center text-[10px] leading-3 text-muted-foreground">{label}</span>
-    </button>
-  );
-}
+  const duplicatePage = (pageId: string) => {
+    const source = doc.pages.find((p) => p.id === pageId);
+    if (!source) return;
+    const copy = { ...structuredClone(source), id: newPage().id, name: nextPageName(doc.pages) };
+    commit({ ...doc, pages: [...doc.pages, copy], activePageId: copy.id });
+    setOpenTabIds((ids) => [...ids, copy.id]);
+  };
 
-function NumField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+  const deletePage = (pageId: string) => {
+    if (doc.pages.length <= 1) return;
+    const pages = doc.pages.filter((p) => p.id !== pageId);
+    const nextActive = pageId === doc.activePageId ? pages[0]!.id : doc.activePageId;
+    commit({ ...doc, pages, activePageId: nextActive });
+    setOpenTabIds((ids) => ids.filter((id) => id !== pageId));
+  };
+
+  const renamePage = (pageId: string, name: string) => {
+    commit({ ...doc, pages: doc.pages.map((p) => (p.id === pageId ? { ...p, name } : p)) });
+  };
+
+  const reorderPages = (from: number, to: number) => {
+    const pages = [...doc.pages];
+    const [item] = pages.splice(from, 1);
+    pages.splice(to, 0, item!);
+    commit({ ...doc, pages });
+  };
+
+  const reorderElements = (from: number, to: number) => {
+    const els = [...pageElements(doc)];
+    const [item] = els.splice(from, 1);
+    els.splice(to, 0, item!);
+    replace(els);
+  };
+
+  const toggleHidden = (id: string) => replace(pageElements(doc).map((el) => (el.id === id ? { ...el, hidden: !el.hidden } : el)));
+  const toggleLocked = (id: string) => replace(pageElements(doc).map((el) => (el.id === id ? { ...el, locked: !el.locked } : el)));
+  const renameElement = (id: string, label: string) => replace(pageElements(doc).map((el) => (el.id === id ? { ...el, label } : el)));
+
+  const updatePageNotes = (notes: string) => commit(updateActivePage(doc, (p) => ({ ...p, notes: notes || undefined })));
+
+  useEffect(() => {
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (!event.altKey || !(event.metaKey || event.ctrlKey)) return;
+      if (event.key === "[") { event.preventDefault(); setLeftOpen((o) => !o); }
+      if (event.key === "]") { event.preventDefault(); setRightOpen((o) => !o); }
+      if (event.key === "Enter" && leftTab === "pages") { event.preventDefault(); addPage(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [leftTab, doc]);
+
+const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(tile.labelKey, tile.labelParams ?? {})));
+
   return (
-    <label className="grid gap-1">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <Input
-        type="number"
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
+    <div ref={rootRef} tabIndex={0} data-thread-id={threadId} className="h-full min-h-0 outline-none" onKeyDown={onKeyDown}>
+      <PrototypeShell
+        shellRef={shellRef}
+        compact={compact}
+        leftOpen={leftOpen}
+        rightOpen={rightOpen}
+        leftOverlay={leftOverlay}
+        rightOverlay={rightOverlay}
+        setLeftOverlay={setLeftOverlay}
+        setRightOverlay={setRightOverlay}
+        toolbar={
+          <PrototypeToolbar
+            barRef={barRef}
+            menu={menu}
+            toggleMenu={toggleMenu}
+            nameDraft={nameDraft}
+            setNameDraft={setNameDraft}
+            commitName={commitName}
+            index={index}
+            historyLength={history.length}
+            undo={undo}
+            redo={redo}
+            selectedCount={selected.length}
+            duplicateSelected={duplicateSelected}
+            removeSelected={removeSelected}
+            nudgeLayer={nudgeLayer}
+            narrow={compact}
+            applyAlign={applyAlign}
+            applyDistribute={applyDistribute}
+            canvasWidth={pageCanvas(doc).width}
+            canvasHeight={pageCanvas(doc).height}
+            applyCanvasPreset={(id) => commit(patchCanvas(doc, CANVAS_PRESETS[id]))}
+            zoom={zoom}
+            setZoom={setZoom}
+            fitZoom={fitZoom}
+            badges={badges}
+            setBadges={setBadges}
+            busy={busy}
+            sendToChat={sendToChat}
+            onNew={() => { commit(newWireframe()); setOpenedStem(null); setSelected([]); setEdit(null); setOpenTabIds([getActivePage(newWireframe()).id]); }}
+            onOpen={() => { setOpenOpen(true); void loadList(); }}
+            onSave={() => { setSaveName(openedStem ?? doc.name); setSaveOpen(true); }}
+            toggleLeftPane={() => setLeftOpen((o) => !o)}
+            toggleRightPane={() => setRightOpen((o) => !o)}
+          />
+        }
+        styleBar={<PrototypeStyleBar inspect={inspect} canvas={pageCanvas(doc)} onCanvas={(patch) => commit(patchCanvas(doc, patch))} onUpdate={updateOne} />}
+        leftPane={
+          <PrototypeLeftPane
+            topTab={leftTab}
+            setTopTab={setLeftTab}
+            pages={doc.pages}
+            activePageId={doc.activePageId}
+            onSelectPage={switchPage}
+            onAddPage={addPage}
+            onDuplicatePage={duplicatePage}
+            onDeletePage={deletePage}
+            onRenamePage={renamePage}
+            onReorderPages={reorderPages}
+            elements={pageElements(doc)}
+            selected={selected}
+            onSelectElement={(id) => setSelected([id])}
+            onToggleHidden={toggleHidden}
+            onToggleLocked={toggleLocked}
+            onReorderElements={reorderElements}
+            onRenameElement={renameElement}
+            paletteView={paletteView}
+            setPaletteView={setPaletteView}
+            query={query}
+            setQuery={setQuery}
+            collapsed={collapsed}
+            setCollapsed={setCollapsed}
+            filteredTiles={filtered}
+            onAddTile={(tile) => addTile(tile)}
+            onAddIcon={(name) => addIconFromLibrary(name)}
+          />
+        }
+        canvas={
+          <PrototypeCanvas
+            canvasPaneRef={canvasPaneRef}
+            boardRef={boardRef}
+            openTabs={openTabs}
+            activePageId={doc.activePageId}
+            onSelectPage={switchPage}
+            onCloseTab={(id) => setOpenTabIds((tabs) => tabs.filter((t) => t !== id))}
+            canvas={pageCanvas(view)}
+            elements={pageElements(view)}
+            zoom={zoom}
+            badges={badges}
+            notes={notes}
+            selected={selected}
+            one={one}
+            edit={edit}
+            editInputRef={editInputRef}
+            selectionBand={selectionBand}
+            onBoardPointerDown={onBoardPointerDown}
+            onBoardPointerMove={onBoardPointerMove}
+            onBoardPointerUp={onBoardPointerUp}
+            onBoardDoubleClick={onBoardDoubleClick}
+            onDrop={onDrop}
+            onEditChange={(draft) => setEdit((e) => (e ? { ...e, draft } : e))}
+            onInlineKeyDown={onInlineKeyDown}
+            onCommitEdit={commitEdit}
+            skipBlur={skipBlur}
+            onPaneClick={() => setMenu(null)}
+          />
+        }
+        inspector={
+          <PrototypeInspector
+            tab={inspectorTab}
+            setTab={setInspectorTab}
+            inspect={inspect}
+            canvas={pageCanvas(doc)}
+            pageNotes={activePage.notes ?? ""}
+            onPageNotes={updatePageNotes}
+            onCanvas={(patch) => commit(patchCanvas(doc, patch))}
+            updateOne={updateOne}
+            setProp={setProp}
+          />
+        }
+        dialogs={
+          <>
+            <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+              <DialogContent>
+                <DialogHeader><DialogTitle>{t("save")}</DialogTitle></DialogHeader>
+                <label className="grid gap-1 text-sm">
+                  <span className="text-xs text-muted-foreground">{t("fileName")}</span>
+                  <Input value={saveName} onChange={(event) => setSaveName(event.target.value.replace(/[/\\]/g, ""))} />
+                </label>
+                <DialogFooter className="flex-wrap gap-2">
+                  <Button variant="outline" disabled={busy} onClick={() => setSaveOpen(false)}>{t("cancel")}</Button>
+                  {openedStem ? <Button variant="outline" disabled={busy} onClick={() => void save(true)}>{t("protoOverwrite")}</Button> : null}
+                  <Button disabled={busy || !saveName.trim()} onClick={() => void save(false)}>{t("save")}</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={openOpen} onOpenChange={setOpenOpen}>
+              <DialogContent>
+                <DialogHeader><DialogTitle>{t("protoOpen")}</DialogTitle></DialogHeader>
+                {savedNames.length === 0 ? <div className="text-sm text-muted-foreground">{t("protoNoSaved")}</div> : (
+                  <div className="flex max-h-64 flex-col gap-1 overflow-auto">
+                    {savedNames.map((name) => (
+                      <button key={name} type="button" className="rounded-md border border-border px-2 py-1.5 text-left text-sm hover:bg-state-hover" onClick={() => void loadOne(name)}>{name}</button>
+                    ))}
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+          </>
+        }
       />
-    </label>
-  );
-}
-
-function FieldEditor({ field, value, onChange }: { field: Field; value: PropValue | undefined; onChange: (value: PropValue) => void }) {
-  if (field.kind === "boolean") {
-    return (
-      <label className="flex items-center gap-2">
-        <input type="checkbox" checked={value === true} onChange={(event) => onChange(event.target.checked)} />
-        <span>{t(field.label)}</span>
-      </label>
-    );
-  }
-  if (field.kind === "number") {
-    return <NumField label={t(field.label)} value={typeof value === "number" ? value : 0} onChange={onChange} />;
-  }
-  if (field.kind === "list") {
-    const lines = Array.isArray(value) ? value.join("\n") : "";
-    return (
-      <label className="grid gap-1">
-        <span className="text-xs text-muted-foreground">{t(field.label)}</span>
-        <Textarea value={lines} onChange={(event) => onChange(event.target.value.split("\n").map((item) => item.trim()).filter(Boolean))} />
-      </label>
-    );
-  }
-  if (field.kind === "select") {
-    return (
-      <label className="grid gap-1">
-        <span className="text-xs text-muted-foreground">{t(field.label)}</span>
-        <select
-          className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
-          value={typeof value === "string" ? value : field.options?.[0] ?? ""}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          {(field.options ?? []).map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      </label>
-    );
-  }
-  const Tag = field.kind === "textarea" ? Textarea : Input;
-  return (
-    <label className="grid gap-1">
-      <span className="text-xs text-muted-foreground">{t(field.label)}</span>
-      <Tag value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} />
-    </label>
+    </div>
   );
 }

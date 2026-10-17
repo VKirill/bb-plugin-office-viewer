@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { defaultElement, newWireframe, parseWireframe } from "./model.ts";
+import { defaultElement, getActivePage, newWireframe, parseWireframe } from "./model.ts";
 import {
   addChoiceSibling,
   applyInlineDraft,
@@ -38,8 +38,8 @@ test("Enter on a radio commits the label and adds a grouped radio below", () => 
   assert.equal(edit.id, elements[1]!.id);
   assert.equal(edit.draft, "");
   const doc = newWireframe("R");
-  doc.elements = elements;
-  assert.equal(parseWireframe(JSON.stringify(doc)).elements.length, 2);
+  getActivePage(doc).elements = elements;
+  assert.equal(getActivePage(parseWireframe(JSON.stringify(doc))).elements.length, 2);
 });
 
 test("checking a radio unchecks others in the group", () => {

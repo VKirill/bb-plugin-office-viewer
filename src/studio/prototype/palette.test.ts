@@ -1,18 +1,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CATALOG_BY_TYPE, ELEMENT_TYPES, newWireframe, parseWireframe } from "./model.ts";
+import { CATALOG_BY_TYPE, ELEMENT_TYPES, getActivePage, newWireframe, parseWireframe } from "./model.ts";
 import { PALETTE_TILES, elementFromTile, tileGroup, tileMatchesQuery } from "./palette.ts";
 
 test("every palette entry builds a valid element and parses", () => {
   const doc = newWireframe("Palette");
   for (const tile of PALETTE_TILES) {
-    const el = elementFromTile(tile, 0, 0, doc.elements);
+    const page = getActivePage(doc);
+    const el = elementFromTile(tile, 0, 0, page.elements);
     assert.equal(el.type, tile.type);
     for (const [key, value] of Object.entries(tile.props)) assert.deepEqual(el.props[key], value);
-    doc.elements.push(el);
+    page.elements.push(el);
   }
   const again = parseWireframe(JSON.stringify(doc));
-  assert.equal(again.elements.length, PALETTE_TILES.length);
+  assert.equal(getActivePage(again).elements.length, PALETTE_TILES.length);
 });
 
 test("palette tiles use only existing types and cover every type", () => {
