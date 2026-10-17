@@ -12,6 +12,8 @@ import { SLIDES_EXTENSIONS, SlidesOpener } from "./src/slides/slides";
 import { PDF_EXTENSIONS, PdfOpener } from "./src/pdf/pdf";
 import { HTML_EXTENSIONS, HtmlOpener } from "./src/html/html";
 import { BrowserDevicesButton, SITE_PANEL, SitePanel } from "./src/html/site";
+import { STUDIO_ICON, STUDIO_PANEL, StudioPanel } from "./src/studio/studio-panel";
+import { StudioHeaderAction } from "./src/studio/header-action";
 
 export default definePluginApp((app) => {
   app.slots.fileOpener({
@@ -51,6 +53,10 @@ export default definePluginApp((app) => {
     component: HtmlOpener,
   });
   app.slots.threadPanelAction({ id: SITE_PANEL, title: t("siteDevices"), icon: "Globe", layout: "flush", component: SitePanel });
+  app.slots.threadPanelAction({ id: STUDIO_PANEL, title: t("studio"), icon: STUDIO_ICON, layout: "flush", component: StudioPanel });
+  if (typeof app.slots.experimental_threadHeaderAction === "function") {
+    app.slots.experimental_threadHeaderAction({ id: "studio", title: t("studio"), component: StudioHeaderAction });
+  }
   // A button beside BB's Browser address bar (BB 0.46+); older hosts don't have the slot.
   const browser = app.slots as typeof app.slots & {
     experimental_browserToolbarAction?: (registration: { id: string; title: string; component: ComponentType<{ url: string }> }) => void;
