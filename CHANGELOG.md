@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.12 — 2026-10-17
+
+### Added
+
+- Office Studio keeps your work: every change autosaves to the chat's files, and hiding the panel, switching chats or reloading BB brings back the same tool, document and view. A save status shows in the toolbar.
+
+### Changed
+
+- Prototype Style panel: standard alignment icons in one row with proper tooltips; controls no longer overlap; clear line height and font size fields.
+- Colour picker: shows the real colour (or «Нет»), rainbow hue and transparency bars, HEX/RGB inputs, document colours, and opens without being cut off.
+
+### Fixed
+
+- Opacity and other Style fields now change the element on the canvas, in PNG export and in Slides.
+
 ## 0.8.11 — 2026-10-17
 
 ### Added
