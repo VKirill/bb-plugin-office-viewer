@@ -1,4 +1,5 @@
 import { t } from "../shared/i18n";
+import { PrototypeBuilder } from "./prototype/builder";
 
 function Placeholder({ label, threadId }: { label: string; threadId: string }) {
   return (
@@ -8,9 +9,8 @@ function Placeholder({ label, threadId }: { label: string; threadId: string }) {
   );
 }
 
-/** Later tasks replace this with the prototype builder. */
 export function PrototypeTool({ threadId }: { threadId: string }) {
-  return <Placeholder label={t("studioPrototype")} threadId={threadId} />;
+  return <PrototypeBuilder threadId={threadId} />;
 }
 
 /** Later tasks replace this with the paint canvas. */
