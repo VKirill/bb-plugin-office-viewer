@@ -4,10 +4,12 @@
 // Only the cells inside the viewport are rendered.
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { columnName, type Merge, type Sheet } from "./sheet";
 import { cellKey, inRange, toRange, type Position, type Range } from "./edits";
 import { MAX_COL, MAX_ROW } from "./formula";
+import { linkIcon, linkLabel } from "./link-chip";
 
 export const ROW_HEIGHT = 24;
 const HEADER_HEIGHT = 24;
@@ -214,16 +216,22 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(props, ref) {
         onMouseEnter={() => enterCell({ row, col })}
         onDoubleClick={() => editable && !pointing && props.onStartEdit({ row, col })}
         className={cn(
-          "absolute select-none truncate border-b border-r border-border bg-background px-1.5 text-xs leading-6 text-foreground",
+          "absolute select-none border-b border-r border-border bg-background px-1.5 text-xs leading-6 text-foreground",
+          cell?.link && !bareFormula ? "flex items-center overflow-hidden" : "truncate",
           cell?.numeric && "text-right tabular-nums",
-          cell?.link && "cursor-pointer text-sky-600 underline decoration-sky-600/40 dark:text-sky-400",
+          cell?.link && "cursor-pointer",
           (cell?.unsupported || bareFormula) && "italic text-muted-foreground",
           matches.has(key) && "bg-amber-500/15",
           current?.row === row && current.col === col && "bg-amber-500/40",
         )}
         style={{ top, left: offsets[col], width, height }}
       >
-        {bareFormula ? cell?.formula : cell?.text}
+        {bareFormula ? cell?.formula : cell?.link ? (
+          <span className="inline-flex h-5 min-w-0 max-w-full items-center gap-1 rounded-md border border-border bg-muted px-1.5 text-xs text-foreground">
+            <Icon name={linkIcon(cell.link)} className="size-3.5 shrink-0" />
+            <span className="truncate">{linkLabel(cell.link)}</span>
+          </span>
+        ) : cell?.text}
       </div>
     );
   };
