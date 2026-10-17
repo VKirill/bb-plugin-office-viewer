@@ -46,6 +46,7 @@ graph LR
 - [x] release 0.8.9 (prototype palette, inline editing, and toolbar improvements)
 - [x] release 0.8.10 (Axure parity batch renumbered to stay within the installed `^0.8` range)
 - [x] release 0.8.11 (Slides, templates, settings, and Style panel)
+- [x] release 0.8.12 (autosave, Style panel, and colour picker fixes)
 - [ ] Studio live check
 
 ### Accepted work
@@ -55,6 +56,7 @@ graph LR
 - `lprun_38203a8bf69c43f294a012b07bded797`: the Axure parity batch was accepted through release 0.9.0; Slides and the Studio live check remain open.
 - `lprun_38203a8bf69c43f294a012b07bded797`: release 0.8.10 accepted as the compatible version for the Axure parity batch; Slides and the Studio live check remain open.
 - `lprun_38203a8bf69c43f294a012b07bded797`: remaining accepted Axure parity tasks, autosave/restore, settings/i18n, Slides deck, and spreadsheet link-chip revert completed, including alignment icons, colour picker, icon loading, native inspector, pane and screen-size fixes, and style application/layout; releases 0.8.6–0.8.11 are accepted. Only the Studio live check and v2 component/state work remain.
+- `lprun_38203a8bf69c43f294a012b07bded797`: accepted remaining Studio Paint, prototype, Slides, autosave/restore and settings work, including release 0.8.12; spreadsheet links remain underlined after the 0.8.7 revert. Only the Studio live check and v2 component/state work remain.
 
 ## Axure parity batch (2026-10-17, from axure-re/index.md)
 
