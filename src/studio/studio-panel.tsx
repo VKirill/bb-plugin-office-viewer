@@ -5,7 +5,7 @@ import { Icon } from "@/components/ui/icon";
 import { t } from "../shared/i18n";
 import { OfficeStudioLogo, PaintLogo, PrototypeLogo, SlidesLogo } from "./logos";
 import { studioToolOf, type StudioTool } from "./studio-tool";
-import { PaintTool, PrototypeTool } from "./tools";
+import { PaintTool, PrototypeTool, SlidesTool } from "./tools";
 
 export const STUDIO_PANEL = "studio";
 export const STUDIO_ICON = "Palette";
@@ -24,7 +24,7 @@ const CARD =
 const TOOLS: { id: StudioTool; Logo: ComponentType<{ className?: string }>; title: "studioPrototype" | "studioPaint" | "studioSlides"; desc: "studioPrototypeDesc" | "studioPaintDesc" | "studioSlidesDesc"; soon?: boolean }[] = [
   { id: "prototype", Logo: PrototypeLogo, title: "studioPrototype", desc: "studioPrototypeDesc" },
   { id: "paint", Logo: PaintLogo, title: "studioPaint", desc: "studioPaintDesc" },
-  { id: "slides", Logo: SlidesLogo, title: "studioSlides", desc: "studioSlidesDesc", soon: true },
+  { id: "slides", Logo: SlidesLogo, title: "studioSlides", desc: "studioSlidesDesc" },
 ];
 
 export function StudioPanel({ threadId, params }: PluginThreadPanelProps) {
@@ -39,11 +39,7 @@ export function StudioPanel({ threadId, params }: PluginThreadPanelProps) {
             {t("studioBack")}
           </Button>
         </div>
-        {picked === "prototype" ? <PrototypeTool threadId={threadId} /> : picked === "paint" ? <PaintTool threadId={threadId} /> : (
-          <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-muted-foreground">
-            {t("studioSlides")} · {t("studioSoon")}
-          </div>
-        )}
+        {picked === "prototype" ? <PrototypeTool threadId={threadId} /> : picked === "paint" ? <PaintTool threadId={threadId} /> : <SlidesTool threadId={threadId} />}
       </div>
     );
   }
