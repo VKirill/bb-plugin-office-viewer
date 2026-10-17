@@ -1,4 +1,5 @@
-import type { DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, RefObject } from "react";
+import type { DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
+import type { BoardElement } from "./containers";
 import { applyInlineDraft, type InlineEdit } from "./editing";
 import { ElementFace } from "./elements";
 import { HANDLE_CLASS, HANDLES, editOverlayBox } from "./builder-geometry";
@@ -40,6 +41,8 @@ export function PrototypeCanvas({
   connectorTool = false,
   connectorHoverId = null,
   connectorDraft = null,
+  boardItems,
+  scopeOverlay = null,
   onOpenShortcuts = () => {},
   onPanePointerDown,
   onPanePointerMove,
@@ -86,6 +89,8 @@ export function PrototypeCanvas({
   connectorTool?: boolean;
   connectorHoverId?: string | null;
   connectorDraft?: { from: { x: number; y: number }; to: { x: number; y: number } } | null;
+  boardItems?: BoardElement[];
+  scopeOverlay?: ReactNode;
   onOpenShortcuts?: () => void;
   onPanePointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPanePointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
@@ -104,6 +109,11 @@ export function PrototypeCanvas({
   onPaneClick: () => void;
 }) {
   const t = useT();
+  const placed =
+    boardItems ??
+    elements
+      .filter((el) => !el.hidden && !isConnector(el) && !el.parentId)
+      .map((el) => ({ element: el, absX: el.x, absY: el.y }));
   const ticks = (max: number, step = 100) => {
     const out: number[] = [];
     for (let v = 0; v <= max; v += step) out.push(v);
@@ -241,7 +251,8 @@ export function PrototypeCanvas({
                     style={{ left: drawPreview.x, top: drawPreview.y, width: drawPreview.w, height: drawPreview.h }}
                   />
                 ) : null}
-                {elements.filter((el) => !el.hidden && !isConnector(el)).map((el) => {
+                {scopeOverlay}
+                {placed.map(({ element: el, absX, absY }) => {
                   const active = selected.includes(el.id);
                   const mark = notes.get(el.id);
                   const locked = el.locked === true;
@@ -250,10 +261,10 @@ export function PrototypeCanvas({
                       key={el.id}
                       data-el={el.id}
                       className={cn("absolute overflow-visible outline outline-1 outline-transparent hover:outline-primary", active && "z-10 outline-2 outline-primary", locked && "opacity-80")}
-                      style={{ left: el.x, top: el.y, width: el.w, height: el.h, ...wireframeElementBoxStyle(el, "base") }}
+                      style={{ left: absX, top: absY, width: el.w, height: el.h, ...wireframeElementBoxStyle(el, "base") }}
                     >
                       <div className="size-full overflow-hidden">
-                        <ElementFace el={edit?.id === el.id ? applyInlineDraft(el, edit) : el} />
+                        <ElementFace el={edit?.id === el.id ? applyInlineDraft(el, edit) : el} allElements={elements} />
                       </div>
                       {badges ? (
                         <span className={cn("pointer-events-none absolute bottom-full left-0 mb-0.5 max-w-full truncate rounded-sm px-1 text-[9px] leading-3", active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>

@@ -20,7 +20,9 @@ import type { AlignEdge, DistributeAxis } from "./align";
 import { InspectorTableEditor } from "./inspector-table-editor";
 import { PrototypeOverlayCloseButton } from "./shell";
 import { collectDocumentColours } from "./inspector-colour";
+import { RepeaterDataGrid } from "./repeater-data-grid";
 import { SNAP, snap, type PropValue, type WireframeCanvas, type WireframeElement } from "./model";
+import { normalizeRepeaterData, repeaterColumns } from "./containers";
 
 export type InspectorTab = "style" | "properties" | "notes";
 
@@ -181,6 +183,20 @@ export function PrototypeInspector({
                 <FieldEditor key={field.key} field={field} value={inspect.props[field.key]} onChange={(value) => setProp(field.key, value)} />
               ))}
             {inspect.type === "Table" ? <InspectorTableEditor el={inspect} onChange={onReplaceElement} /> : null}
+            {inspect.type === "Repeater" ? (
+              <div className="mt-3 space-y-2">
+                <RepeaterDataGrid
+                  repeater={inspect}
+                  onUpdate={({ columns, data }) => {
+                    const cols = columns ?? repeaterColumns(inspect);
+                    onReplaceElement({
+                      ...inspect,
+                      props: { ...inspect.props, columns: cols, data: normalizeRepeaterData(cols, data), rows: data.length },
+                    });
+                  }}
+                />
+              </div>
+            ) : null}
           </>
         ) : null}
 

@@ -66,7 +66,7 @@ export function SlidesPresenter({
             .filter((el) => !el.hidden && !isConnector(el))
             .map((el) => (
               <WireframeElementFrame key={el.id} el={el} className="absolute overflow-hidden">
-                <ElementFace el={el} />
+                <ElementFace el={el} allElements={slide.elements} />
               </WireframeElementFrame>
             ))}
           <ConnectorsLayer elements={slide.elements} selected={[]} connectorTool={false} hoverElementId={null} draftLine={null} />
