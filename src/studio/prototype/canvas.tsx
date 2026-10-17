@@ -3,7 +3,7 @@ import { applyInlineDraft, type InlineEdit } from "./editing";
 import { ElementFace } from "./elements";
 import { HANDLE_CLASS, HANDLES, editOverlayBox } from "./builder-geometry";
 import { wireframeElementBoxStyle } from "./inspector-model";
-import type { CanvasRect, DistanceLine, SnapGuide } from "./canvas-math";
+import type { CanvasRect, DistanceLine, ElementBox, SnapGuide } from "./canvas-math";
 import { cn } from "@/lib/utils";
 import { useT } from "../../shared/i18n";
 import { type WireframeCanvas, type WireframeElement, type WireframePage } from "./model";
@@ -33,6 +33,9 @@ export function PrototypeCanvas({
   moveTooltip,
   panning,
   insertMode,
+  drawPreview = null,
+  modifierHint = null,
+  onOpenShortcuts = () => {},
   onPanePointerDown,
   onPanePointerMove,
   onPanePointerUp,
@@ -72,6 +75,9 @@ export function PrototypeCanvas({
   moveTooltip: { x: number; y: number; w: number; h: number } | null;
   panning: boolean;
   insertMode: boolean;
+  drawPreview?: ElementBox | null;
+  modifierHint?: string | null;
+  onOpenShortcuts?: () => void;
   onPanePointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPanePointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPanePointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
@@ -214,6 +220,13 @@ export function PrototypeCanvas({
                     style={{ left: marquee.left, top: marquee.top, width: marquee.right - marquee.left, height: marquee.bottom - marquee.top }}
                   />
                 ) : null}
+                {drawPreview ? (
+                  <div
+                    data-proto-skip
+                    className="pointer-events-none absolute border-2 border-dashed border-primary bg-primary/5"
+                    style={{ left: drawPreview.x, top: drawPreview.y, width: drawPreview.w, height: drawPreview.h }}
+                  />
+                ) : null}
                 {elements.filter((el) => !el.hidden).map((el) => {
                   const active = selected.includes(el.id);
                   const mark = notes.get(el.id);
@@ -270,6 +283,24 @@ export function PrototypeCanvas({
                     {Math.round(moveTooltip.x)}, {Math.round(moveTooltip.y)} · {Math.round(moveTooltip.w)}×{Math.round(moveTooltip.h)}
                   </div>
                 ) : null}
+                <div data-proto-skip className="pointer-events-none absolute bottom-2 left-2 right-2 z-30 flex items-end justify-between gap-2">
+                  {modifierHint ? (
+                    <span className="max-w-[min(100%,28rem)] rounded-md bg-foreground/90 px-2 py-1 text-[10px] text-background shadow-sm">
+                      {modifierHint}
+                    </span>
+                  ) : (
+                    <span />
+                  )}
+                  <button
+                    type="button"
+                    data-proto-skip
+                    className="pointer-events-auto size-7 rounded-md border border-border bg-background text-xs font-medium text-muted-foreground shadow-sm hover:bg-state-hover"
+                    title={t("protoShortcutsHint")}
+                    onClick={onOpenShortcuts}
+                  >
+                    ?
+                  </button>
+                </div>
               </div>
             </div>
           </div>
