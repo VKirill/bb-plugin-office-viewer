@@ -3,7 +3,8 @@
 - View Word, PowerPoint, and PDF documents with their supported search, navigation, zoom, and chat quoting controls.
 - View images, video, and audio; annotate and save images, capture video frames, and browse image siblings.
 - Open HTML pages and websites on devices, including WebP page snapshots.
-- Open Office Studio from the thread header to build and save UI prototypes or paint drawings, then send their files or screenshots to chat; Slides is marked as coming soon.
+- Open Office Studio from the thread header; its launcher uses the approved studio and tool logos, with Slides marked as coming soon.
+- Build UI prototypes with live palette previews, inline editing, grouped icon tools, badges, and save/send support; paint on a blank canvas with a smooth brush and eraser, then save or send the result.
 
 ## Blocked
 - Marketplace PR #583 awaits the maintainer's `v1-change` label.
@@ -13,8 +14,8 @@
 - Build the remaining Office Studio Slides tool and complete the Studio live check.
 
 ## Last verify
-- command: Lane Pilot accepted the spreadsheet link-chip/revert and Office Studio tasks in `lprun_38203a8bf69c43f294a012b07bded797`.
-- result: green (spreadsheet links restored; Office Studio launcher, prototype builder, and Paint shipped in version 0.8.8)
+- command: Lane Pilot accepted the spreadsheet link-chip/revert and Office Studio launcher, prototype, and Paint tasks in `lprun_38203a8bf69c43f294a012b07bded797`.
+- result: green (spreadsheet links restored; Office Studio 0.8.8 includes launcher redesign, prototype inline editing, palette previews, and icon toolbar)
 - when: 2026-10-17
 
 ## Pointers

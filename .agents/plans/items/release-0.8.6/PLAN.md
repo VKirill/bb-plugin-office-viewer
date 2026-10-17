@@ -11,6 +11,9 @@
 
 Nothing else changes.
 
+## Completion
+- [x] Ship spreadsheet link chips as version 0.8.6 (subsequently reverted in 0.8.7).
+
 ## History
 ### 2026-10-17
 - Completed and accepted in Lane Pilot run `lprun_38203a8bf69c43f294a012b07bded797` (task `release-0.8.6`).
