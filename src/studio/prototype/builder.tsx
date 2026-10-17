@@ -47,6 +47,7 @@ import {
   type InlineTarget,
 } from "./editing";
 import { alignElements, distributeElements, type AlignEdge, type DistributeAxis } from "./align";
+import { FLOW_SHAPES } from "./shapes";
 import { ICON_DRAG_PREFIX, iconDisplayLabel } from "./icons";
 import { IconsLibraryPanel } from "./icons-library";
 import { IconInspector, readIconColor, readIconSize } from "./icon-inspector";
@@ -80,10 +81,13 @@ type FieldKind = "text" | "textarea" | "number" | "boolean" | "list" | "select";
 type Field = { key: string; kind: FieldKind; label: I18nKey; options?: string[] };
 
 const GROUPS: { id: PaletteGroup; label: I18nKey }[] = [
-  { id: "layout", label: "protoGroupLayout" },
-  { id: "inputs", label: "protoGroupInputs" },
+  { id: "common", label: "protoGroupCommon" },
+  { id: "dynamic", label: "protoGroupDynamic" },
+  { id: "forms", label: "protoGroupForms" },
+  { id: "menus", label: "protoGroupMenus" },
   { id: "content", label: "protoGroupContent" },
-  { id: "navigation", label: "protoGroupNavigation" },
+  { id: "markup", label: "protoGroupMarkup" },
+  { id: "flow", label: "protoGroupFlow" },
 ];
 
 const FIELDS: Partial<Record<ElementType, Field[]>> = {
@@ -146,6 +150,85 @@ const FIELDS: Partial<Record<ElementType, Field[]>> = {
   Modal: [
     { key: "title", kind: "text", label: "protoPropTitle" },
     { key: "text", kind: "textarea", label: "protoPropText" },
+  ],
+  Box: [
+    { key: "text", kind: "text", label: "protoPropText" },
+    { key: "fill", kind: "select", label: "protoPropFill", options: ["none", "light", "dark", "custom"] },
+    { key: "fillColor", kind: "text", label: "protoPropFillColor" },
+    { key: "radius", kind: "number", label: "protoPropRadius" },
+  ],
+  Ellipse: [
+    { key: "text", kind: "text", label: "protoPropText" },
+    { key: "fill", kind: "select", label: "protoPropFill", options: ["none", "light", "dark"] },
+  ],
+  Placeholder: [{ key: "text", kind: "text", label: "protoPropText" }],
+  Label: [{ key: "text", kind: "text", label: "protoPropText" }],
+  Paragraph: [{ key: "text", kind: "textarea", label: "protoPropText" }],
+  Line: [
+    { key: "orientation", kind: "select", label: "protoPropOrientation", options: ["horizontal", "vertical"] },
+    { key: "stroke", kind: "text", label: "protoPropStroke" },
+    { key: "dashed", kind: "boolean", label: "protoPropDashed" },
+  ],
+  DynamicPanel: [
+    { key: "states", kind: "list", label: "protoPropStates" },
+    { key: "active", kind: "text", label: "protoPropActive" },
+  ],
+  Repeater: [
+    { key: "layout", kind: "select", label: "protoPropLayout", options: ["table", "cards"] },
+    { key: "columns", kind: "list", label: "protoPropColumnsList" },
+    { key: "rows", kind: "number", label: "protoPropRows" },
+  ],
+  HotSpot: [{ key: "note", kind: "text", label: "protoNote" }],
+  InlineFrame: [{ key: "url", kind: "text", label: "protoPropUrl" }],
+  Snapshot: [{ key: "target", kind: "text", label: "protoPropTarget" }],
+  ListBox: [
+    { key: "items", kind: "list", label: "protoPropItems" },
+    { key: "selected", kind: "text", label: "protoPropSelected" },
+  ],
+  SearchField: [
+    { key: "placeholder", kind: "text", label: "protoPropPlaceholder" },
+    { key: "value", kind: "text", label: "protoPropValue" },
+  ],
+  DatePicker: [{ key: "placeholder", kind: "text", label: "protoPropPlaceholder" }],
+  FileUpload: [{ key: "text", kind: "text", label: "protoPropText" }],
+  Tree: [{ key: "items", kind: "list", label: "protoPropItems" }],
+  Menu: [
+    { key: "orientation", kind: "select", label: "protoPropOrientation", options: ["horizontal", "vertical"] },
+    { key: "items", kind: "list", label: "protoPropItems" },
+  ],
+  Breadcrumbs: [{ key: "items", kind: "list", label: "protoPropItems" }],
+  Pagination: [
+    { key: "pages", kind: "number", label: "protoPropPages" },
+    { key: "current", kind: "number", label: "protoPropCurrent" },
+  ],
+  Progress: [{ key: "value", kind: "number", label: "protoPropValue" }],
+  Alert: [
+    { key: "variant", kind: "select", label: "protoPropVariant", options: ["info", "success", "warning", "error"] },
+    { key: "title", kind: "text", label: "protoPropTitle" },
+    { key: "text", kind: "textarea", label: "protoPropText" },
+  ],
+  Tooltip: [
+    { key: "text", kind: "text", label: "protoPropText" },
+    { key: "placement", kind: "select", label: "protoPropPlacement", options: ["top", "bottom", "left", "right"] },
+  ],
+  Arrow: [
+    { key: "orientation", kind: "select", label: "protoPropOrientation", options: ["horizontal", "vertical"] },
+    { key: "stroke", kind: "text", label: "protoPropStroke" },
+  ],
+  Sticky: [
+    { key: "color", kind: "select", label: "protoPropColor", options: ["yellow", "blue", "green", "pink"] },
+    { key: "text", kind: "textarea", label: "protoPropText" },
+  ],
+  Marker: [
+    { key: "shape", kind: "select", label: "protoPropMarkerShape", options: ["circle", "drop"] },
+    { key: "text", kind: "text", label: "protoPropText" },
+    { key: "color", kind: "select", label: "protoPropColor", options: ["red", "blue", "green", "orange"] },
+  ],
+  Shape: [
+    { key: "shape", kind: "select", label: "protoPropFlowShape", options: [...FLOW_SHAPES] },
+    { key: "text", kind: "text", label: "protoPropText" },
+    { key: "fill", kind: "text", label: "protoPropFillColor" },
+    { key: "stroke", kind: "text", label: "protoPropStroke" },
   ],
 };
 
@@ -221,10 +304,26 @@ function editOverlayBox(el: WireframeElement, target: InlineTarget): { left: num
       const h = el.h / n;
       return { left: 16, top: target.index * h, width: Math.max(8, el.w - 20), height: h };
     }
-    if (el.type === "Nav" || el.type === "Tabs") {
+    if (el.type === "Nav" || el.type === "Tabs" || el.type === "Menu" || el.type === "Breadcrumbs") {
       const n = Math.max(1, stringList(el, target.key).length);
-      const w = el.w / n;
-      return { left: target.index * w, top: 0, width: w, height: el.h };
+      const orientation = el.props.orientation;
+      const horizontal = el.type !== "Menu" || (typeof orientation === "string" ? orientation : "horizontal") !== "vertical";
+      if (horizontal) {
+        const w = el.w / n;
+        return { left: target.index * w, top: 0, width: w, height: el.h };
+      }
+      const h = el.h / n;
+      return { left: 0, top: target.index * h, width: el.w, height: h };
+    }
+    if (el.type === "ListBox" || el.type === "Tree") {
+      const n = Math.max(1, stringList(el, "items").length);
+      const h = el.h / n;
+      return { left: 4, top: target.index * h, width: Math.max(8, el.w - 8), height: h };
+    }
+    if (el.type === "DynamicPanel" && target.key === "states") {
+      const n = Math.max(1, stringList(el, "states").length);
+      const h = (el.h - 24) / n;
+      return { left: 8, top: 24 + target.index * h, width: Math.max(8, el.w - 16), height: h };
     }
     return { left: 8, top: 4, width: Math.max(8, el.w - 32), height: Math.max(8, el.h - 8) };
   }
@@ -268,7 +367,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [zoom, setZoom] = useState(1);
   const [query, setQuery] = useState("");
   const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements");
-  const [collapsed, setCollapsed] = useState<Partial<Record<PaletteGroup, boolean>>>({});
+  const [collapsed, setCollapsed] = useState<Partial<Record<PaletteGroup, boolean>>>({ flow: true });
   const [busy, setBusy] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const [openOpen, setOpenOpen] = useState(false);
@@ -771,7 +870,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
     }
   };
 
-  const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(tile.labelKey)));
+  const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(tile.labelKey, tile.labelParams ?? {})));
 
   return (
     <div
@@ -973,7 +1072,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
                   {open ? (
                     <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1">
                       {items.map((tile) => (
-                        <PaletteTileButton key={tile.id} tile={tile} onAdd={() => addTile(tile)} />
+                        <PaletteTileButton key={tile.id} tile={tile} onAdd={() => addTile(tile)} label={t(tile.labelKey, tile.labelParams ?? {})} />
                       ))}
                     </div>
                   ) : null}
@@ -1240,7 +1339,7 @@ function TagGlyph() {
   );
 }
 
-function PaletteTileButton({ tile, onAdd }: { tile: PaletteTile; onAdd: () => void }) {
+function PaletteTileButton({ tile, onAdd, label }: { tile: PaletteTile; onAdd: () => void; label: string }) {
   const previewRef = useRef<HTMLDivElement>(null);
   const el = previewElement(tile);
   const boxW = 64;
@@ -1265,7 +1364,7 @@ function PaletteTileButton({ tile, onAdd }: { tile: PaletteTile; onAdd: () => vo
           </div>
         </div>
       </div>
-      <span className="line-clamp-2 min-h-7 px-0.5 text-center text-[10px] leading-3 text-muted-foreground">{t(tile.labelKey)}</span>
+      <span className="line-clamp-2 min-h-7 px-0.5 text-center text-[10px] leading-3 text-muted-foreground">{label}</span>
     </button>
   );
 }
