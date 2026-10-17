@@ -40,8 +40,10 @@ graph LR
 - [x] `prototype-inline-edit`, `prototype-palette-previews`, and `prototype-toolbar`: inline editing, visual palette tiles, and grouped icon controls
 - [ ] slides (phase 2), components/states (Axure masters, dynamic panels) v2
 - [x] release 0.8.8
+- [x] release 0.8.9 (prototype palette, inline editing, and toolbar improvements)
 - [ ] Studio live check
 
 ### Accepted work
 - `lprun_38203a8bf69c43f294a012b07bded797`: `studio-launcher`, `studio-launcher-design`, `prototype-builder`, and `paint-canvas` accepted; Slides and the Studio release/live check remain open.
 - `lprun_38203a8bf69c43f294a012b07bded797`: `prototype-inline-edit`, `prototype-palette-previews`, and `prototype-toolbar` accepted; release 0.8.8 shipped. Slides and the Studio live check remain open.
+- `lprun_38203a8bf69c43f294a012b07bded797`: release 0.8.9 accepted; Slides and the Studio live check remain open.

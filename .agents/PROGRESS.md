@@ -15,10 +15,10 @@
 
 ## Last verify
 - command: Lane Pilot accepted the spreadsheet link-chip/revert and Office Studio launcher, prototype, and Paint tasks in `lprun_38203a8bf69c43f294a012b07bded797`.
-- result: green (spreadsheet links restored; Office Studio 0.8.8 includes launcher redesign, prototype inline editing, palette previews, and icon toolbar)
+- result: green (spreadsheet links restored after 0.8.6/0.8.7; Office Studio 0.8.8 and prototype improvements 0.8.9 accepted, including launcher, Paint, inline editing, palette previews, and icon toolbar)
 - when: 2026-10-17
 
 ## Pointers
-- Open todos: none (`.agents/todos/INDEX.md` does not exist).
+- Open todos: no todo index exists (`.agents/todos/INDEX.md`).
 - Active plans: [Office Studio](plans/2026-10-17-office-studio.md) (in progress); [chat link chips in BB core](plans/2026-10-17-chat-link-chips-core.md) (planned).
 - [Changelog](CHANGELOG.md) — project memory updates.
