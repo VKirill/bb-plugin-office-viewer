@@ -3,39 +3,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { t, type I18nKey } from "../../shared/i18n";
-import { IconInspector, readIconColor, readIconSize } from "./icon-inspector";
+import { t } from "../../shared/i18n";
 import type { Field } from "./inspector-fields";
 import { INSPECTOR_FIELDS } from "./inspector-fields";
 import { InspectorListDialog } from "./inspector-list-dialog";
 import {
   LIST_EDITOR_TYPES,
-  STYLE_EFFECTS,
-  STYLE_TAB_FIELDS,
   listPropKey,
-  mixedStyleValue,
   radioGroupOptions,
   readStringList,
-  resolveStylePatch,
-  stylePatchToInline,
   type StylePatch,
   type StyleTarget,
 } from "./inspector-model";
+import { InspectorStylePanel } from "./inspector-style-panel";
+import type { AlignEdge, DistributeAxis } from "./align";
 import { InspectorTableEditor } from "./inspector-table-editor";
-import { iconDisplayLabel } from "./icons";
-import { ElementFace } from "./elements";
 import { PrototypeOverlayCloseButton } from "./shell";
 import { SNAP, snap, type PropValue, type WireframeCanvas, type WireframeElement } from "./model";
 
 export type InspectorTab = "style" | "properties" | "notes";
-
-const STYLE_EFFECT_LABEL: Record<(typeof STYLE_EFFECTS)[number], I18nKey> = {
-  hover: "protoStyleHover",
-  pressed: "protoStylePressed",
-  selected: "protoStyleSelected",
-  disabled: "protoStyleDisabled",
-  focus: "protoStyleFocus",
-};
 
 export function PrototypeInspector({
   tab,
@@ -55,6 +41,8 @@ export function PrototypeInspector({
   onReplaceElement,
   onRadioGroup,
   onRadioChecked,
+  applyAlign,
+  applyDistribute,
 }: {
   tab: InspectorTab;
   setTab: (tab: InspectorTab) => void;
@@ -73,6 +61,8 @@ export function PrototypeInspector({
   onReplaceElement: (el: WireframeElement) => void;
   onRadioGroup: (groupId: string | null) => void;
   onRadioChecked: (checked: boolean) => void;
+  applyAlign: (edge: AlignEdge) => void;
+  applyDistribute: (axis: DistributeAxis) => void;
 }) {
   const [styleTarget, setStyleTarget] = useState<StyleTarget>("base");
   const [listOpen, setListOpen] = useState(false);
@@ -95,9 +85,6 @@ export function PrototypeInspector({
       return { ...el, style: { ...style, effects } };
     });
   };
-
-  const previewEl = inspect ? { ...inspect, ...(selection[0] ?? inspect) } : null;
-  const previewPatch = previewEl ? resolveStylePatch(previewEl, styleTarget) : {};
 
   return (
     <aside className="flex h-full min-h-0 w-full flex-col border-l border-border bg-background">
@@ -136,76 +123,22 @@ export function PrototypeInspector({
           </label>
         ) : null}
 
-        {tab === "style" && selection.length ? (
-          <>
-            {multi ? <div className="mb-2 text-xs text-muted-foreground">{t("protoMultiSelection", { count: selection.length })}</div> : null}
-            {!multi && inspect ? (
-              <label className="mb-2 grid gap-1">
-                <span className="text-xs text-muted-foreground">{t("protoLabel")}</span>
-                <Input value={inspect.label} onChange={(event) => updateOne({ label: event.target.value || inspect.type })} />
-              </label>
-            ) : null}
-            <label className="mb-2 grid gap-1">
-              <span className="text-xs text-muted-foreground">{t("protoStyleEffect")}</span>
-              <select
-                className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
-                value={styleTarget}
-                onChange={(event) => setStyleTarget(event.target.value as StyleTarget)}
-              >
-                <option value="base">{t("protoStyleBase")}</option>
-                {STYLE_EFFECTS.map((effect) => (
-                  <option key={effect} value={effect}>{t(STYLE_EFFECT_LABEL[effect])}</option>
-                ))}
-              </select>
-            </label>
-            {previewEl ? (
-              <div className="mb-3 rounded border border-border bg-muted/30 p-2" style={{ minHeight: 48 }}>
-                <div className="relative mx-auto" style={{ width: Math.min(120, previewEl.w), height: Math.min(80, previewEl.h) }}>
-                  <div className="absolute inset-0 overflow-hidden" style={stylePatchToInline(previewPatch)}>
-                    <ElementFace el={previewEl} />
-                  </div>
-                </div>
-              </div>
-            ) : null}
-            {STYLE_TAB_FIELDS.map((field) => (
-              <StyleFieldEditor
-                key={field.key}
-                field={field}
-                value={mixedStyleValue(selection, styleTarget, field.key)}
-                onChange={(value) => applyStyleField(field.key, value)}
-              />
-            ))}
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <NumField label={t("protoX")} value={inspect?.x ?? 0} mixed={multi && new Set(selection.map((el) => el.x)).size > 1} onChange={(value) => updateMany((el) => (selection.some((s) => s.id === el.id) ? { ...el, x: snap(value) } : el))} />
-              <NumField label={t("protoY")} value={inspect?.y ?? 0} mixed={multi && new Set(selection.map((el) => el.y)).size > 1} onChange={(value) => updateMany((el) => (selection.some((s) => s.id === el.id) ? { ...el, y: snap(value) } : el))} />
-              <NumField label={t("protoW")} value={inspect?.w ?? 0} mixed={multi && new Set(selection.map((el) => el.w)).size > 1} onChange={(value) => updateMany((el) => (selection.some((s) => s.id === el.id) ? { ...el, w: Math.max(SNAP, snap(value)) } : el))} />
-              <NumField label={t("protoH")} value={inspect?.h ?? 0} mixed={multi && new Set(selection.map((el) => el.h)).size > 1} onChange={(value) => updateMany((el) => (selection.some((s) => s.id === el.id) ? { ...el, h: Math.max(SNAP, snap(value)) } : el))} />
-            </div>
-            {inspect?.type === "Icon" && !multi ? (
-              <IconInspector
-                name={typeof inspect.props.name === "string" ? inspect.props.name : "Star"}
-                size={readIconSize(inspect.props)}
-                color={readIconColor(inspect.props)}
-                onName={(iconName) => updateOne({ props: { ...inspect.props, name: iconName }, label: iconDisplayLabel(iconName) })}
-                onSize={(value) => updateOne({ props: { ...inspect.props, size: value }, w: value, h: value })}
-                onColor={(value) => setProp("color", value)}
-              />
-            ) : null}
-          </>
-        ) : null}
-
-        {tab === "style" && !selection.length ? (
-          <>
-            <div className="mb-2 text-xs text-muted-foreground">{t("protoNoSelection")}</div>
-            <label className="grid gap-1">
-              <span className="text-xs text-muted-foreground">{t("protoBackground")}</span>
-              <Input value={canvas.background} onChange={(event) => onCanvas({ background: event.target.value || "#ffffff" })} />
-            </label>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <NumField label={t("protoW")} value={canvas.width} onChange={(value) => onCanvas({ width: Math.max(SNAP, snap(value)) })} />
-              <NumField label={t("protoH")} value={canvas.height} onChange={(value) => onCanvas({ height: Math.max(SNAP, snap(value)) })} />
-            </div>
-          </>
+        {tab === "style" ? (
+          <InspectorStylePanel
+            inspect={inspect}
+            selection={selection}
+            canvas={canvas}
+            multi={multi}
+            styleTarget={styleTarget}
+            setStyleTarget={setStyleTarget}
+            applyStyleField={applyStyleField}
+            updateOne={updateOne}
+            updateMany={updateMany}
+            setProp={setProp}
+            onCanvas={onCanvas}
+            applyAlign={applyAlign}
+            applyDistribute={applyDistribute}
+          />
         ) : null}
 
         {tab === "properties" && inspect && !multi ? (
@@ -281,53 +214,6 @@ function NumField({ label, value, onChange, mixed }: { label: string; value: num
     <label className="grid gap-1">
       <span className="text-xs text-muted-foreground">{label}</span>
       <Input type="number" value={mixed ? "" : value} placeholder={mixed ? "—" : undefined} onChange={(event) => onChange(Number(event.target.value))} />
-    </label>
-  );
-}
-
-function StyleFieldEditor({
-  field,
-  value,
-  onChange,
-}: {
-  field: (typeof STYLE_TAB_FIELDS)[number];
-  value: string | number | boolean | "mixed" | undefined;
-  onChange: (value: PropValue) => void;
-}) {
-  const mixed = value === "mixed";
-  if (field.kind === "boolean") {
-    return (
-      <label className="flex items-center gap-2">
-        <input type="checkbox" checked={value === true} disabled={mixed} onChange={(event) => onChange(event.target.checked)} />
-        <span>{t(field.label)}</span>
-      </label>
-    );
-  }
-  if (field.kind === "number") {
-    return (
-      <label className="grid gap-1">
-        <span className="text-xs text-muted-foreground">{t(field.label)}</span>
-        <Input type="number" value={mixed || value === undefined ? "" : String(value)} placeholder={mixed ? "—" : undefined} onChange={(event) => onChange(Number(event.target.value))} />
-      </label>
-    );
-  }
-  if (field.kind === "select") {
-    return (
-      <label className="grid gap-1">
-        <span className="text-xs text-muted-foreground">{t(field.label)}</span>
-        <select className="h-8 rounded-md border border-input bg-transparent px-2 text-sm" value={mixed ? "" : typeof value === "string" ? value : field.options?.[0] ?? ""} onChange={(event) => onChange(event.target.value)}>
-          {mixed ? <option value="">—</option> : null}
-          {(field.options ?? []).map((option) => (
-            <option key={option} value={option}>{option}</option>
-          ))}
-        </select>
-      </label>
-    );
-  }
-  return (
-    <label className="grid gap-1">
-      <span className="text-xs text-muted-foreground">{t(field.label)}</span>
-      <Input value={mixed ? "" : typeof value === "string" ? value : ""} placeholder={mixed ? "—" : undefined} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }

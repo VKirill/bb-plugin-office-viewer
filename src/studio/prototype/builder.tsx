@@ -1142,6 +1142,8 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
               if (!one) return;
               replace(setRadioChecked(pageElements(doc), one.id, checked));
             }}
+            applyAlign={applyAlign}
+            applyDistribute={applyDistribute}
           />
         }
         dialogs={
