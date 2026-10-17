@@ -10,11 +10,11 @@
 
 ## Next
 - Follow up on marketplace PR #583 when the maintainer label is available.
-- Build the remaining Office Studio Slides tool and complete its release/live check.
+- Build the remaining Office Studio Slides tool and complete the Studio live check.
 
 ## Last verify
 - command: Lane Pilot accepted the spreadsheet link-chip/revert and Office Studio tasks in `lprun_38203a8bf69c43f294a012b07bded797`.
-- result: green (spreadsheet links restored; version 0.8.7; Studio launcher, prototype builder, and Paint delivered)
+- result: green (spreadsheet links restored; Office Studio launcher, prototype builder, and Paint shipped in version 0.8.8)
 - when: 2026-10-17
 
 ## Pointers
