@@ -10,12 +10,18 @@ const HOST_ICONS: { domain: string; icon: string }[] = [
   { domain: "telegram.org", icon: "Telegram" },
   { domain: "youtube.com", icon: "Youtube" },
   { domain: "youtu.be", icon: "Youtube" },
-  { domain: "docs.google.com", icon: "FileText" },
-  { domain: "drive.google.com", icon: "FileText" },
+  { domain: "docs.google.com", icon: "GoogleDoc" },
+  { domain: "drive.google.com", icon: "GoogleDrive" },
 ];
 
-/** URL shown in a cell chip: scheme stripped, one trailing slash dropped. */
-export function linkLabel(url: string): string {
+export const LINK_CHIP_ICONS: readonly string[] = [
+  "Globe",
+  ...new Set(HOST_ICONS.map((entry) => entry.icon)),
+];
+
+/** Chip text: keep a hyperlink's friendly name, otherwise the URL without scheme. */
+export function linkLabel(url: string, display?: string): string {
+  if (display && display !== url) return display;
   if (!URL_RE.test(url)) return url;
   let rest = url.replace(/^https?:\/\//i, "");
   if (rest.endsWith("/")) rest = rest.slice(0, -1);

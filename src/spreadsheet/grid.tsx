@@ -228,8 +228,8 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(props, ref) {
       >
         {bareFormula ? cell?.formula : cell?.link ? (
           <span className="inline-flex h-5 min-w-0 max-w-full items-center gap-1 rounded-md border border-border bg-muted px-1.5 text-xs text-foreground">
-            <Icon name={linkIcon(cell.link)} className="size-3.5 shrink-0" />
-            <span className="truncate">{linkLabel(cell.link)}</span>
+            <Icon name={linkIcon(cell.link)} fallback="Globe" className="size-3.5 shrink-0" />
+            <span className="truncate">{linkLabel(cell.link, cell.text)}</span>
           </span>
         ) : cell?.text}
       </div>

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { linkIcon, linkLabel } from "./link-chip.ts";
+import { EXTENDED_ICON_NAMES } from "../../components/ui/icon-registry.ts";
+import { LINK_CHIP_ICONS, linkIcon, linkLabel } from "./link-chip.ts";
 
 test("linkLabel strips http(s) and one trailing slash", () => {
   assert.equal(linkLabel("https://github.com/get-bb/bb"), "github.com/get-bb/bb");
@@ -8,6 +9,12 @@ test("linkLabel strips http(s) and one trailing slash", () => {
   assert.equal(linkLabel("http://example.com"), "example.com");
   assert.equal(linkLabel("HTTP://Example.com/path/"), "Example.com/path");
   assert.equal(linkLabel("https://t.me/neuro"), "t.me/neuro");
+});
+
+test("linkLabel keeps a hyperlink friendly name", () => {
+  assert.equal(linkLabel("https://github.com/get-bb/bb", "BB repo"), "BB repo");
+  assert.equal(linkLabel("https://github.com/get-bb/bb", "https://github.com/get-bb/bb"), "github.com/get-bb/bb");
+  assert.equal(linkLabel("https://github.com/get-bb/bb", ""), "github.com/get-bb/bb");
 });
 
 test("linkLabel leaves non-URLs unchanged", () => {
@@ -28,8 +35,8 @@ test("linkIcon maps brand hosts including www and subdomains", () => {
   assert.equal(linkIcon("https://telegram.org/blog"), "Telegram");
   assert.equal(linkIcon("https://youtube.com/watch?v=1"), "Youtube");
   assert.equal(linkIcon("https://youtu.be/abc"), "Youtube");
-  assert.equal(linkIcon("https://docs.google.com/document/d/1"), "FileText");
-  assert.equal(linkIcon("https://drive.google.com/file/d/1"), "FileText");
+  assert.equal(linkIcon("https://docs.google.com/document/d/1"), "GoogleDoc");
+  assert.equal(linkIcon("https://drive.google.com/file/d/1"), "GoogleDrive");
 });
 
 test("linkIcon falls back to Globe for other hosts", () => {
@@ -40,3 +47,25 @@ test("linkIcon falls back to Globe for other hosts", () => {
   assert.equal(linkIcon("https://notgithub.com/"), "Globe");
   assert.equal(linkIcon("not a url"), "Globe");
 });
+
+test("every icon name linkIcon can return is registered", () => {
+  const registered = new Set<string>(EXTENDED_ICON_NAMES);
+  for (const name of LINK_CHIP_ICONS) {
+    assert.equal(linkIcon(name === "Globe" ? "https://example.com" : sampleUrl(name)), name);
+    assert.ok(registered.has(name), name);
+  }
+});
+
+function sampleUrl(icon: string): string {
+  const samples: Record<string, string> = {
+    Github: "https://github.com/get-bb/bb",
+    Figma: "https://figma.com/file/abc",
+    Notion: "https://notion.so/page",
+    Slack: "https://slack.com",
+    Telegram: "https://t.me/neuro",
+    Youtube: "https://youtu.be/abc",
+    GoogleDoc: "https://docs.google.com/document/d/1",
+    GoogleDrive: "https://drive.google.com/file/d/1",
+  };
+  return samples[icon] ?? "https://example.com";
+}
