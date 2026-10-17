@@ -7,6 +7,8 @@ import { wireframeElementBoxStyle } from "./inspector-model";
 import type { CanvasRect, DistanceLine, ElementBox, SnapGuide } from "./canvas-math";
 import { ConnectorsLayer, connectorHandlePoints } from "./connector-layer";
 import { isConnector } from "./connectors";
+import { elementHasInteractions } from "./interactions";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { useT } from "../../shared/i18n";
 import { type WireframeCanvas, type WireframeComponent, type WireframeElement, type WireframePage } from "./model";
@@ -275,6 +277,11 @@ export function PrototypeCanvas({
                       ) : null}
                       {mark !== undefined ? (
                         <span className="pointer-events-none absolute bottom-full right-0 mb-0.5 flex size-3.5 items-center justify-center rounded-full bg-destructive text-[9px] text-destructive-foreground">{mark}</span>
+                      ) : null}
+                      {elementHasInteractions(el) ? (
+                        <span className="pointer-events-none absolute right-0 top-0 flex size-4 items-center justify-center rounded-bl bg-amber-500 text-amber-950" title={t("protoIxBadge")}>
+                          <Icon name="Zap" className="size-3" />
+                        </span>
                       ) : null}
                       {edit?.id === el.id ? (
                         <input

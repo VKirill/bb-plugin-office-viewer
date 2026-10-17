@@ -92,6 +92,7 @@ import {
   zoomToFit,
 } from "./canvas-math";
 import { ProtoShortcutsSheet } from "./proto-shortcuts-sheet";
+import { PrototypePreviewPlayer } from "./preview-player";
 import { PrototypeContextMenu } from "./prototype-context-menu";
 import {
   applyZOrder,
@@ -224,6 +225,8 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [quickQuery, setQuickQuery] = useState("");
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; target: MenuTarget } | null>(null);
   const [deleteComponentId, setDeleteComponentId] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const previewBoardRef = useRef<HTMLDivElement>(null);
   const [renameElementId, setRenameElementId] = useState<string | null>(null);
   const [renamePageId, setRenamePageId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -1029,6 +1032,34 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     setOpenedStem(saved.name);
   };
 
+  const sendPreviewToChat = async () => {
+    const node = previewBoardRef.current;
+    if (!node) return;
+    setBusy(true);
+    try {
+      const lib = await loadScreenshotLibrary();
+      const png = await lib.domToBlob(node, {
+        scale: 2,
+        type: "image/png",
+        filter: (item) => !(item instanceof Element && item.hasAttribute("data-proto-skip")),
+      });
+      const files = [new File([png], `${doc.name}-preview.png`, { type: "image/png" })];
+      const attach = (composer as typeof composer & { experimental_vkAttachFiles?: (files: File[]) => Promise<void> }).experimental_vkAttachFiles;
+      if (typeof attach === "function") {
+        await attach.call(composer, files);
+        toast.success(t("protoSentChat"));
+        return;
+      }
+      composer.updateText((draft) => `${draft.trim() ? `${draft.trimEnd()}\n\n` : ""}${t("protoPreviewSendFallback")}\n\n`);
+      composer.focus();
+      toast.success(t("protoSentChat"));
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const sendToChat = async (kind: SendKind) => {
     setMenu(null);
     setBusy(true);
@@ -1342,6 +1373,11 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
         return;
       }
     }
+    if (!mod && event.key === ".") {
+      event.preventDefault();
+      setPreviewOpen(true);
+      return;
+    }
     if (event.key === "?" || (event.shiftKey && event.key === "/")) {
       event.preventDefault();
       setShortcutsOpen(true);
@@ -1634,6 +1670,7 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             autosaveStatus={autosaveStatus}
             connectorToolActive={isConnectorTool(pendingTool)}
             onToggleConnectorTool={() => setPendingTool((tool) => (isConnectorTool(tool) ? null : { type: "Connector" }))}
+            onPreview={() => setPreviewOpen(true)}
           />
         }
         styleBar={<PrototypeStyleBar inspect={inspect} canvas={pageCanvas(doc)} onCanvas={(patch) => commit(patchCanvas(doc, patch))} onUpdate={updateOne} />}
@@ -1781,6 +1818,11 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
               if (!one || one.type !== "Instance") return;
               replaceElement(clearOverride(one, masterElementId, propKey));
             }}
+            pages={doc.pages}
+            onInteractionsChange={(interactions) => {
+              if (!one) return;
+              replaceElement({ ...one, interactions });
+            }}
           />
         }
         dialogs={
@@ -1838,6 +1880,14 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
           </>
         }
       />
+      {previewOpen ? (
+        <PrototypePreviewPlayer
+          doc={view}
+          boardRef={previewBoardRef}
+          onClose={() => setPreviewOpen(false)}
+          onSendScreenshot={sendPreviewToChat}
+        />
+      ) : null}
       <ProtoShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <PrototypeContextMenu
         open={contextMenu !== null}

@@ -24,9 +24,11 @@ import { RepeaterDataGrid } from "./repeater-data-grid";
 import { SNAP, snap, type PropValue, type WireframeCanvas, type WireframeElement } from "./model";
 import { listInstanceOverrides } from "./components";
 import { normalizeRepeaterData, repeaterColumns } from "./containers";
-import type { WireframeComponent } from "./model";
+import type { WireframeComponent, WireframePage } from "./model";
+import { InspectorInteractionsPanel } from "./inspector-interactions";
+import type { Interaction } from "./interactions";
 
-export type InspectorTab = "style" | "properties" | "notes";
+export type InspectorTab = "style" | "properties" | "interactions" | "notes";
 
 export function PrototypeInspector({
   tab,
@@ -52,6 +54,8 @@ export function PrototypeInspector({
   onInstanceOverride,
   onInstanceResetOverrides,
   onInstanceClearOverride,
+  pages = [],
+  onInteractionsChange,
 }: {
   tab: InspectorTab;
   setTab: (tab: InspectorTab) => void;
@@ -76,6 +80,8 @@ export function PrototypeInspector({
   onInstanceOverride?: (masterElementId: string, propKey: string, value: string) => void;
   onInstanceResetOverrides?: () => void;
   onInstanceClearOverride?: (masterElementId: string, propKey: string) => void;
+  pages?: readonly WireframePage[];
+  onInteractionsChange?: (interactions: Interaction[]) => void;
 }) {
   const t = useT();
   const [styleTarget, setStyleTarget] = useState<StyleTarget>("base");
@@ -110,14 +116,22 @@ export function PrototypeInspector({
     <aside className="flex h-full min-h-0 w-full flex-col border-l border-border bg-background">
       <div className="flex items-center gap-1 border-b border-border p-2">
         <div className="flex min-w-0 flex-1 gap-1">
-          {(["style", "properties", "notes"] as InspectorTab[]).map((id) => (
+          {(["style", "properties", "interactions", "notes"] as InspectorTab[]).map((id) => (
             <button
               key={id}
               type="button"
               className={cn("min-w-0 flex-1 rounded px-2 py-1 text-xs font-medium", tab === id ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
               onClick={() => setTab(id)}
             >
-              {t(id === "style" ? "protoTabStyle" : id === "properties" ? "protoTabProperties" : "protoTabNotes")}
+              {t(
+                id === "style"
+                  ? "protoTabStyle"
+                  : id === "properties"
+                    ? "protoTabProperties"
+                    : id === "interactions"
+                      ? "protoTabInteractions"
+                      : "protoTabNotes",
+              )}
             </button>
           ))}
         </div>
@@ -159,6 +173,15 @@ export function PrototypeInspector({
             onCanvas={onCanvas}
             applyAlign={applyAlign}
             applyDistribute={applyDistribute}
+          />
+        ) : null}
+
+        {tab === "interactions" && inspect && !multi && onInteractionsChange ? (
+          <InspectorInteractionsPanel
+            inspect={inspect}
+            pages={pages}
+            elements={elements}
+            onChange={onInteractionsChange}
           />
         ) : null}
 
