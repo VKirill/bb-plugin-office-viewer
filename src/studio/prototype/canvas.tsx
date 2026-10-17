@@ -44,6 +44,7 @@ export function PrototypeCanvas({
   onBoardPointerUp,
   onBoardDoubleClick,
   onBoardContextMenu,
+  onPageTabContextMenu,
   onDrop,
   onEditChange,
   onInlineKeyDown,
@@ -86,6 +87,7 @@ export function PrototypeCanvas({
   onBoardPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onBoardDoubleClick: (event: ReactMouseEvent<HTMLDivElement>) => void;
   onBoardContextMenu: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  onPageTabContextMenu?: (pageId: string, event: ReactMouseEvent<HTMLButtonElement>) => void;
   onDrop: (event: DragEvent<HTMLDivElement>) => void;
   onEditChange: (draft: string) => void;
   onInlineKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
@@ -109,6 +111,10 @@ export function PrototypeCanvas({
             type="button"
             className={cn("flex items-center gap-1 rounded px-2 py-1 text-xs", page.id === activePageId ? "bg-muted font-medium" : "text-muted-foreground hover:bg-state-hover")}
             onClick={() => onSelectPage(page.id)}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              onPageTabContextMenu?.(page.id, event);
+            }}
           >
             {page.name}
             {openTabs.length > 1 ? (

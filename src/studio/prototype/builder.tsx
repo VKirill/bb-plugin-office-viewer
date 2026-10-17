@@ -89,7 +89,15 @@ import {
   zoomToFit,
 } from "./canvas-math";
 import { ProtoShortcutsSheet } from "./proto-shortcuts-sheet";
-import { PrototypeContextMenu, type ContextMenuAction } from "./canvas-context-menu";
+import { PrototypeContextMenu } from "./prototype-context-menu";
+import {
+  applyZOrder,
+  nudgeZOrder,
+  zOrderOpFromAction,
+  type MenuActionId,
+  type MenuBuildContext,
+  type MenuTarget,
+} from "./menus";
 
 const MAX_HISTORY = 60;
 
@@ -155,7 +163,9 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [quickInsertOpen, setQuickInsertOpen] = useState(false);
   const [quickQuery, setQuickQuery] = useState("");
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; target: MenuTarget } | null>(null);
+  const [renameElementId, setRenameElementId] = useState<string | null>(null);
+  const [renamePageId, setRenamePageId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   
   const [leftTab, setLeftTab] = useState<LeftTopTab>("pages");
@@ -429,16 +439,11 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
 
   const nudgeLayer = (delta: 1 | -1) => {
     if (!selected.length) return;
-    const next = [...pageElements(doc)];
-    const ids = new Set(selected);
-    const indexes = next.map((el, i) => (ids.has(el.id) ? i : -1)).filter((i) => i >= 0);
-    const walk = delta === 1 ? [...indexes].reverse() : indexes;
-    for (const i of walk) {
-      const j = i + delta;
-      if (j < 0 || j >= next.length || ids.has(next[j]!.id)) continue;
-      [next[i], next[j]] = [next[j]!, next[i]!];
-    }
-    replace(next);
+    replace(nudgeZOrder(pageElements(doc), selected, delta));
+  };
+
+  const openContextMenu = (x: number, y: number, target: MenuTarget) => {
+    setContextMenu({ x, y, target });
   };
 
   const boardPoint = (event: { clientX: number; clientY: number }) => {
@@ -683,10 +688,16 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     event.preventDefault();
     const id = (event.target as HTMLElement).closest("[data-el]")?.getAttribute("data-el");
     if (id && !selected.includes(id)) setSelected(expandToGroups(pageElements(view), [id]));
-    setContextMenu({ x: event.clientX, y: event.clientY });
+    const target: MenuTarget = id ? { kind: "canvasElement", elementId: id } : { kind: "canvasEmpty" };
+    openContextMenu(event.clientX, event.clientY, target);
   };
 
-  const onContextAction = (action: ContextMenuAction) => {
+  const onContextAction = (action: MenuActionId, target: MenuTarget) => {
+    const zOp = zOrderOpFromAction(action);
+    if (zOp) {
+      replace(applyZOrder(pageElements(doc), selected, zOp));
+      return;
+    }
     if (action === "cut") cutSelected();
     else if (action === "copy") copySelected();
     else if (action === "paste") paste();
@@ -697,8 +708,31 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     else if (action === "lock" || action === "unlock") toggleLockSelected();
     else if (action === "hide") setHiddenSelected(true);
     else if (action === "show") setHiddenSelected(false);
-    else if (action === "bringForward") nudgeLayer(1);
-    else if (action === "sendBackward") nudgeLayer(-1);
+    else if (action === "rename") {
+      if (target.kind === "page" || target.kind === "pageTab") setRenamePageId(target.pageId);
+      else if (target.kind === "outlineLayer" || target.kind === "canvasElement") {
+        const id = target.kind === "outlineLayer" ? target.elementId : target.elementId;
+        if (!selected.includes(id)) setSelected(expandToGroups(pageElements(view), [id]));
+        setRenameElementId(id);
+        setLeftTab("outline");
+      }
+    } else if (action === "duplicatePage" && (target.kind === "page" || target.kind === "pageTab")) {
+      duplicatePage(target.pageId);
+    } else if (action === "deletePage" && (target.kind === "page" || target.kind === "pageTab")) {
+      deletePage(target.pageId);
+    } else if (action === "addPage") addPage();
+    else if (action === "closeTab" && target.kind === "pageTab") {
+      setOpenTabIds((tabs) => tabs.filter((id) => id !== target.pageId));
+    } else if (action === "insertPalette" && target.kind === "paletteTile") {
+      const tile = PALETTE_BY_ID[target.tileId];
+      if (tile) addTile(tile);
+    } else if (action === "insertTemplate" && target.kind === "templateTile") {
+      addTemplate(target.templateId);
+    } else if (action === "insertIcon" && target.kind === "iconTile") {
+      addIconFromLibrary(target.iconName);
+    } else if (action === "selectAll") {
+      setSelected(pageElements(doc).map((el) => el.id));
+    }
   };
 
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -1030,6 +1064,12 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       patchStudioSettings({ protoSnap: !snapGrid });
       return;
     }
+    if (event.key === "F2" && selected.length === 1) {
+      event.preventDefault();
+      setRenameElementId(selected[0]!);
+      setLeftTab("outline");
+      return;
+    }
     if (event.key === "Delete" || event.key === "Backspace") {
       event.preventDefault();
       removeSelected();
@@ -1214,6 +1254,22 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
   const selectionLocked = selected.length > 0 && selected.every((id) => pageElements(doc).find((el) => el.id === id)?.locked);
   const selectionHidden = selected.length > 0 && selected.every((id) => pageElements(doc).find((el) => el.id === id)?.hidden);
 
+  const menuBuildContext: MenuBuildContext = useMemo(
+    () => ({
+      selectedElementIds: selected,
+      targetElementId: selected[0],
+      canPaste: clipboard.current.length > 0,
+      canGroup,
+      canUngroup,
+      selectionLocked,
+      selectionHidden,
+      pageCount: doc.pages.length,
+      canDeletePage: doc.pages.length > 1,
+      componentsFeatureEnabled: false,
+    }),
+    [selected, canGroup, canUngroup, selectionLocked, selectionHidden, doc.pages.length],
+  );
+
   return (
     <div ref={rootRef} tabIndex={0} data-thread-id={threadId} className="h-full min-h-0 outline-none" onKeyDown={onKeyDown}>
       <PrototypeShell
@@ -1274,7 +1330,14 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             onReorderPages={reorderPages}
             elements={pageElements(doc)}
             selected={selected}
-            onSelectElement={(id) => setSelected([id])}
+            onSelectElements={(ids) => setSelected(ids)}
+            onOpenContextMenu={openContextMenu}
+            renameElementId={renameElementId}
+            renamePageId={renamePageId}
+            onRenameHandled={() => {
+              setRenameElementId(null);
+              setRenamePageId(null);
+            }}
             onToggleHidden={toggleHidden}
             onToggleLocked={toggleLocked}
             onReorderElements={reorderElements}
@@ -1328,6 +1391,10 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             onBoardPointerUp={onBoardPointerUp}
             onBoardDoubleClick={onBoardDoubleClick}
             onBoardContextMenu={onBoardContextMenu}
+            onPageTabContextMenu={(pageId, event) => {
+              event.preventDefault();
+              openContextMenu(event.clientX, event.clientY, { kind: "pageTab", pageId });
+            }}
             onDrop={onDrop}
             onEditChange={(draft) => setEdit((e) => (e ? { ...e, draft } : e))}
             onInlineKeyDown={onInlineKeyDown}
@@ -1405,11 +1472,8 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
         open={contextMenu !== null}
         x={contextMenu?.x ?? 0}
         y={contextMenu?.y ?? 0}
-        canPaste={clipboard.current.length > 0}
-        canGroup={canGroup}
-        canUngroup={canUngroup}
-        locked={selectionLocked}
-        hidden={selectionHidden}
+        target={contextMenu?.target ?? null}
+        context={menuBuildContext}
         onAction={onContextAction}
         onClose={() => setContextMenu(null)}
       />

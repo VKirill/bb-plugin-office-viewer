@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from "react";
 import { cn } from "@/lib/utils";
 import { useT } from "../../shared/i18n";
 import { filterIcons, ICON_DRAG_PREFIX, iconDisplayLabel } from "./icons";
@@ -11,9 +11,11 @@ const ICON_PREVIEW = 20;
 
 export function IconsLibraryPanel({
   onPick,
+  onIconContextMenu,
   className,
 }: {
   onPick: (iconName: string) => void;
+  onIconContextMenu?: (iconName: string, event: MouseEvent) => void;
   className?: string;
 }) {
   const t = useT();
@@ -77,7 +79,7 @@ export function IconsLibraryPanel({
           <div style={{ paddingTop: topPad, paddingBottom: bottomPad }}>
             <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
               {visible.map((name) => (
-                <IconTile key={name} name={name} onPick={onPick} />
+                <IconTile key={name} name={name} onPick={onPick} onContextMenu={onIconContextMenu} />
               ))}
             </div>
           </div>
@@ -87,7 +89,15 @@ export function IconsLibraryPanel({
   );
 }
 
-function IconTile({ name, onPick }: { name: string; onPick: (iconName: string) => void }) {
+function IconTile({
+  name,
+  onPick,
+  onContextMenu,
+}: {
+  name: string;
+  onPick: (iconName: string) => void;
+  onContextMenu?: (iconName: string, event: MouseEvent) => void;
+}) {
   const label = iconDisplayLabel(name);
   const previewRef = useRef<HTMLDivElement>(null);
   return (
@@ -100,6 +110,7 @@ function IconTile({ name, onPick }: { name: string; onPick: (iconName: string) =
         if (previewRef.current) event.dataTransfer.setDragImage(previewRef.current, 36, 28);
       }}
       onClick={() => onPick(name)}
+      onContextMenu={onContextMenu ? (event) => onContextMenu(name, event) : undefined}
       className="flex cursor-grab flex-col overflow-hidden rounded-lg px-1 pb-1 pt-1 text-left text-foreground hover:bg-state-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:cursor-grabbing active:bg-state-active"
     >
       <div ref={previewRef} className="flex h-11 items-center justify-center overflow-hidden text-muted-foreground">

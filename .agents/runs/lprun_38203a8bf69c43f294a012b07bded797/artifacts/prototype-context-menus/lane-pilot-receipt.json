@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "status": "accepted",
+  "lanePilotRunId": "lprun_38203a8bf69c43f294a012b07bded797",
+  "lanePilotTaskId": "prototype-context-menus",
+  "attemptId": "lpattempt_51924b3f600148ffb4deef7382f1bdcd",
+  "pmThreadId": "thr_wdpmipwdxc",
+  "writerThreadId": "thr_j2p67gp2i6",
+  "ownsPaths": [
+    "src/studio/prototype/",
+    "src/shared/i18n.ts",
+    "components/ui/"
+  ],
+  "readFirst": [
+    {
+      "path": "src/studio/prototype/canvas-context-menu.tsx",
+      "windows": []
+    },
+    {
+      "path": "src/studio/prototype/left-pane.tsx",
+      "windows": []
+    },
+    {
+      "path": "src/studio/prototype/canvas.tsx",
+      "windows": []
+    },
+    {
+      "path": "src/studio/prototype/builder.tsx",
+      "windows": []
+    }
+  ],
+  "output": "Unified context menus across the prototype builder.\n\n### Core\n- **`menus.ts`** — `MenuTarget` / `MenuActionId`, `buildMenuItems()` per surface, z-order helpers (`nudgeZOrder`, `applyZOrder`), shortcut templates\n- **`menus.test.ts`** — menu model and z-order tests\n- **`INTERACTIONS.md`** — shared click/selection/drag/context-menu rules\n- **`components/ui/anchored-menu.tsx`** — keyboard-navigable menu, viewport clamping\n- **`prototype-context-menu.tsx`** — i18n + menu model → anchored menu\n\n### Wiring\n- **`builder.tsx`** — single menu host, action dispatch (including front/back, pages, inserts, F2 rename)\n- **`left-pane.tsx`** — outline/pages/palette/template/icon menus; shift/cmd outline selection\n- **`canvas.tsx`** — page tab context menu\n- **`shell.tsx`** — block native context menu outside text fields\n- **`icons-library.tsx`**, **`template-tile.tsx`** — tile context menus\n- **`i18n.ts`** — new menu strings (EN/RU)\n\n**Changed paths:**  \n`src/studio/prototype/menus.ts`, `menus.test.ts`, `INTERACTIONS.md`, `prototype-context-menu.tsx`, `canvas-context-menu.tsx`, `builder.tsx`, `left-pane.tsx`, `canvas.tsx`, `shell.tsx`, `icons-library.tsx`, `template-tile.tsx`, `components/ui/anchored-menu.tsx`, `src/shared/i18n.ts`\n\n`npx tsc --noEmit` and 112 prototype tests pass.",
+  "verification": [
+    {
+      "command": "npx tsc --noEmit",
+      "exitCode": 0,
+      "stdout": "\\\u001b[1G\u001b[0K\\\u001b[1G\u001b[0K\u001b[1mnpm\u001b[22m \u001b[96mnotice\u001b[39m\r\n\u001b[1mnpm\u001b[22m \u001b[96mnotice\u001b[39m New \u001b[31mmajor\u001b[39m version of npm available! \u001b[31m11.16.0\u001b[39m -> \u001b[34m12.2.0\u001b[39m\r\n\u001b[1mnpm\u001b[22m \u001b[96mnotice\u001b[39m Changelog: \u001b[34mhttps://github.com/npm/cli/releases/tag/v12.2.0\u001b[39m\r\n\u001b[1mnpm\u001b[22m \u001b[96mnotice\u001b[39m To update run: \u001b[4mnpm install -g npm@12.2.0\u001b[24m\r\n\u001b[1mnpm\u001b[22m \u001b[96mnotice\u001b[39m\r\n\\\u001b[1G\u001b[0K",
+      "stderr": "",
+      "sandboxBackend": "macos-seatbelt",
+      "policySha256": "ccc209fbf653763fb5b7c2e34471300cad3c2da0105341822fc61506371cc490",
+      "workspacePath": "/Users/vechkasov/.lane-pilot/worktrees/lpattempt_b584239ee8c748b4a2996a0e4151a0da/bb-plugin-office-viewer"
+    },
+    {
+      "command": "node --experimental-strip-types --test 'src/studio/prototype/*.test.ts'",
+      "exitCode": 0,
+      "stdout": "✔ align left/center/right uses the selection bounds (0.732375ms)\r\n✔ align top/middle/bottom and a single element to the canvas (0.086209ms)\r\n✔ distribute spaces three or more; two is a no-op (0.1335ms)\r\n✔ marquee intersect vs contain (3.230917ms)\r\n✔ click selection with meta and shift (0.098625ms)\r\n✔ group and ungroup (0.249333ms)\r\n✔ snap guides align edges (0.168833ms)\r\n✔ snapDelta respects grid (0.079375ms)\r\n✔ nudge step sizes (0.062583ms)\r\n✔ distance lines between separated boxes (0.123667ms)\r\n✔ zoom helpers clamp (0.084791ms)\r\n✔ grid step toggle (0.056833ms)\r\n✔ drawRect shift square down-right (0.13825ms)\r\n✔ drawRect shift square up-left (0.051916ms)\r\n✔ drawRect alt from center (0.039666ms)\r\n✔ drawRect shift and alt circle (0.031209ms)\r\n✔ snapAngle locks line to 45 degrees (0.051041ms)\r\n✔ constrainMove axis lock (0.043917ms)\r\n✔ resizeBox shift keeps aspect on corner (0.1175ms)\r\n✔ resizeBox alt from center (0.033375ms)\r\n✔ resizeBox lockAspect without shift (0.0355ms)\r\n✔ click drag threshold (0.022667ms)\r\n✔ double-click targets: button text and field placeholder (0.951ms)\r\n✔ Enter on a radio commits the label and adds a grouped radio below (25.395041ms)\r\n✔ checking a radio unchecks others in the group (0.164667ms)\r\n✔ Enter on a checkbox adds another below without exclusivity (0.098375ms)\r\n✔ Enter on a list item inserts an empty item after it (1.563208ms)\r\n✔ Backspace on an empty list item removes it (1.404125ms)\r\n✔ Nav/Tabs/ChoicePicker item index and draft (0.50075ms)\r\n▶ iconSearchWords\r\n  ✔ splits CamelCase and strips Icon suffix (3.782584ms)\r\n  ✔ handles registry-style names (0.170584ms)\r\n✔ iconSearchWords (6.386458ms)\r\n▶ filterIcons\r\n  ✔ returns all when query is empty (0.338375ms)\r\n  ✔ filters by multiple terms (0.252042ms)\r\n  ✔ matches export name substring (0.176667ms)\r\n✔ filterIcons (0.990416ms)\r\n▶ parseColour\r\n  ✔ parses short and long hex (1.068459ms)\r\n  ✔ parses rgba and transparent (0.161667ms)\r\n✔ parseColour (1.844167ms)\r\n▶ hsl round trip\r\n  ✔ converts hex to hsl and back (1.58ms)\r\n✔ hsl round trip (1.740166ms)\r\n▶ normalizeColourInput\r\n  ✔ formats parsed colours (0.251542ms)\r\n✔ normalizeColourInput (0.413417ms)\r\n✔ resolvePickerColour uses fallback when unset (0.386167ms)\r\n✔ parseRgbChannels round-trips (2.459875ms)\r\n✔ collectDocumentColours gathers canvas and element styles (0.345375ms)\r\n✔ mergeStylePatch keeps unrelated fields on element (1.961ms)\r\n✔ mixed style value detects differences (0.117417ms)\r\n✔ wireframeElementBoxStyle maps element.style opacity for canvas (4.505625ms)\r\n✔ applyStyleToElements updates selection only (1.017666ms)\r\n✔ radio group assign and exclusive check (1.229958ms)\r\n✔ table read write and TSV paste (12.612375ms)\r\n✔ table cell navigation (0.712333ms)\r\n✔ list editor write (0.125333ms)\r\n✔ outline menu includes z-order rename and delete (12.475625ms)\r\n✔ canvas empty menu paste and select all (0.39175ms)\r\n✔ nudgeZOrder swaps with neighbor (1.310458ms)\r\n✔ applyZOrder front and back (2.767375ms)\r\n✔ zOrderOpFromAction maps menu ids (0.101625ms)\r\n✔ parseWireframe round-trips a valid v2 document (3.605417ms)\r\n✔ parseWireframe migrates v1 to v2 with elements preserved (0.338709ms)\r\n✔ every type has catalog defaults and a numbered label (0.77575ms)\r\n✔ snap uses an 8px grid (0.0495ms)\r\n✔ canvas presets match legacy sizes and orientation swap (0.06875ms)\r\n✔ parseWireframe rejects a bad file (0.738708ms)\r\n✔ every palette entry builds a valid element and parses (19.522459ms)\r\n✔ palette tiles use only existing types and cover every type (0.142416ms)\r\n✔ every palette tile has a designed pictogram (0.078334ms)\r\n✔ pictogram source bundle size (0.139125ms)\r\n✔ variants create existing types with their props (0.113875ms)\r\n✔ search matches type, id and display name (0.075125ms)\r\n▶ parseLeftPaneSplit\r\n  ✔ returns defaults for bad input (1.018208ms)\r\n  ✔ round-trips persisted fields (0.089125ms)\r\n✔ parseLeftPaneSplit (1.704167ms)\r\n▶ resolveLeftPaneHeights\r\n  ✔ enforces minimum section sizes when expanded (0.117625ms)\r\n  ✔ collapses pages to header height (0.049542ms)\r\n  ✔ keyboard nudge changes ratio within bounds (0.075917ms)\r\n✔ resolveLeftPaneHeights (0.3335ms)\r\n▶ topRatioFromHeight\r\n  ✔ clamps extreme ratios (0.055833ms)\r\n✔ topRatioFromHeight (0.10025ms)\r\n▶ shapePath\r\n  ✔ returns a non-empty path for rectangle (0.685375ms)\r\n  ✔ returns a non-empty path for stacked-rectangle (0.07375ms)\r\n  ✔ returns a non-empty path for rounded (0.075958ms)\r\n  ✔ returns a non-empty path for stacked-rounded (0.0495ms)\r\n  ✔ returns a non-empty path for beveled (0.057625ms)\r\n  ✔ returns a non-empty path for diamond (0.052333ms)\r\n  ✔ returns a non-empty path for file (0.170208ms)\r\n  ✔ returns a non-empty path for stacked-file (0.066333ms)\r\n  ✔ returns a non-empty path for bracket (0.073917ms)\r\n  ✔ returns a non-empty path for semicircle (0.097875ms)\r\n  ✔ returns a non-empty path for triangle (0.048875ms)\r\n  ✔ returns a non-empty path for trapezoid (0.033875ms)\r\n  ✔ returns a non-empty path for ellipse (0.038834ms)\r\n  ✔ returns a non-empty path for hexagon (0.040209ms)\r\n  ✔ returns a non-empty path for parallelogram (0.026792ms)\r\n  ✔ returns a non-empty path for actor (0.058666ms)\r\n  ✔ returns a non-empty path for database (0.052541ms)\r\n  ✔ returns a non-empty path for subroutine (0.034958ms)\r\n  ✔ returns a non-empty path for delay (0.025958ms)\r\n  ✔ returns a non-empty path for document (0.0285ms)\r\n  ✔ returns a non-empty path for multi-document (0.025375ms)\r\n  ✔ returns a non-empty path for off-page (0.026708ms)\r\n  ✔ returns a non-empty path for manual-input (0.023458ms)\r\n  ✔ returns a non-empty path for stored-data (0.023542ms)\r\n  ✔ returns a non-empty path for internal-storage (0.023167ms)\r\n  ✔ returns a non-empty path for offline-storage (0.023208ms)\r\n  ✔ returns a non-empty path for display (0.027709ms)\r\n  ✔ returns a non-empty path for sort (0.025292ms)\r\n  ✔ returns a non-empty path for collate (0.027958ms)\r\n  ✔ returns a non-empty path for summing-junction (0.027625ms)\r\n  ✔ returns a non-empty path for logical-or (0.025542ms)\r\n  ✔ returns a non-empty path for magnetic-tape (0.023708ms)\r\n  ✔ returns a non-empty path for punched-tape (0.02675ms)\r\n  ✔ returns a non-empty path for punched-card (0.023625ms)\r\n  ✔ returns a non-empty path for keying (0.023792ms)\r\n✔ shapePath (3.14575ms)\r\n▶ template catalog\r\n  ✔ has at least 12 form and 14 interface templates (0.382625ms)\r\n  ✔ every template builds valid grouped elements (4.368375ms)\r\n✔ template catalog (6.159666ms)\r\n▶ filterTemplates\r\n  ✔ finds templates by Russian keyword (0.118917ms)\r\n  ✔ finds templates by id fragment (0.068417ms)\r\n✔ filterTemplates (0.263375ms)\r\n▶ previewElementsForTemplate\r\n  ✔ returns elements for library thumbnails (0.084458ms)\r\n✔ previewElementsForTemplate (0.122ms)\r\nℹ tests 112\r\nℹ suites 12\r\nℹ pass 112\r\nℹ fail 0\r\nℹ cancelled 0\r\nℹ skipped 0\r\nℹ todo 0\r\nℹ duration_ms 526.358167\r\n",
+      "stderr": "",
+      "sandboxBackend": "macos-seatbelt",
+      "policySha256": "8a47d6e1c524830d0e74e222575e9903774970bbf4368e470e3aad73093209c7",
+      "workspacePath": "/Users/vechkasov/.lane-pilot/worktrees/lpattempt_b584239ee8c748b4a2996a0e4151a0da/bb-plugin-office-viewer"
+    }
+  ],
+  "runV2": {
+    "schemaVersion": 1,
+    "pools": {
+      "provider": 15,
+      "verification": 2
+    },
+    "score": 5,
+    "risk": "medium",
+    "sourceRisk": "medium",
+    "scoreAdapter": "task-risk-v1"
+  },
+  "reasoning": [
+    {
+      "planSha256": "1f891577aea2d585df1093ac917501d02f67cbe45168a90f7bb0309045cc6b1c",
+      "sentPlanSha256": "1f891577aea2d585df1093ac917501d02f67cbe45168a90f7bb0309045cc6b1c",
+      "sourceLength": 2046,
+      "sentLength": 2046,
+      "jevStatus": "ok",
+      "jevDecision": "medium",
+      "requestedReasoningLevel": "medium",
+      "effectiveReasoningLevel": "medium",
+      "fallbackReason": null,
+      "retryEffort": {
+        "enabled": true,
+        "retryIndex": 0,
+        "before": "medium",
+        "after": "medium",
+        "changed": false
+      },
+      "providerId": "acp-cursor",
+      "model": "composer-2.5",
+      "serviceTier": "default",
+      "requestedServiceTier": "default",
+      "runId": "lprun_38203a8bf69c43f294a012b07bded797",
+      "attemptId": "lpattempt_51924b3f600148ffb4deef7382f1bdcd",
+      "threadId": "thr_j2p67gp2i6",
+      "effortMode": "automatic",
+      "selectionSource": {
+        "providerId": "acp-cursor",
+        "model": "composer-2.5",
+        "reasoningLevel": "medium",
+        "serviceTier": "default",
+        "reasoningLevelSource": "client-preference"
+      },
+      "dispatchContext": {
+        "memoryText": "Area «feature:office-studio-prototype»: earlier accepted tasks, newest first. Their decisions are in main; keep them unless this task changes them.\n- 2026-10-17T18:27 prototype-inspector-native: Prototype inspector: native Axure-like Style panel with icons, pickers, fonts and colour picker. The Style tab is a compact native panel: icon align row, geometry grid, collapsible sections, font and weight pickers, text alignment icons and a real colour picker.\n- 2026-10-17T18:25 prototype-screen-size: Prototype: single screen-size dropdown with device presets, compact W/H and colour swatch; tidy toolbar. Screen size is chosen in one place: a device dropdown with presets and orientation, compact W/H and a colour swatch; no duplicate device buttons.\n- 2026-10-17T18:24 prototype-left-split: Prototype left pane: one draggable divider between Pages and Libraries, remove extra separators. The owner drags one divider to give the Libraries section more height; the left column has no stacked extra lines.\n- 2026-10-17T18:18 prototype-templates: Prototype: Templates library with ready forms and UI patterns. The owner inserts ready forms and UI blocks (login, registration, checkout, header, pricing, table with filters…) from a Templates library.\n- 2026-10-17T18:16 prototype-icons-fix: Fix Icons library: load Hugeicons data from the plugin server instead of a bare dynamic import. The Icons library, Icon elements and the icon picker show the actual icons.\n- 2026-10-17T18:15 prototype-overlay-close: Prototype: proper close button and backdrop for side-pane overlays. In a narrow panel the side panes open as overlays with a clean close button that does not overlap the tabs.\n- 2026-10-17T18:01 prototype-pictograms: Prototype palette: designed pictograms instead of live previews. Palette tiles show clear designed pictograms like Axure's library instead of tiny live previews.\n- 2026-10-17T18:00 prototype-inspector-axure: Prototype: Axure inspector - Style tab, properties, radio group combo, list editor, table editing, notes. The prototype inspector matches Axure: a full Style tab, per-type properties with radio groups and style effects, a list editor, table cell editing and notes.\n- 2026-10-17T17:57 prototype-canvas-axure: Prototype: Axure canvas behaviour - marquee, groups, lock, snap guides, distances, context menu, tool shortcuts, quick insert. Working on the prototype canvas feels like Axure: marquee, groups, snap guides, distances, context menu, single-key tools and quick insert.\n- 2026-10-17T17:54 prototype-shell-pages: Prototype: split builder, Axure three-column shell, pages and outline, rulers, style bar. The prototype builder gets Axure's layout: pages and outline on the left over the libraries, Style/Properties/Notes on the right, rulers and a context style bar.\n- 2026-10-17T17:50 prototype-axure-widgets: Prototype: full Axure-standard widget set incl. Flow shapes and Markup. The prototype palette has the full standard Axure widget set: Common, Dynamic, Forms, Menus and table, Content, Markup and Flow shapes.\n- 2026-10-17T17:46 prototype-icons-library: Prototype: Icons library with searchable Hugeicons set. The prototype builder has an Icons library: thousands of searchable icons that go onto the canvas as Icon elements.\nFiles of this area: src/shared/i18n.ts, src/studio/prototype/builder.tsx, src/studio/prototype/inspector-colour-picker.tsx, src/studio/prototype/inspector-colour.test.ts, src/studio/prototype/inspector-colour.ts, src/studio/prototype/inspector-style-panel.tsx, src/studio/prototype/inspector.tsx, src/studio/prototype/model.test.ts, src/studio/prototype/model.ts, src/studio/prototype/shell.tsx, src/studio/prototype/toolbar.tsx, src/studio/prototype/left-pane.tsx, src/studio/prototype/pane-split.test.ts, src/studio/prototype/pane-split.ts, src/studio/prototype/template-tile.tsx, src/studio/prototype/templates.test.ts, src/studio/prototype/templates.ts, server.ts, src/server/hugeicons.test.ts, src/server/hugeicons.ts, src/studio/prototype/hugeicons-runtime.ts, src/studio/prototype/palette.test.ts, src/studio/prototype/palette.ts, src/studio/prototype/pictograms-ids.ts, src/studio/prototype/pictograms.tsx, src/studio/prototype/canvas.tsx, src/studio/prototype/editing.ts, src/studio/prototype/elements.tsx, src/studio/prototype/inspector-list-dialog.tsx, src/studio/prototype/inspector-model.test.ts, src/studio/prototype/inspector-model.ts, src/studio/prototype/inspector-table-editor.tsx, src/studio/prototype/canvas-context-menu.tsx, src/studio/prototype/canvas-math.test.ts, src/studio/prototype/canvas-math.ts, src/studio/prototype/builder-geometry.ts, src/studio/prototype/editing.test.ts, src/studio/prototype/inspector-fields.ts, src/studio/prototype/shapes.test.ts, src/studio/prototype/shapes.ts\n\n- `components/ui/icon-extended.tsx` and `components/ui/icon-registry.ts` register the builtin brand icon names `Figma`, `Notion`, `Slack`, `Telegram`, `Youtube`, `GoogleDoc` and `GoogleDrive`, alongside the existing names, which are unchanged. The test in `src/spreadsheet/link-chip.test.ts` checks against `EXTENDED_ICON_NAMES`.\n- Invariant: picking a tool and the Back to tools action in the launcher work as before. The Prototype and Paint tools (`src/studio/prototype/` and `src/studio/paint/`) are not changed by launcher work.\n- The `button-outline` palette tile (outline variant) is defined in `src/studio/prototype/palette.ts` and creates the outline button. Its label comes from the i18n key `protoTileButtonOutline` in `src/shared/i18n.ts`; the ru labels are «Кнопка» (outline) and «Основная кнопка» (primary).",
+        "memoryPicked": [
+          "87e45859f07768b26a7fae7d074ee391ab826ee1b27556bbcf3f88140fe13d71",
+          "1af0c25e14e3789cbfc11fe9202f61f9617fdcb938b7bccefb5a456387692c2f",
+          "bfb2bbaec1ae867300ad77322b2069affcb8b31f910899355bc009a1e6c5f125"
+        ],
+        "rulesText": "- Перед ответом по задаче Lane Pilot сверяй каждый путь, который собираешься изменить из-за ошибки проверки, с owns_paths; если пути там нет, не меняй файл и сообщи об ошибке диспетчеру.",
+        "rulesPicked": {
+          "total": 19,
+          "picked": [
+            "rule_572535fb78e20b9d"
+          ]
+        },
+        "executionPacket": "Read these before editing; they are the context for this task:\n- src/studio/prototype/inspector-style-panel.tsx L1-L438 (sha256 a2b53772)\n- src/studio/prototype/toolbar.tsx L1-L248 (sha256 686fa6cc)",
+        "executionPacketSha256": "9ee796c3a9c0c22c68be6bbe24077be1fde0162c914c1c623f83b2a66e8ff41b",
+        "pmReadContext": "{\"summary\":\"The task contract asks for a prototype change so alignment and distribution buttons use standard Hugeicons glyphs in one row with proper hover tooltips (label plus shortcut, floating above, not overlapping), with the same icons and tooltips in the toolbar and a disabled state when an action is unavailable. Acceptance requires: align left/centre/right/top/middle/bottom and distribute H/V use Hugeicons, no hand-drawn glyphs; one row of 8 (two rows of 4 when narrow) with the lock-aspect toggle between W and H; a shared tooltip component for icon buttons; align/distribute behaviour unchanged. Verification is `npx tsc --noEmit` and `node --experimental-strip-types --test 'src/studio/prototype/*.test.ts'`. Owned paths are src/studio/prototype/, components/ui/, and src/shared/i18n.ts; docs/, README.md, PROJECT.md, package.json and CHANGELOG.md must not be touched.\\n\\nThe host-read excerpts of inspector-style-panel.tsx (L1-L438) show the current state. The alignment-related controls sit in one grid, `grid grid-cols-3`, inside a bordered box. The grid holds nine items in this order: left, center, right, top, middle, bottom, horizontal (distribute), lock, vertical (distribute). That gives three rows of three, not the one row of eight the contract wants, and the lock toggle sits last rather than between W and H. Each button is wrapped in a `<span title={t(labelKey)}>`, which gives a native browser title tooltip, not a styled floating tooltip with a shortcut. Alignment glyphs are inline hand-drawn SVG paths (`AlignIcon`, `DistributeIcon`) and the lock uses `Icon name=\\\"Lock\\\"` / `\\\"SquareUnlock02\\\"`, so they are not yet Hugeicons-verified. Distribute is disabled when `selection.length < 3`; align is disabled when `!selection.length`. The panel receives `applyAlign` and `applyDistribute` as props. The W and H ScrubFields sit in a `grid-cols-2` block, and the lock state (`lockAspect`) is local to the panel.\\n\\nThe excerpt of toolbar.tsx (L1-L248) only reaches the imports and the start of the `PrototypeToolbar` component. It defines `ALIGN_TOOLS` (six align entries with i18n keys) and accepts `narrow`, `applyAlign`, `applyDistribute` and `selectedCount` props, but the excerpt stops before the JSX that renders those buttons, so how the toolbar lays out or tooltips align actions is unknown.\\n\\nThe excerpts do not show: the contents of icon-registry.ts or icon-extended.tsx (these were listed as read_first but were not supplied); whether Hugeicons is already a dependency or how it is imported; the existing `Icon` component's API beyond `name` and `className`; any existing shared tooltip component in components/ui/; the shortcut keys for align/distribute actions; the i18n keys' values in src/shared/i18n.ts; the `align.ts` types; whether a `narrow` breakpoint is applied to the inspector panel (it is not a prop of InspectorStylePanel); and whether any `.test.ts` files exist under src/studio/prototype/.\",\"keyFacts\":[\"inspector-style-panel.tsx: alignment buttons are a 9-item grid (`grid grid-cols-3`) in order left, center, right, top, middle, bottom, horizontal, lock, vertical, so the current layout is 3 rows of 3, not one row of 8.\",\"inspector-style-panel.tsx: each icon button is wrapped in `<span title={t(labelKey)}>`, a native title attribute, not a custom floating tooltip, and no shortcut is shown.\",\"inspector-style-panel.tsx: AlignIcon, DistributeIcon, TextAlignIcon and VerticalAlignIcon render hand-drawn SVG `<path>` glyphs (viewBox 0 0 16 16), which conflicts with the requirement to use Hugeicons.\",\"inspector-style-panel.tsx: lock-aspect toggle uses `Icon name={lockAspect ? \\\"Lock\\\" : \\\"SquareUnlock02\\\"}` and is local state `lockAspect` (useState false).\",\"inspector-style-panel.tsx: distribute buttons are disabled when `selection.length < 3`; align buttons are disabled when `!selection.length`.\",\"inspector-style-panel.tsx: W and H ScrubFields respect lockAspect, scaling the other dimension by the element's ratio when lock is on.\",\"inspector-style-panel.tsx: props include applyAlign(edge: AlignEdge) and applyDistribute(axis: DistributeAxis), typed from ./align.\",\"inspector-style-panel.tsx: imports `Icon` from @/components/ui/icon, `Button` from @/components/ui/button, and `iconDisplayLabel` from ./icons; no Tooltip import exists.\",\"inspector-style-panel.tsx: text-alignment and vertical-alignment toggles also use hand-drawn SVG glyphs and span-title tooltips; these are in the 'text' section, which is out of scope per the contract.\",\"toolbar.tsx: ALIGN_TOOLS defines six align entries (left, center, right, top, middle, bottom) with I18nKey labels protoAlignLeft..protoAlignBottom.\",\"toolbar.tsx: PrototypeToolbar accepts applyAlign, applyDistribute, selectedCount and narrow props.\",\"toolbar.tsx: excerpt is cut off at L248 inside the root `<div>` opening; the JSX that renders align/distribute buttons is not visible.\",\"Task contract owns src/studio/prototype/, components/ui/ and src/shared/i18n.ts; never_touch includes docs/, README.md, PROJECT.md, package.json, CHANGELOG.md.\",\"Task contract verification: `npx tsc --noEmit` (600s timeout) and `node --experimental-strip-types --test 'src/studio/prototype/*.test.ts'` (120s timeout), both from the project root.\",\"Task contract invariant: align/distribute behaviour must remain unchanged; out of scope: other inspector sections.\"],\"openQuestions\":[\"Does components/ui/icon-registry.ts or icon-extended.tsx already map Hugeicons glyphs for align/distribute names? Those files were listed as read_first but were not in the excerpts.\",\"Is Hugeicons already a project dependency, and what is the import path and naming convention used by components/ui/icon?\",\"Does a shared tooltip component already exist in components/ui/ (for example a Radix-based Tooltip), or must one be created?\",\"What shortcut keys exist for align and distribute actions, so the tooltip can display them?\",\"What do the i18n keys (protoAlignLeft, protoDistributeH, protoLockAspect, etc.) resolve to in src/shared/i18n.ts, and are shortcut strings already defined?\",\"How does toolbar.tsx render its align/distribute buttons (the excerpt stops before the JSX), and does it currently duplicate the inspector's grid?\",\"What does the AlignEdge and DistributeAxis type set in ./align contain, and does it match the six edges and two axes used here?\",\"Where is the 'narrow' signal for the one-row vs two-row layout sourced from in the inspector? InspectorStylePanel has no narrow prop, and the toolbar has one.\",\"Do any *.test.ts files exist under src/studio/prototype/, and how do they exercise the panel or toolbar? The contract's test command depends on them.\",\"Does the current `Icon` component accept arbitrary Hugeicons names, or only names in icon-registry?\",\"Are the lock icon names 'Lock' and 'SquareUnlock02' valid in the chosen icon set?\"]}",
+        "agent": "Lane Pilot writer",
+        "promptChars": 13299,
+        "helperMode": "roles",
+        "helperRequired": false,
+        "skillPick": {
+          "enabled": true,
+          "skills": [],
+          "picked": [],
+          "projectFolder": [],
+          "hints": [],
+          "sources": {},
+          "reason": null,
+          "materialized": []
+        }
+      }
+    }
+  ],
+  "emergencyFallback": null,
+  "turns": 1
+}
