@@ -128,6 +128,54 @@ export const CANVAS_PRESETS = {
   phone: { width: 375, height: 812 },
 } as const;
 
+export type CanvasPresetGroupId = "desktop" | "tablet" | "phone";
+
+export type CanvasPresetId = "desktop" | "desktopWide" | "tablet" | "tabletLandscape" | "phone" | "phoneLarge";
+
+export type CanvasPresetEntry = {
+  id: CanvasPresetId;
+  group: CanvasPresetGroupId;
+  labelKey: string;
+  icon: string;
+  width: number;
+  height: number;
+};
+
+export const CANVAS_PRESET_GROUPS: readonly { id: CanvasPresetGroupId; labelKey: string }[] = [
+  { id: "desktop", labelKey: "protoPresetGroupDesktop" },
+  { id: "tablet", labelKey: "protoPresetGroupTablet" },
+  { id: "phone", labelKey: "protoPresetGroupPhone" },
+];
+
+export const CANVAS_PRESET_ENTRIES: readonly CanvasPresetEntry[] = [
+  { id: "desktop", group: "desktop", labelKey: "protoDesktop", icon: "Laptop", width: 1280, height: 800 },
+  { id: "desktopWide", group: "desktop", labelKey: "protoDesktopWide", icon: "Laptop", width: 1440, height: 900 },
+  { id: "tablet", group: "tablet", labelKey: "protoTablet", icon: "AppWindow", width: 768, height: 1024 },
+  { id: "tabletLandscape", group: "tablet", labelKey: "protoTabletLandscape", icon: "AppWindow", width: 1024, height: 768 },
+  { id: "phone", group: "phone", labelKey: "protoPhone", icon: "Smartphone", width: 375, height: 812 },
+  { id: "phoneLarge", group: "phone", labelKey: "protoPhoneLarge", icon: "Smartphone", width: 414, height: 896 },
+];
+
+export const CANVAS_BACKGROUND_PRESETS = ["#ffffff", "#f8fafc", "#e2e8f0", "#fef3c7", "#1e293b", "#000000"] as const;
+
+export function findCanvasPreset(width: number, height: number): CanvasPresetEntry | null {
+  return CANVAS_PRESET_ENTRIES.find((entry) => entry.width === width && entry.height === height) ?? null;
+}
+
+export function isCustomCanvasSize(width: number, height: number): boolean {
+  return findCanvasPreset(width, height) === null;
+}
+
+export function swapCanvasOrientation(size: { width: number; height: number }): { width: number; height: number } {
+  return { width: snap(size.height), height: snap(size.width) };
+}
+
+export function canvasPresetDimensions(id: CanvasPresetId): { width: number; height: number } {
+  const entry = CANVAS_PRESET_ENTRIES.find((item) => item.id === id);
+  if (!entry) return CANVAS_PRESETS.desktop;
+  return { width: entry.width, height: entry.height };
+}
+
 export const CATALOG: readonly CatalogEntry[] = [
   { type: "Box", group: "common", w: 160, h: 96, props: { fill: "none", border: true, radius: 0, text: "" } },
   { type: "Ellipse", group: "common", w: 120, h: 80, props: { fill: "light", border: true, text: "" } },

@@ -1,23 +1,12 @@
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Icon, type IconName } from "@/components/ui/icon";
+import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { t, type I18nKey } from "../../shared/i18n";
 import type { AlignEdge, DistributeAxis } from "./align";
-import { CANVAS_PRESETS } from "./model";
 
 export type ToolbarMenu = "file" | "send" | "zoom" | "more";
 
-const DEVICE_ICON: Record<keyof typeof CANVAS_PRESETS, IconName> = {
-  desktop: "Laptop",
-  tablet: "AppWindow",
-  phone: "Smartphone",
-};
-const DEVICE_LABEL: Record<keyof typeof CANVAS_PRESETS, I18nKey> = {
-  desktop: "protoDesktop",
-  tablet: "protoTablet",
-  phone: "protoPhone",
-};
 const ALIGN_TOOLS: { kind: AlignEdge; label: I18nKey }[] = [
   { kind: "left", label: "protoAlignLeft" },
   { kind: "center", label: "protoAlignCenter" },
@@ -46,9 +35,6 @@ export function PrototypeToolbar({
   narrow,
   applyAlign,
   applyDistribute,
-  canvasWidth,
-  canvasHeight,
-  applyCanvasPreset,
   zoom,
   setZoom,
   fitZoom,
@@ -79,9 +65,6 @@ export function PrototypeToolbar({
   narrow: boolean;
   applyAlign: (edge: AlignEdge) => void;
   applyDistribute: (axis: DistributeAxis) => void;
-  canvasWidth: number;
-  canvasHeight: number;
-  applyCanvasPreset: (id: keyof typeof CANVAS_PRESETS) => void;
   zoom: number;
   setZoom: (value: number) => void;
   fitZoom: () => void;
@@ -113,7 +96,7 @@ export function PrototypeToolbar({
       <Input
         value={nameDraft}
         aria-label={t("protoRename")}
-        className="h-8 w-32 min-w-16 max-w-40"
+        className="h-8 w-32 min-w-16 max-w-40 border-transparent bg-transparent shadow-none hover:border-input focus-visible:border-input"
         onChange={(event) => setNameDraft(event.target.value.replace(/[/\\]/g, ""))}
         onBlur={commitName}
         onKeyDown={(event) => {
@@ -178,19 +161,6 @@ export function PrototypeToolbar({
           ))}
         </>
       )}
-      <Sep />
-      <div className="flex rounded-md border border-border">
-        {(Object.keys(CANVAS_PRESETS) as (keyof typeof CANVAS_PRESETS)[]).map((id) => (
-          <ToolBtn
-            key={id}
-            tip={t(DEVICE_LABEL[id])}
-            pressed={canvasWidth === CANVAS_PRESETS[id].width && canvasHeight === CANVAS_PRESETS[id].height}
-            onClick={() => applyCanvasPreset(id)}
-          >
-            <Icon name={DEVICE_ICON[id]} className="size-4" />
-          </ToolBtn>
-        ))}
-      </div>
       <div className="relative" data-toolbar-menu title={t("protoZoomMenu")}>
         <Button type="button" variant="ghost" size="sm" className="h-8 min-w-14 gap-1 tabular-nums" aria-expanded={menu === "zoom"} onClick={() => toggleMenu("zoom")}>
           {Math.round(zoom * 100)}%

@@ -9,7 +9,6 @@ import type { rpcContract } from "../../../server";
 import { detectLocale, t } from "../../shared/i18n";
 import {
   CATALOG_BY_TYPE,
-  CANVAS_PRESETS,
   SNAP,
   cloneWireframe,
   defaultElement,
@@ -1026,9 +1025,6 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             narrow={compact}
             applyAlign={applyAlign}
             applyDistribute={applyDistribute}
-            canvasWidth={pageCanvas(doc).width}
-            canvasHeight={pageCanvas(doc).height}
-            applyCanvasPreset={(id) => commit(patchCanvas(doc, CANVAS_PRESETS[id]))}
             zoom={zoom}
             setZoom={setZoom}
             fitZoom={fitZoom}
