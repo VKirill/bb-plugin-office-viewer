@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
+import { readIconColor, readIconSize } from "./icon-inspector";
+import { ProtoIcon } from "./proto-icon";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -132,12 +134,16 @@ export function ElementFace({ el }: { el: WireframeElement }) {
       );
     case "Avatar":
       return <div className={cn(inert, "flex items-center justify-center rounded-full bg-secondary text-xs font-semibold")}>{text(p, "initials", "AB")}</div>;
-    case "Icon":
+    case "Icon": {
+      const iconName = text(p, "name", "Star");
+      const size = readIconSize(p, 24);
+      const color = readIconColor(p);
       return (
-        <div className={cn(inert, "flex items-center justify-center text-muted-foreground")}>
-          <Icon name={text(p, "name", "Star")} className="size-5" />
+        <div className={cn(inert, "flex items-center justify-center")}>
+          <ProtoIcon name={iconName} size={size} color={color} />
         </div>
       );
+    }
     case "Badge":
       return <span className={cn(inert, "inline-flex items-center justify-center rounded-full bg-secondary px-2 text-xs")}>{text(p, "text", "Badge")}</span>;
     case "Table": {
