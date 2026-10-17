@@ -14,11 +14,10 @@ import { SCREENSHOT_LIBRARY } from "../../html/capture";
 import { detectLocale, t, type I18nKey } from "../../shared/i18n";
 import { ElementFace } from "./elements";
 import {
-  CATALOG,
+  CATALOG_BY_TYPE,
   CANVAS_PRESETS,
   SNAP,
   cloneWireframe,
-  defaultElement,
   newElementId,
   newWireframe,
   parseWireframe,
@@ -29,6 +28,7 @@ import {
   type Wireframe,
   type WireframeElement,
 } from "./model";
+import { PALETTE_BY_ID, PALETTE_TILES, elementFromTile, previewElement, tileGroup, tileMatchesQuery, type PaletteTile } from "./palette";
 
 const MAX_HISTORY = 60;
 const MIN_SIZE = SNAP;
@@ -199,6 +199,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [badges, setBadges] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [query, setQuery] = useState("");
+  const [collapsed, setCollapsed] = useState<Partial<Record<PaletteGroup, boolean>>>({});
   const [busy, setBusy] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const [openOpen, setOpenOpen] = useState(false);
@@ -220,8 +221,12 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
 
   const replace = (elements: WireframeElement[]) => commit({ ...doc, elements });
 
-  const addAt = (type: ElementType, x: number, y: number) => {
-    const el = placeOnCanvas(defaultElement(type, x, y, doc.elements), doc.canvas);
+  const addTile = (tile: PaletteTile, x?: number, y?: number) => {
+    const spec = CATALOG_BY_TYPE[tile.type];
+    const el = placeOnCanvas(
+      elementFromTile(tile, x ?? (doc.canvas.width - spec.w) / 2, y ?? (doc.canvas.height - spec.h) / 2, doc.elements),
+      doc.canvas,
+    );
     replace([...doc.elements, el]);
     setSelected([el.id]);
   };
@@ -345,11 +350,11 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
 
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    const type = event.dataTransfer.getData("text/plain") as ElementType;
-    if (!CATALOG.some((item) => item.type === type)) return;
+    const tile = PALETTE_BY_ID[event.dataTransfer.getData("text/plain")];
+    if (!tile) return;
     const p = boardPoint(event);
-    const spec = CATALOG.find((item) => item.type === type)!;
-    addAt(type, p.x - spec.w / 2, p.y - spec.h / 2);
+    const spec = CATALOG_BY_TYPE[tile.type];
+    addTile(tile, p.x - spec.w / 2, p.y - spec.h / 2);
   };
 
   const capturePng = async () => {
@@ -496,7 +501,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
     }
   };
 
-  const filtered = CATALOG.filter((item) => !query || item.type.toLowerCase().includes(query.toLowerCase()));
+  const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(tile.labelKey)));
 
   return (
     <div
@@ -602,32 +607,34 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-52 shrink-0 flex-col border-r border-border">
+        <aside className="flex w-72 shrink-0 flex-col border-r border-border bg-background">
           <div className="border-b border-border p-2">
             <div className="mb-1 text-xs font-medium text-muted-foreground">{t("protoPalette")}</div>
             <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("protoSearch")} className="h-8" />
           </div>
           <div className="min-h-0 flex-1 overflow-auto p-2">
             {GROUPS.map((group) => {
-              const items = filtered.filter((item) => item.group === group.id);
+              const items = filtered.filter((tile) => tileGroup(tile) === group.id);
               if (!items.length) return null;
+              const open = query.trim() ? true : !collapsed[group.id];
               return (
                 <div key={group.id} className="mb-3">
-                  <div className="mb-1 text-xs text-muted-foreground">{t(group.label)}</div>
-                  <div className="flex flex-col gap-1">
-                    {items.map((item) => (
-                      <button
-                        key={item.type}
-                        type="button"
-                        draggable
-                        onDragStart={(event) => event.dataTransfer.setData("text/plain", item.type)}
-                        onClick={() => addAt(item.type, (doc.canvas.width - item.w) / 2, (doc.canvas.height - item.h) / 2)}
-                        className="rounded-md border border-border px-2 py-1.5 text-left text-sm hover:bg-state-hover"
-                      >
-                        {item.type}
-                      </button>
-                    ))}
-                  </div>
+                  <button
+                    type="button"
+                    className="mb-1 flex w-full items-center gap-1 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+                    aria-expanded={open}
+                    onClick={() => setCollapsed((was) => ({ ...was, [group.id]: !was[group.id] }))}
+                  >
+                    <Icon name="ChevronDown" className={cn("size-3 shrink-0 transition-transform", !open && "-rotate-90")} />
+                    {t(group.label)}
+                  </button>
+                  {open ? (
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
+                      {items.map((tile) => (
+                        <PaletteTileButton key={tile.id} tile={tile} onAdd={() => addTile(tile)} />
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
@@ -791,6 +798,36 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function PaletteTileButton({ tile, onAdd }: { tile: PaletteTile; onAdd: () => void }) {
+  const previewRef = useRef<HTMLDivElement>(null);
+  const el = previewElement(tile);
+  const boxW = 64;
+  const boxH = 44;
+  const scale = Math.min(boxW / el.w, boxH / el.h, 1);
+  return (
+    <button
+      type="button"
+      title={tile.type}
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.setData("text/plain", tile.id);
+        if (previewRef.current) event.dataTransfer.setDragImage(previewRef.current, boxW / 2, boxH / 2);
+      }}
+      onClick={onAdd}
+      className="flex cursor-grab flex-col overflow-hidden rounded-md border border-border bg-card text-left text-foreground hover:bg-state-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:cursor-grabbing"
+    >
+      <div ref={previewRef} className="flex h-11 items-center justify-center overflow-hidden bg-background">
+        <div className="relative" style={{ width: el.w * scale, height: el.h * scale }}>
+          <div className="pointer-events-none" style={{ width: el.w, height: el.h, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+            <ElementFace el={el} />
+          </div>
+        </div>
+      </div>
+      <span className="truncate border-t border-border px-1 py-1 text-[11px] leading-4 text-foreground">{t(tile.labelKey)}</span>
+    </button>
   );
 }
 
