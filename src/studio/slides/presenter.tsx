@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ElementFace } from "../prototype/elements";
 import type { SlidesDeck } from "./model";
 import { getActiveSlide } from "./model";
-import { t } from "../../shared/i18n";
+import { useT } from "../../shared/i18n";
 import { Button } from "@/components/ui/button";
 
 export function SlidesPresenter({
@@ -14,6 +14,7 @@ export function SlidesPresenter({
   startIndex: number;
   onClose: () => void;
 }) {
+  const t = useT();
   const [index, setIndex] = useState(startIndex);
   const slide = deck.slides[index] ?? deck.slides[0]!;
   const total = deck.slides.length;

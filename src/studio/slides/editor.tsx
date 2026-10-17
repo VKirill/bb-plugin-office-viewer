@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { rpcContract } from "../../../server";
-import { detectLocale, t } from "../../shared/i18n";
+import { studioLocale, useT } from "../../shared/i18n";
 import {
   applyThemeToDeck,
   cloneDeck,
@@ -33,9 +33,10 @@ type SendKind = "both" | "png" | "pptx";
 const MAX_HISTORY = 40;
 
 export function SlidesEditor({ threadId }: { threadId: string }) {
+  const t = useT();
   const rpc = useRpc<typeof rpcContract>();
   const composer = useComposer();
-  const locale = detectLocale();
+  const locale = studioLocale();
   const captureRef = useRef<(() => Promise<Blob>) | null>(null);
   const dragSlide = useRef<number | null>(null);
 
@@ -50,7 +51,7 @@ export function SlidesEditor({ threadId }: { threadId: string }) {
   const [layoutOpen, setLayoutOpen] = useState(false);
   const [savedNames, setSavedNames] = useState<string[]>([]);
   const [openedStem, setOpenedStem] = useState<string | null>(null);
-  const [saveName, setSaveName] = useState("Untitled");
+  const [saveName, setSaveName] = useState(() => t("protoUntitled"));
   const [sendMenu, setSendMenu] = useState(false);
 
   const commit = useCallback((next: SlidesDeck) => {

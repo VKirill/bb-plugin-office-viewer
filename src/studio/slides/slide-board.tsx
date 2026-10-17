@@ -41,7 +41,7 @@ import { alignElements, distributeElements, type AlignEdge, type DistributeAxis 
 import { ICON_DRAG_PREFIX, iconDisplayLabel } from "../prototype/icons";
 import { TEMPLATE_DRAG_PREFIX, insertTemplateElements } from "../prototype/templates";
 import type { Slide } from "./model";
-import { t } from "../../shared/i18n";
+import { useT } from "../../shared/i18n";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -60,6 +60,7 @@ export function SlideBoard({
   onChange: (slide: Slide) => void;
   captureRef?: React.MutableRefObject<(() => Promise<Blob>) | null>;
 }) {
+  const t = useT();
   const canvasPaneRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);

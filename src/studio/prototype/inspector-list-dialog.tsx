@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { t } from "../../shared/i18n";
+import { useT } from "../../shared/i18n";
 
 export function InspectorListDialog({
   open,
@@ -17,6 +17,7 @@ export function InspectorListDialog({
   onClose: () => void;
   onSave: (items: string[]) => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState(items.join("\n"));
 
   useEffect(() => {

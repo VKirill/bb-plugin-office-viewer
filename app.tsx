@@ -14,6 +14,7 @@ import { HTML_EXTENSIONS, HtmlOpener } from "./src/html/html";
 import { BrowserDevicesButton, SITE_PANEL, SitePanel } from "./src/html/site";
 import { STUDIO_ICON, STUDIO_PANEL, StudioPanel } from "./src/studio/studio-panel";
 import { StudioHeaderAction } from "./src/studio/header-action";
+import { StudioSettingsForm } from "./src/studio/settings-dialog";
 
 export default definePluginApp((app) => {
   app.slots.fileOpener({
@@ -57,6 +58,7 @@ export default definePluginApp((app) => {
   if (typeof app.slots.experimental_threadHeaderAction === "function") {
     app.slots.experimental_threadHeaderAction({ id: "studio", title: t("studio"), component: StudioHeaderAction });
   }
+  app.slots.settingsSection({ id: "office-studio", title: t("studioSettings"), component: StudioSettingsForm });
   // A button beside BB's Browser address bar (BB 0.46+); older hosts don't have the slot.
   const browser = app.slots as typeof app.slots & {
     experimental_browserToolbarAction?: (registration: { id: string; title: string; component: ComponentType<{ url: string }> }) => void;

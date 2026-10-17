@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
-import { t } from "../../shared/i18n";
+import { useT } from "../../shared/i18n";
 import { filterIcons, ICON_DRAG_PREFIX, iconDisplayLabel } from "./icons";
 import { getHugeiconsCatalogSnapshot, preloadHugeiconsCatalog, subscribeHugeiconsCatalog } from "./hugeicons-runtime";
 import { ProtoIcon } from "./proto-icon";
@@ -16,6 +16,7 @@ export function IconsLibraryPanel({
   onPick: (iconName: string) => void;
   className?: string;
 }) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportH, setViewportH] = useState(320);

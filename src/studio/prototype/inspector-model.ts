@@ -1,5 +1,5 @@
 // Inspector helpers: element.style, effects, lists, tables, radio groups.
-import type { I18nKey } from "../../shared/i18n";
+import type { I18nKey } from "../../shared/i18n.ts";
 import { checkRadio, type ItemKey } from "./editing.ts";
 import type { ElementStyle, ElementType, PropValue, WireframeElement } from "./model.ts";
 

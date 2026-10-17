@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { studioT } from "../../shared/i18n.ts";
 import {
   SNAP,
   type WireframeCanvas,
@@ -160,31 +161,31 @@ export function defaultTheme(): DeckTheme {
 export function nextSlideName(slides: readonly { name: string }[]): string {
   const used = new Set(slides.map((slide) => slide.name));
   let n = 1;
-  while (used.has(`Slide ${n}`)) n += 1;
-  return `Slide ${n}`;
+  while (used.has(studioT("slidesSlideN", { n }))) n += 1;
+  return studioT("slidesSlideN", { n });
 }
 
 export function newSlide(layout: SlideLayout, theme: DeckTheme, name?: string, elements: WireframeElement[] = []): Slide {
   return {
     id: newSlideId(),
-    name: name ?? "Slide 1",
+    name: name ?? studioT("slidesSlideN", { n: 1 }),
     layout,
     canvas: themeCanvas(theme),
     elements,
   };
 }
 
-export function newDeck(name = "Untitled"): SlidesDeck {
+export function newDeck(name?: string): SlidesDeck {
   const theme = defaultTheme();
-  const slide = newSlide("title", theme, "Slide 1");
+  const slide = newSlide("title", theme);
   slide.elements = [
-    headingElement("Title", 80, 252, 1120, 96, []),
-    textElement("Subtitle", 80, 364, 1120, 48, slide.elements),
+    headingElement(studioT("slidesDefTitle"), 80, 252, 1120, 96, []),
+    textElement(studioT("slidesDefSubtitle"), 80, 364, 1120, 48, slide.elements),
   ];
   return {
     format: SLIDES_FORMAT,
     version: SLIDES_VERSION,
-    name,
+    name: name ?? studioT("protoUntitled"),
     theme,
     slides: [slide],
     activeSlideId: slide.id,

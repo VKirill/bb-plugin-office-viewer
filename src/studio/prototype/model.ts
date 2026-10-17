@@ -1,5 +1,7 @@
 // Wireframe document: pages (v2), 8px snap, parse/create helpers.
 import { z } from "zod";
+import { studioT } from "../../shared/i18n.ts";
+import { localizeProps } from "../localize.ts";
 
 export const WIREFRAME_FORMAT = "bb-wireframe" as const;
 export const WIREFRAME_VERSION = 2;
@@ -345,8 +347,8 @@ export function nextLabel(type: ElementType, existing: readonly { label: string 
 export function nextPageName(pages: readonly { name: string }[]): string {
   const used = new Set(pages.map((page) => page.name));
   let n = 1;
-  while (used.has(`Page ${n}`)) n += 1;
-  return `Page ${n}`;
+  while (used.has(studioT("protoPageN", { n }))) n += 1;
+  return studioT("protoPageN", { n });
 }
 
 export function defaultElement(type: ElementType, x: number, y: number, existing: readonly WireframeElement[] = []): WireframeElement {
@@ -359,20 +361,20 @@ export function defaultElement(type: ElementType, x: number, y: number, existing
     y: snap(y),
     w: spec.w,
     h: spec.h,
-    props: structuredClone(spec.props),
+    props: localizeProps(structuredClone(spec.props)),
   };
 }
 
 export function newPage(name?: string, canvas: WireframeCanvas = { ...CANVAS_PRESETS.desktop, background: "#ffffff" }): WireframePage {
-  return { id: newPageId(), name: name ?? "Page 1", canvas, elements: [] };
+  return { id: newPageId(), name: name ?? studioT("protoPageN", { n: 1 }), canvas, elements: [] };
 }
 
-export function newWireframe(name = "Untitled"): Wireframe {
-  const page = newPage("Page 1");
+export function newWireframe(name?: string, canvas?: WireframeCanvas): Wireframe {
+  const page = newPage(undefined, canvas ?? { ...CANVAS_PRESETS.desktop, background: "#ffffff" });
   return {
     format: WIREFRAME_FORMAT,
     version: WIREFRAME_VERSION,
-    name,
+    name: name ?? studioT("protoUntitled"),
     pages: [page],
     activePageId: page.id,
   };

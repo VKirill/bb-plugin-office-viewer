@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
-import { t, type I18nKey } from "../../shared/i18n";
+import { useT, type I18nKey } from "../../shared/i18n";
 import type { AlignEdge, DistributeAxis } from "./align";
 import { IconInspector, readIconColor, readIconSize } from "./icon-inspector";
 import { InspectorColourPicker } from "./inspector-colour-picker";
@@ -70,6 +70,7 @@ export function InspectorStylePanel({
   applyAlign: (edge: AlignEdge) => void;
   applyDistribute: (axis: DistributeAxis) => void;
 }) {
+  const t = useT();
   const [lockAspect, setLockAspect] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     geometry: true,

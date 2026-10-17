@@ -1,10 +1,11 @@
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { Button } from "@/components/ui/button";
-import { t } from "../shared/i18n";
+import { useT } from "../shared/i18n";
 import { OfficeStudioMark } from "./logos";
 import { STUDIO_PANEL } from "./studio-panel";
 
 export function StudioHeaderAction({ threadId }: { threadId: string }) {
+  const t = useT();
   const navigate = useBbNavigate();
   return (
     <span title={t("studio")} className="shrink-0">

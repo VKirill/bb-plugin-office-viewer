@@ -6,7 +6,7 @@ import { ProtoIcon } from "./proto-icon";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { t } from "../../shared/i18n";
+import { useT } from "../../shared/i18n";
 import { readTable } from "./inspector-model";
 import type { PropValue, WireframeElement } from "./model";
 import { isFlowShape, shapePath } from "./shapes";
@@ -63,6 +63,7 @@ function markerBg(color: string): string {
 
 /** Looks like the real control; the canvas wrapper owns pointer events. */
 export function ElementFace({ el }: { el: WireframeElement }) {
+  const t = useT();
   const p = el.props;
   switch (el.type) {
     case "Header":

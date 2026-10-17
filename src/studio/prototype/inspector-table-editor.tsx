@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { t } from "../../shared/i18n";
+import { useT } from "../../shared/i18n";
 import {
   deleteTableColumn,
   deleteTableRow,
@@ -18,6 +18,7 @@ import {
 import type { WireframeElement } from "./model";
 
 export function InspectorTableEditor({ el, onChange }: { el: WireframeElement; onChange: (el: WireframeElement) => void }) {
+  const t = useT();
   const [model, setModel] = useState<TableModel>(() => readTable(el));
   const [focus, setFocus] = useState({ row: 0, col: 0 });
 
