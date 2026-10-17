@@ -43,6 +43,7 @@ export const PALETTE_TILES: readonly PaletteTile[] = [
   { id: "heading-2", type: "Heading", props: { level: 2 }, labelKey: "protoTileHeading2", pictogram: "heading-2" },
   { id: "heading-3", type: "Heading", props: { level: 3 }, labelKey: "protoTileHeading3", pictogram: "heading-3" },
   { id: "text", type: "Text", props: {}, labelKey: "protoTileText", pictogram: "text" },
+  { id: "button-outline", type: "Button", props: { variant: "outline", text: "Button" }, labelKey: "protoTileButtonOutline", pictogram: "button-outline" },
   { id: "button-primary", type: "Button", props: { variant: "default" }, labelKey: "protoTileButtonPrimary", pictogram: "button-primary" },
   { id: "button-link", type: "Button", props: { variant: "link", text: "Link" }, labelKey: "protoTileButtonLink", pictogram: "button-link" },
   { id: "image", type: "Image", props: {}, labelKey: "protoTileImage", pictogram: "image" },
@@ -91,6 +92,8 @@ export const PALETTE_TILES: readonly PaletteTile[] = [
 ];
 
 export const PALETTE_BY_ID: Record<string, PaletteTile> = Object.fromEntries(PALETTE_TILES.map((tile) => [tile.id, tile]));
+
+export { hasPictogram, PICTOGRAM_IDS, type PictogramId } from "./pictograms-ids.ts";
 
 export function tileGroup(tile: PaletteTile): PaletteGroup {
   return CATALOG_BY_TYPE[tile.type].group;

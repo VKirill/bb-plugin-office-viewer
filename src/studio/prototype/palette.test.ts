@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { CATALOG_BY_TYPE, ELEMENT_TYPES, getActivePage, newWireframe, parseWireframe } from "./model.ts";
-import { PALETTE_TILES, elementFromTile, tileGroup, tileMatchesQuery } from "./palette.ts";
+import { PALETTE_TILES, elementFromTile, hasPictogram, tileGroup, tileMatchesQuery } from "./palette.ts";
 
 test("every palette entry builds a valid element and parses", () => {
   const doc = newWireframe("Palette");
@@ -25,7 +27,23 @@ test("palette tiles use only existing types and cover every type", () => {
   for (const type of ELEMENT_TYPES) assert.ok(types.has(type), type);
 });
 
+test("every palette tile has a designed pictogram", () => {
+  for (const tile of PALETTE_TILES) {
+    assert.ok(hasPictogram(tile.pictogram), `${tile.id} -> ${tile.pictogram}`);
+  }
+});
+
+test("pictogram source bundle size", () => {
+  const path = fileURLToPath(new URL("./pictograms.tsx", import.meta.url));
+  const bytes = readFileSync(path, "utf8").length;
+  assert.ok(bytes > 2000, "pictograms.tsx unexpectedly small");
+  assert.ok(bytes < 80_000, `pictograms.tsx is ${bytes} bytes (budget 80kb)`);
+});
+
 test("variants create existing types with their props", () => {
+  const outline = elementFromTile(PALETTE_TILES.find((tile) => tile.id === "button-outline")!, 0, 0);
+  assert.equal(outline.type, "Button");
+  assert.equal(outline.props.variant, "outline");
   const primary = elementFromTile(PALETTE_TILES.find((tile) => tile.id === "button-primary")!, 0, 0);
   assert.equal(primary.type, "Button");
   assert.equal(primary.props.variant, "default");
