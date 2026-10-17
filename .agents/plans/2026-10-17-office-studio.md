@@ -38,7 +38,8 @@ graph LR
 - [x] `prototype-builder`: canvas, palette, badges, save/open/export/send
 - [x] `paint-canvas`: blank-canvas paint mode, save and send
 - [x] `prototype-inline-edit`, `prototype-palette-previews`, and `prototype-toolbar`: inline editing, visual palette tiles, and grouped icon controls
-- [ ] slides (phase 2), components/states (Axure masters, dynamic panels) v2
+- [x] Slides tool (deck editor, presenter, PPTX export, save and send)
+- [ ] components/states (Axure masters, dynamic panels) v2
 - [x] release 0.8.8
 - [x] release 0.8.9 (prototype palette, inline editing, and toolbar improvements)
 - [x] release 0.8.10 (Axure parity batch renumbered to stay within the installed `^0.8` range)
@@ -50,6 +51,7 @@ graph LR
 - `lprun_38203a8bf69c43f294a012b07bded797`: release 0.8.9 accepted; Slides and the Studio live check remain open.
 - `lprun_38203a8bf69c43f294a012b07bded797`: the Axure parity batch was accepted through release 0.9.0; Slides and the Studio live check remain open.
 - `lprun_38203a8bf69c43f294a012b07bded797`: release 0.8.10 accepted as the compatible version for the Axure parity batch; Slides and the Studio live check remain open.
+- `lprun_38203a8bf69c43f294a012b07bded797`: remaining accepted Axure parity tasks, Office Studio settings/i18n, Slides deck, and spreadsheet link-chip revert completed; only the Studio live check and v2 component/state work remain.
 
 ## Axure parity batch (2026-10-17, from axure-re/index.md)
 
