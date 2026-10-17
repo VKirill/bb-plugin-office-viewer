@@ -37,7 +37,9 @@ graph LR
 - [x] `studio-launcher`: header icon + panel tab «Office Studio» with tool cards
 - [x] `prototype-builder`: canvas, palette, badges, save/open/export/send
 - [x] `paint-canvas`: blank-canvas paint mode, save and send
+- [x] `studio-autosave-restore`, `studio-settings-i18n`: restore work across panel/chat reloads and apply language/default settings across tools
 - [x] `prototype-inline-edit`, `prototype-palette-previews`, and `prototype-toolbar`: inline editing, visual palette tiles, and grouped icon controls
+- [x] `prototype-align-icons`, `prototype-color-picker-fix`, `prototype-icons-fix`, `prototype-inspector-native`, `prototype-left-split`, `prototype-overlay-close`, `prototype-screen-size`, `prototype-style-apply-fix`, and `prototype-style-layout`: alignment, picker, icon loading, inspector, pane, sizing, and style fixes
 - [x] Slides tool (deck editor, presenter, PPTX export, save and send)
 - [ ] components/states (Axure masters, dynamic panels) v2
 - [x] release 0.8.8
@@ -52,7 +54,7 @@ graph LR
 - `lprun_38203a8bf69c43f294a012b07bded797`: release 0.8.9 accepted; Slides and the Studio live check remain open.
 - `lprun_38203a8bf69c43f294a012b07bded797`: the Axure parity batch was accepted through release 0.9.0; Slides and the Studio live check remain open.
 - `lprun_38203a8bf69c43f294a012b07bded797`: release 0.8.10 accepted as the compatible version for the Axure parity batch; Slides and the Studio live check remain open.
-- `lprun_38203a8bf69c43f294a012b07bded797`: remaining accepted Axure parity tasks, Office Studio settings/i18n, Slides deck, and spreadsheet link-chip revert completed; only the Studio live check and v2 component/state work remain.
+- `lprun_38203a8bf69c43f294a012b07bded797`: remaining accepted Axure parity tasks, autosave/restore, settings/i18n, Slides deck, and spreadsheet link-chip revert completed, including alignment icons, colour picker, icon loading, native inspector, pane and screen-size fixes, and style application/layout; releases 0.8.6–0.8.11 are accepted. Only the Studio live check and v2 component/state work remain.
 
 ## Axure parity batch (2026-10-17, from axure-re/index.md)
 
