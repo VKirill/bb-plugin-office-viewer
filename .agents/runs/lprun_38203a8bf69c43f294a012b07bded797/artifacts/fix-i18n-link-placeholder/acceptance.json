@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "task_id": "fix-i18n-link-placeholder",
+  "task_sha256": "2b4828a343ac695e136c0c17c0e2ba8d789e3d60a89c2b608d1b5717b49847fc",
+  "attempt": 1,
+  "provider_exit": 0,
+  "report": "complete",
+  "report_sha256": "e9177eade353ade6d7990e6640fd71307f7f3f8a15ef8cd53c8719affbfff59c",
+  "owns_check": "passed",
+  "verification": "passed",
+  "review": "not_required",
+  "accepted": true,
+  "accepted_at": "2026-10-17T22:06:35.688Z",
+  "model": "composer-2.5"
+}

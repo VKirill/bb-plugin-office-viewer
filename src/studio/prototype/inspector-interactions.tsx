@@ -181,7 +181,7 @@ function ActionEditor({
       ) : null}
       {action.type === "openLink" ? (
         <>
-          <Input className="h-8 text-xs" value={action.url ?? ""} placeholder="https://" onChange={(event) => onChange({ ...action, url: event.target.value })} />
+          <Input className="h-8 text-xs" value={action.url ?? ""} placeholder={t("protoIxLinkUrlPlaceholder")} onChange={(event) => onChange({ ...action, url: event.target.value })} />
           <select
             className="h-8 rounded-md border border-input bg-background px-2 text-xs"
             value={action.target ?? "_blank"}
