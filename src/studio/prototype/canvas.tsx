@@ -2,9 +2,10 @@ import type { DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEv
 import { applyInlineDraft, type InlineEdit } from "./editing";
 import { ElementFace } from "./elements";
 import { HANDLE_CLASS, HANDLES, editOverlayBox } from "./builder-geometry";
+import type { CanvasRect, DistanceLine, SnapGuide } from "./canvas-math";
 import { cn } from "@/lib/utils";
 import { t } from "../../shared/i18n";
-import { SNAP, type WireframeCanvas, type WireframeElement, type WireframePage } from "./model";
+import { type WireframeCanvas, type WireframeElement, type WireframePage } from "./model";
 
 export function PrototypeCanvas({
   canvasPaneRef,
@@ -23,10 +24,22 @@ export function PrototypeCanvas({
   edit,
   editInputRef,
   selectionBand,
+  showSnapGrid,
+  gridSize,
+  marquee,
+  snapGuides,
+  distanceLines,
+  moveTooltip,
+  panning,
+  insertMode,
+  onPanePointerDown,
+  onPanePointerMove,
+  onPanePointerUp,
   onBoardPointerDown,
   onBoardPointerMove,
   onBoardPointerUp,
   onBoardDoubleClick,
+  onBoardContextMenu,
   onDrop,
   onEditChange,
   onInlineKeyDown,
@@ -50,10 +63,22 @@ export function PrototypeCanvas({
   edit: InlineEdit | null;
   editInputRef: RefObject<HTMLInputElement | null>;
   selectionBand: { left: number; top: number; right: number; bottom: number } | null;
+  showSnapGrid: boolean;
+  gridSize: number;
+  marquee: CanvasRect | null;
+  snapGuides: SnapGuide[];
+  distanceLines: DistanceLine[];
+  moveTooltip: { x: number; y: number; w: number; h: number } | null;
+  panning: boolean;
+  insertMode: boolean;
+  onPanePointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPanePointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPanePointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onBoardPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onBoardPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onBoardPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onBoardDoubleClick: (event: ReactMouseEvent<HTMLDivElement>) => void;
+  onBoardContextMenu: (event: ReactMouseEvent<HTMLDivElement>) => void;
   onDrop: (event: DragEvent<HTMLDivElement>) => void;
   onEditChange: (draft: string) => void;
   onInlineKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
@@ -91,7 +116,15 @@ export function PrototypeCanvas({
           </button>
         ))}
       </div>
-      <div ref={canvasPaneRef} className="min-h-0 flex-1 overflow-auto bg-muted/40 p-4" onClick={onPaneClick}>
+      <div
+        ref={canvasPaneRef}
+        className={cn("min-h-0 flex-1 overflow-auto bg-muted/40 p-4", panning && "cursor-grabbing")}
+        onClick={onPaneClick}
+        onPointerDown={onPanePointerDown}
+        onPointerMove={onPanePointerMove}
+        onPointerUp={onPanePointerUp}
+        onPointerCancel={onPanePointerUp}
+      >
         <div className="inline-flex min-h-full min-w-full flex-col items-start">
           <div className="flex">
             <div className="size-5 shrink-0" />
@@ -118,26 +151,66 @@ export function PrototypeCanvas({
                 ref={boardRef}
                 role="application"
                 aria-label={t("protoCanvas")}
-                className="relative shrink-0 shadow-sm"
+                className={cn("relative shrink-0 shadow-sm", insertMode && "cursor-crosshair")}
                 style={{ width: canvas.width, height: canvas.height, background: canvas.background, transform: `scale(${zoom})`, transformOrigin: "top left" }}
                 onPointerDown={onBoardPointerDown}
                 onPointerMove={onBoardPointerMove}
                 onPointerUp={onBoardPointerUp}
                 onPointerCancel={onBoardPointerUp}
                 onDoubleClick={onBoardDoubleClick}
+                onContextMenu={onBoardContextMenu}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={onDrop}
               >
-                <div
-                  data-proto-skip
-                  className="pointer-events-none absolute inset-0"
-                  style={{
-                    backgroundImage: "linear-gradient(to right, color-mix(in oklab, var(--border) 35%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklab, var(--border) 35%, transparent) 1px, transparent 1px)",
-                    backgroundSize: `${SNAP}px ${SNAP}px`,
-                  }}
-                />
+                {showSnapGrid ? (
+                  <div
+                    data-proto-skip
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                      backgroundImage: "linear-gradient(to right, color-mix(in oklab, var(--border) 35%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklab, var(--border) 35%, transparent) 1px, transparent 1px)",
+                      backgroundSize: `${gridSize}px ${gridSize}px`,
+                    }}
+                  />
+                ) : null}
                 {elements.length === 0 ? (
                   <div data-proto-skip className="pointer-events-none absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">{t("protoEmptyCanvas")}</div>
+                ) : null}
+                {snapGuides.map((guide, index) =>
+                  guide.axis === "x" ? (
+                    <div
+                      key={`g-${index}`}
+                      data-proto-skip
+                      className="pointer-events-none absolute bg-pink-500"
+                      style={{ left: guide.at, top: guide.from, width: 1, height: guide.to - guide.from }}
+                    />
+                  ) : (
+                    <div
+                      key={`g-${index}`}
+                      data-proto-skip
+                      className="pointer-events-none absolute bg-pink-500"
+                      style={{ left: guide.from, top: guide.at, width: guide.to - guide.from, height: 1 }}
+                    />
+                  ),
+                )}
+                {distanceLines.map((line, index) =>
+                  line.axis === "x" ? (
+                    <div key={`d-${index}`} data-proto-skip className="pointer-events-none absolute">
+                      <div className="absolute bg-sky-500" style={{ left: line.from, top: line.at, width: line.to - line.from, height: 1 }} />
+                      <span className="absolute -translate-x-1/2 text-[9px] text-sky-700" style={{ left: line.at, top: line.at - 12 }}>{Math.round(line.gap)}</span>
+                    </div>
+                  ) : (
+                    <div key={`d-${index}`} data-proto-skip className="pointer-events-none absolute">
+                      <div className="absolute bg-sky-500" style={{ left: line.at, top: line.from, width: 1, height: line.to - line.from }} />
+                      <span className="absolute -translate-y-1/2 text-[9px] text-sky-700" style={{ left: line.at + 4, top: line.at }}>{Math.round(line.gap)}</span>
+                    </div>
+                  ),
+                )}
+                {marquee ? (
+                  <div
+                    data-proto-skip
+                    className="pointer-events-none absolute border border-primary bg-primary/10"
+                    style={{ left: marquee.left, top: marquee.top, width: marquee.right - marquee.left, height: marquee.bottom - marquee.top }}
+                  />
                 ) : null}
                 {elements.filter((el) => !el.hidden).map((el) => {
                   const active = selected.includes(el.id);
@@ -186,6 +259,15 @@ export function PrototypeCanvas({
                     </div>
                   );
                 })}
+                {moveTooltip ? (
+                  <div
+                    data-proto-skip
+                    className="pointer-events-none absolute z-30 rounded bg-foreground px-1.5 py-0.5 text-[10px] text-background"
+                    style={{ left: moveTooltip.x, top: Math.max(0, moveTooltip.y - 20) }}
+                  >
+                    {Math.round(moveTooltip.x)}, {Math.round(moveTooltip.y)} · {Math.round(moveTooltip.w)}×{Math.round(moveTooltip.h)}
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
