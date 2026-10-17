@@ -1,4 +1,4 @@
-import { useRef, useState, type DragEvent } from "react";
+import { useMemo, useRef, useState, type DragEvent } from "react";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -8,7 +8,11 @@ import { PALETTE_GROUPS } from "./inspector-fields";
 import { tileGroup, tileMatchesQuery, type PaletteTile } from "./palette";
 import { Pictogram } from "./pictograms";
 import { PrototypeOverlayCloseButton } from "./shell";
+import { TemplateTileButton } from "./template-tile";
+import { FORM_TEMPLATES, INTERFACE_TEMPLATES, filterTemplates } from "./templates";
 import type { PaletteGroup, WireframeElement, WireframePage } from "./model";
+
+export type PaletteLibraryView = "elements" | "templates" | "icons";
 
 export type LeftTopTab = "pages" | "outline";
 
@@ -38,6 +42,7 @@ export function PrototypeLeftPane({
   setCollapsed,
   filteredTiles,
   onAddTile,
+  onAddTemplate,
   onAddIcon,
 }: {
   topTab: LeftTopTab;
@@ -57,14 +62,15 @@ export function PrototypeLeftPane({
   onToggleLocked: (id: string) => void;
   onReorderElements: (from: number, to: number) => void;
   onRenameElement: (id: string, label: string) => void;
-  paletteView: "elements" | "icons";
-  setPaletteView: (view: "elements" | "icons") => void;
+  paletteView: PaletteLibraryView;
+  setPaletteView: (view: PaletteLibraryView) => void;
   query: string;
   setQuery: (value: string) => void;
   collapsed: Partial<Record<PaletteGroup, boolean>>;
   setCollapsed: (fn: (was: Partial<Record<PaletteGroup, boolean>>) => Partial<Record<PaletteGroup, boolean>>) => void;
   filteredTiles: readonly PaletteTile[];
   onAddTile: (tile: PaletteTile) => void;
+  onAddTemplate: (templateId: string) => void;
   onAddIcon: (name: string) => void;
 }) {
   const [pageEdit, setPageEdit] = useState<string | null>(null);
@@ -75,6 +81,14 @@ export function PrototypeLeftPane({
   const dragEl = useRef<number | null>(null);
 
   const outline = [...elements].reverse();
+  const filteredFormTemplates = useMemo(
+    () => filterTemplates(FORM_TEMPLATES, query, (template) => t(template.labelKey)),
+    [query],
+  );
+  const filteredInterfaceTemplates = useMemo(
+    () => filterTemplates(INTERFACE_TEMPLATES, query, (template) => t(template.labelKey)),
+    [query],
+  );
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-background">
@@ -176,13 +190,34 @@ export function PrototypeLeftPane({
         <div className="border-b border-border px-2 py-1 text-xs font-medium text-muted-foreground">{t("protoLibraries")}</div>
         <div className="border-b border-border p-2">
           <div className="mb-2 flex gap-1 rounded-md border border-border p-0.5">
-            <button type="button" className={cn("flex-1 rounded px-2 py-1 text-xs font-medium", paletteView === "elements" ? "bg-muted" : "text-muted-foreground")} onClick={() => setPaletteView("elements")}>{t("protoPalette")}</button>
-            <button type="button" className={cn("flex-1 rounded px-2 py-1 text-xs font-medium", paletteView === "icons" ? "bg-muted" : "text-muted-foreground")} onClick={() => setPaletteView("icons")}>{t("protoPaletteIcons")}</button>
+            <button type="button" className={cn("flex-1 rounded px-1 py-1 text-[11px] font-medium", paletteView === "elements" ? "bg-muted" : "text-muted-foreground")} onClick={() => setPaletteView("elements")}>{t("protoPalette")}</button>
+            <button type="button" className={cn("flex-1 rounded px-1 py-1 text-[11px] font-medium", paletteView === "templates" ? "bg-muted" : "text-muted-foreground")} onClick={() => setPaletteView("templates")}>{t("protoPaletteTemplates")}</button>
+            <button type="button" className={cn("flex-1 rounded px-1 py-1 text-[11px] font-medium", paletteView === "icons" ? "bg-muted" : "text-muted-foreground")} onClick={() => setPaletteView("icons")}>{t("protoPaletteIcons")}</button>
           </div>
           {paletteView === "elements" ? <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("protoSearch")} className="h-8" /> : null}
+          {paletteView === "templates" ? <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("protoSearchTemplates")} className="h-8" /> : null}
         </div>
         {paletteView === "icons" ? (
           <IconsLibraryPanel onPick={onAddIcon} />
+        ) : paletteView === "templates" ? (
+          <div className="min-h-0 flex-1 overflow-auto p-2">
+            <div className="mb-3">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">{t("protoTemplateGroupForms")}</div>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1">
+                {filteredFormTemplates.map((template) => (
+                  <TemplateTileButton key={template.id} template={template} label={t(template.labelKey)} onAdd={() => onAddTemplate(template.id)} />
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="mb-1 text-xs font-medium text-muted-foreground">{t("protoTemplateGroupInterface")}</div>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1">
+                {filteredInterfaceTemplates.map((template) => (
+                  <TemplateTileButton key={template.id} template={template} label={t(template.labelKey)} onAdd={() => onAddTemplate(template.id)} />
+                ))}
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-auto p-2">
             {PALETTE_GROUPS.map((group) => {

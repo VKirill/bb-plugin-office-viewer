@@ -28,7 +28,7 @@ import {
 } from "./model";
 import { PrototypeShell, PrototypeStyleBar } from "./shell";
 import { PrototypeToolbar, type ToolbarMenu } from "./toolbar";
-import { PrototypeLeftPane, type LeftTopTab } from "./left-pane";
+import { PrototypeLeftPane, type LeftTopTab, type PaletteLibraryView } from "./left-pane";
 import { PrototypeCanvas } from "./canvas";
 import { PrototypeInspector, type InspectorTab } from "./inspector";
 import { assignRadioGroup, createRadioGroup, setRadioChecked } from "./inspector-model";
@@ -51,6 +51,7 @@ import {
 } from "./editing";
 import { alignElements, distributeElements, type AlignEdge, type DistributeAxis } from "./align";
 import { ICON_DRAG_PREFIX, iconDisplayLabel } from "./icons";
+import { TEMPLATE_DRAG_PREFIX, insertTemplateElements } from "./templates";
 import {
   arrowNudge,
   CANVAS_TOOL_KEYS,
@@ -134,7 +135,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [openTabIds, setOpenTabIds] = useState<string[]>(() => [getActivePage(doc).id]);
   const shellRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
-const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements");
+const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   const [collapsed, setCollapsed] = useState<Partial<Record<PaletteGroup, boolean>>>({ flow: true });
   const [busy, setBusy] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
@@ -216,6 +217,17 @@ const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements")
     );
     replace([...pageElements(doc), el]);
     setSelected([el.id]);
+  };
+
+  const addTemplate = (templateId: string, x?: number, y?: number) => {
+    const canvas = pageCanvas(doc);
+    const centerX = x ?? canvas.width / 2;
+    const centerY = y ?? canvas.height / 2;
+    const built = insertTemplateElements(templateId, centerX, centerY, pageElements(doc));
+    if (!built?.length) return;
+    const placed = built.map((el) => placeOnCanvas(el, canvas));
+    replace([...pageElements(doc), ...placed]);
+    setSelected(placed.map((el) => el.id));
   };
 
   const addIconFromLibrary = (iconName: string, x?: number, y?: number) => {
@@ -547,6 +559,12 @@ const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements")
       const iconName = raw.slice(ICON_DRAG_PREFIX.length);
       if (!iconName) return;
       addIconFromLibrary(iconName, p.x - 12, p.y - 12);
+      return;
+    }
+    if (raw.startsWith(TEMPLATE_DRAG_PREFIX)) {
+      const templateId = raw.slice(TEMPLATE_DRAG_PREFIX.length);
+      if (!templateId) return;
+      addTemplate(templateId, p.x, p.y);
       return;
     }
     const tile = PALETTE_BY_ID[raw];
@@ -1053,6 +1071,7 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             setCollapsed={setCollapsed}
             filteredTiles={filtered}
             onAddTile={(tile) => addTile(tile)}
+            onAddTemplate={(templateId) => addTemplate(templateId)}
             onAddIcon={(name) => addIconFromLibrary(name)}
           />
         }
