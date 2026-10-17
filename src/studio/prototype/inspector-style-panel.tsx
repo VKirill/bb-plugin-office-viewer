@@ -10,6 +10,7 @@ import type { AlignEdge, DistributeAxis } from "./align";
 import { InspectorAlignRow } from "./align-ui";
 import { IconInspector, readIconColor, readIconSize } from "./icon-inspector";
 import { InspectorColourPicker } from "./inspector-colour-picker";
+import { PROTOTYPE_STYLE_COLOUR_FALLBACK } from "./inspector-colour";
 import {
   STYLE_EFFECTS,
   mixedStyleValue,
@@ -60,10 +61,12 @@ export function InspectorStylePanel({
   onCanvas,
   applyAlign,
   applyDistribute,
+  documentColours,
 }: {
   inspect: WireframeElement | null;
   selection: WireframeElement[];
   canvas: WireframeCanvas;
+  documentColours: string[];
   multi: boolean;
   styleTarget: StyleTarget;
   setStyleTarget: (target: StyleTarget) => void;
@@ -93,7 +96,13 @@ export function InspectorStylePanel({
     return (
       <div className="space-y-3">
         <div className="text-xs text-muted-foreground">{t("protoNoSelection")}</div>
-        <InspectorColourPicker label={t("protoBackground")} value={canvas.background} onChange={(value) => onCanvas({ background: value })} />
+        <InspectorColourPicker
+          label={t("protoBackground")}
+          value={canvas.background}
+          fallback={PROTOTYPE_STYLE_COLOUR_FALLBACK.canvas}
+          documentColours={documentColours}
+          onChange={(value) => onCanvas({ background: value })}
+        />
       </div>
     );
   }
@@ -316,7 +325,9 @@ export function InspectorStylePanel({
         <InspectorColourPicker
           label={t("protoPropColor")}
           value={typeof mixedStyleValue(selection, styleTarget, "color") === "string" ? (mixedStyleValue(selection, styleTarget, "color") as string) : undefined}
+          fallback={PROTOTYPE_STYLE_COLOUR_FALLBACK.text}
           mixed={mixedStyleValue(selection, styleTarget, "color") === "mixed"}
+          documentColours={documentColours}
           onChange={(value) => applyStyleField("color", value)}
         />
       </CollapseSection>
@@ -325,7 +336,9 @@ export function InspectorStylePanel({
         <InspectorColourPicker
           label={t("protoPropFill")}
           value={typeof mixedStyleValue(selection, styleTarget, "fill") === "string" ? (mixedStyleValue(selection, styleTarget, "fill") as string) : undefined}
+          fallback={PROTOTYPE_STYLE_COLOUR_FALLBACK.fill}
           mixed={mixedStyleValue(selection, styleTarget, "fill") === "mixed"}
+          documentColours={documentColours}
           onChange={(value) => applyStyleField("fill", value)}
         />
       </CollapseSection>
@@ -334,7 +347,9 @@ export function InspectorStylePanel({
         <InspectorColourPicker
           label={t("protoPropStroke")}
           value={typeof mixedStyleValue(selection, styleTarget, "stroke") === "string" ? (mixedStyleValue(selection, styleTarget, "stroke") as string) : undefined}
+          fallback={PROTOTYPE_STYLE_COLOUR_FALLBACK.stroke}
           mixed={mixedStyleValue(selection, styleTarget, "stroke") === "mixed"}
+          documentColours={documentColours}
           onChange={(value) => applyStyleField("stroke", value)}
         />
         <ScrubField
