@@ -1,19 +1,10 @@
-import { t } from "../shared/i18n";
 import { PrototypeBuilder } from "./prototype/builder";
-
-function Placeholder({ label, threadId }: { label: string; threadId: string }) {
-  return (
-    <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-muted-foreground" data-thread-id={threadId}>
-      {label}
-    </div>
-  );
-}
+import { PaintCanvas } from "./paint/paint";
 
 export function PrototypeTool({ threadId }: { threadId: string }) {
   return <PrototypeBuilder threadId={threadId} />;
 }
 
-/** Later tasks replace this with the paint canvas. */
 export function PaintTool({ threadId }: { threadId: string }) {
-  return <Placeholder label={t("studioPaint")} threadId={threadId} />;
+  return <PaintCanvas threadId={threadId} />;
 }
