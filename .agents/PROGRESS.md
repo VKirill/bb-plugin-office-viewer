@@ -3,19 +3,21 @@
 - View Word, PowerPoint, and PDF documents with their supported search, navigation, zoom, and chat quoting controls.
 - View images, video, and audio; annotate and save images, capture video frames, and browse image siblings.
 - Open HTML pages and websites on devices, including WebP page snapshots.
+- Open Office Studio from the thread header to build and save UI prototypes or paint drawings, then send their files or screenshots to chat; Slides is marked as coming soon.
 
 ## Blocked
 - Marketplace PR #583 awaits the maintainer's `v1-change` label.
 
 ## Next
 - Follow up on marketplace PR #583 when the maintainer label is available.
+- Build the remaining Office Studio Slides tool and complete its release/live check.
 
 ## Last verify
-- command: Lane Pilot accepted `release-0.8.6`, `sheet-link-chips`, `sheet-link-chips-fix`, and `sheet-link-chips-revert` in `lprun_38203a8bf69c43f294a012b07bded797`.
-- result: green (final spreadsheet links restored; version 0.8.7)
+- command: Lane Pilot accepted the spreadsheet link-chip/revert and Office Studio tasks in `lprun_38203a8bf69c43f294a012b07bded797`.
+- result: green (spreadsheet links restored; version 0.8.7; Studio launcher, prototype builder, and Paint delivered)
 - when: 2026-10-17
 
 ## Pointers
 - Open todos: none (`.agents/todos/INDEX.md` does not exist).
-- Active plans: none.
+- Active plans: [Office Studio](plans/2026-10-17-office-studio.md) (in progress); [chat link chips in BB core](plans/2026-10-17-chat-link-chips-core.md) (planned).
 - [Changelog](CHANGELOG.md) — project memory updates.
