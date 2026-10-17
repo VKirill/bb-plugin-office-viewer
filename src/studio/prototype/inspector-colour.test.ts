@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import { formatHex, hexToHsl, hslToHex, normalizeColourInput, parseColour } from "./inspector-colour.ts";
+import { describe, it, test } from "node:test";
+import {
+  collectDocumentColours,
+  colourIsNone,
+  formatHex,
+  hexToHsl,
+  hslToHex,
+  normalizeColourInput,
+  parseColour,
+  parseRgbChannels,
+  resolvePickerColour,
+} from "./inspector-colour.ts";
+import { defaultElement } from "./model.ts";
 
 describe("parseColour", () => {
   it("parses short and long hex", () => {
@@ -29,4 +40,25 @@ describe("normalizeColourInput", () => {
     assert.equal(normalizeColourInput("#ffffff"), "#FFFFFF");
     assert.equal(formatHex({ r: 0, g: 0, b: 0, a: 0.5 }, true).length, 9);
   });
+});
+
+test("resolvePickerColour uses fallback when unset", () => {
+  const rgba = resolvePickerColour(undefined, "#336699");
+  assert.equal(rgba.b, 153);
+  assert.equal(colourIsNone("transparent"), true);
+  assert.equal(colourIsNone(undefined), false);
+});
+
+test("parseRgbChannels round-trips", () => {
+  const rgba = parseRgbChannels("10, 20, 30", 1);
+  assert.deepEqual(rgba, { r: 10, g: 20, b: 30, a: 1 });
+});
+
+test("collectDocumentColours gathers canvas and element styles", () => {
+  const el = defaultElement("Box", 0, 0);
+  const styled = { ...el, style: { base: { fill: "#ff0000", stroke: "#00ff00" } } };
+  const colours = collectDocumentColours({ width: 100, height: 100, background: "#ffffff" }, [styled]);
+  assert.ok(colours.includes("#FFFFFF"));
+  assert.ok(colours.includes("#FF0000"));
+  assert.ok(colours.includes("#00FF00"));
 });

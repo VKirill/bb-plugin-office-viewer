@@ -1,4 +1,19 @@
+import type { WireframeCanvas, WireframeElement } from "./model.ts";
+
 export type Rgba = { r: number; g: number; b: number; a: number };
+
+export const CHECKERBOARD_BG =
+  "repeating-conic-gradient(#e2e8f0 0% 25%, #ffffff 0% 50%) 50% / 10px 10px";
+
+export const HUE_SLIDER_BG =
+  "linear-gradient(to right, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%)";
+
+export const PROTOTYPE_STYLE_COLOUR_FALLBACK = {
+  text: "#000000",
+  fill: "#ffffff",
+  stroke: "#333333",
+  canvas: "#ffffff",
+} as const;
 
 export const INSPECTOR_COLOUR_PRESETS = [
   "#000000",
@@ -130,4 +145,52 @@ export function normalizeColourInput(value: string): string {
   const parsed = parseColour(value);
   if (!parsed) return value;
   return rgbaToCss(parsed);
+}
+
+export function colourIsNone(value: string | undefined): boolean {
+  if (!value) return false;
+  if (value.trim() === "transparent") return true;
+  const parsed = parseColour(value);
+  return parsed !== null && parsed.a <= 0;
+}
+
+/** Value shown in the field: explicit colour, else fallback (not written until the user edits). */
+export function resolvePickerColour(value: string | undefined, fallback: string): Rgba {
+  const source = value === undefined || value === "" ? fallback : value;
+  return parseColour(source) ?? parseColour(fallback) ?? { r: 0, g: 0, b: 0, a: 1 };
+}
+
+export function formatRgbChannels(rgba: Rgba): string {
+  return `${clampChannel(rgba.r)}, ${clampChannel(rgba.g)}, ${clampChannel(rgba.b)}`;
+}
+
+export function parseRgbChannels(input: string, alpha = 1): Rgba | null {
+  const parts = input.split(",").map((part) => part.trim());
+  if (parts.length !== 3) return null;
+  const r = Number(parts[0]);
+  const g = Number(parts[1]);
+  const b = Number(parts[2]);
+  if (![r, g, b].every((n) => Number.isFinite(n))) return null;
+  return { r: clampChannel(r), g: clampChannel(g), b: clampChannel(b), a: clampAlpha(alpha) };
+}
+
+export function withAlpha(rgba: Rgba, alpha: number): string {
+  return rgbaToCss({ ...rgba, a: clampAlpha(alpha) });
+}
+
+export function collectDocumentColours(canvas: WireframeCanvas, elements: readonly WireframeElement[]): string[] {
+  const seen = new Set<string>();
+  const add = (raw?: string) => {
+    if (!raw) return;
+    const parsed = parseColour(raw);
+    if (!parsed || parsed.a <= 0) return;
+    seen.add(formatHex(parsed, parsed.a < 1));
+  };
+  add(canvas.background);
+  for (const el of elements) {
+    add(el.style?.base?.fill);
+    add(el.style?.base?.color);
+    add(el.style?.base?.stroke);
+  }
+  return [...seen].slice(0, 14);
 }

@@ -19,6 +19,7 @@ import { InspectorStylePanel } from "./inspector-style-panel";
 import type { AlignEdge, DistributeAxis } from "./align";
 import { InspectorTableEditor } from "./inspector-table-editor";
 import { PrototypeOverlayCloseButton } from "./shell";
+import { collectDocumentColours } from "./inspector-colour";
 import { SNAP, snap, type PropValue, type WireframeCanvas, type WireframeElement } from "./model";
 
 export type InspectorTab = "style" | "properties" | "notes";
@@ -70,6 +71,7 @@ export function PrototypeInspector({
   const listKey = inspect ? listPropKey(inspect.type) : null;
   const listItems = inspect && listKey ? readStringList(inspect, listKey) : [];
   const groups = useMemo(() => radioGroupOptions(elements), [elements]);
+  const documentColours = useMemo(() => collectDocumentColours(canvas, elements), [canvas, elements]);
   const multi = selection.length > 1;
 
   const applyStyleField = (key: keyof StylePatch, value: PropValue | undefined) => {
@@ -129,6 +131,7 @@ export function PrototypeInspector({
             inspect={inspect}
             selection={selection}
             canvas={canvas}
+            documentColours={documentColours}
             multi={multi}
             styleTarget={styleTarget}
             setStyleTarget={setStyleTarget}
