@@ -24,6 +24,7 @@ import {
 import { InspectorTableEditor } from "./inspector-table-editor";
 import { iconDisplayLabel } from "./icons";
 import { ElementFace } from "./elements";
+import { PrototypeOverlayCloseButton } from "./shell";
 import { SNAP, snap, type PropValue, type WireframeCanvas, type WireframeElement } from "./model";
 
 export type InspectorTab = "style" | "properties" | "notes";
@@ -100,17 +101,20 @@ export function PrototypeInspector({
 
   return (
     <aside className="flex h-full min-h-0 w-full flex-col border-l border-border bg-background">
-      <div className="flex gap-1 border-b border-border p-2">
-        {(["style", "properties", "notes"] as InspectorTab[]).map((id) => (
-          <button
-            key={id}
-            type="button"
-            className={cn("flex-1 rounded px-2 py-1 text-xs font-medium", tab === id ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
-            onClick={() => setTab(id)}
-          >
-            {t(id === "style" ? "protoTabStyle" : id === "properties" ? "protoTabProperties" : "protoTabNotes")}
-          </button>
-        ))}
+      <div className="flex items-center gap-1 border-b border-border p-2">
+        <div className="flex min-w-0 flex-1 gap-1">
+          {(["style", "properties", "notes"] as InspectorTab[]).map((id) => (
+            <button
+              key={id}
+              type="button"
+              className={cn("min-w-0 flex-1 rounded px-2 py-1 text-xs font-medium", tab === id ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
+              onClick={() => setTab(id)}
+            >
+              {t(id === "style" ? "protoTabStyle" : id === "properties" ? "protoTabProperties" : "protoTabNotes")}
+            </button>
+          ))}
+        </div>
+        <PrototypeOverlayCloseButton />
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-3 text-sm">
         {tab === "notes" ? (
