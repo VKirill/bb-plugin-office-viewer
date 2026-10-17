@@ -1,5 +1,5 @@
 ## Now
-- Open and edit `.xlsx`, `.xlsm`, `.csv`, and `.tsv` spreadsheets with formula support, search, range quoting, and URL link chips.
+- Open and edit `.xlsx`, `.xlsm`, `.csv`, and `.tsv` spreadsheets with formula support, search, range quoting, and URL link chips with brand icons and friendly hyperlink names.
 - View Word, PowerPoint, and PDF documents with their supported search, navigation, zoom, and chat quoting controls.
 - View images, video, and audio; annotate and save images, capture video frames, and browse image siblings.
 - Open HTML pages and websites on devices, including WebP page snapshots.
