@@ -23,6 +23,7 @@ const STATIC_IDS = [
   "button-link",
   "image",
   "dynamic-panel",
+  "instance",
   "repeater-table",
   "repeater-cards",
   "hotspot",

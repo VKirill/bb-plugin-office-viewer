@@ -128,6 +128,24 @@ import {
   type EditScope,
 } from "./containers";
 import { ContainerScopeBar, PanelScopeBar } from "./panel-scope-bar";
+import {
+  applyComponentFromSelection,
+  boardElementsForComponent,
+  clearOverride,
+  collectSelectionForComponent,
+  COMPONENT_DRAG_PREFIX,
+  countInstances,
+  createInstanceFromComponent,
+  detachInstance as detachInstanceElements,
+  filterComponents,
+  findComponent,
+  instanceComponentId,
+  purgeComponent,
+  resetOverrides,
+  setOverride,
+  syncInstanceDimensions,
+  updateComponentElements,
+} from "./components";
 
 const MAX_HISTORY = 60;
 
@@ -205,6 +223,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [quickInsertOpen, setQuickInsertOpen] = useState(false);
   const [quickQuery, setQuickQuery] = useState("");
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; target: MenuTarget } | null>(null);
+  const [deleteComponentId, setDeleteComponentId] = useState<string | null>(null);
   const [renameElementId, setRenameElementId] = useState<string | null>(null);
   const [renamePageId, setRenamePageId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -286,7 +305,21 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   const undo = () => setTimeline((s) => ({ ...s, index: Math.max(0, s.index - 1) }));
   const redo = () => setTimeline((s) => ({ ...s, index: Math.min(s.history.length - 1, s.index + 1) }));
 
-  const replace = (elements: WireframeElement[]) => commit(patchElements(doc, elements));
+  const withBoardElements = (elements: WireframeElement[]) => {
+    if (editScope.kind === "component") {
+      return syncInstanceDimensions(updateComponentElements(doc, editScope.componentId, elements));
+    }
+    return patchElements(doc, elements);
+  };
+
+  const replace = (elements: WireframeElement[]) => commit(withBoardElements(elements));
+
+  const boardElementsFor = (source: Wireframe) => {
+    if (editScope.kind === "component") {
+      return findComponent(source, editScope.componentId)?.elements ?? [];
+    }
+    return pageElements(source);
+  };
 
   const addTile = (tile: PaletteTile, x?: number, y?: number) => {
     if (tile.type === "Connector") {
@@ -303,9 +336,9 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   };
 
   const insertOnBoard = (draft: WireframeElement, absX: number, absY: number) => {
-    const scoped = editScope.kind === "page" ? draft : attachToScope(draft, editScope, absX, absY, pageElements(doc));
+    const scoped = editScope.kind === "page" ? draft : attachToScope(draft, editScope, absX, absY, boardElementsFor(doc));
     const el = placeOnCanvas(scoped, pageCanvas(doc));
-    replace([...pageElements(doc), el]);
+    replace([...boardElementsFor(doc), el]);
     setSelected([el.id]);
   };
 
@@ -366,7 +399,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     setSelected([el.id]);
   };
 
-  const selectedEls = pageElements(view).filter((el) => selected.includes(el.id));
+  const selectedEls = boardElementsFor(view).filter((el) => selected.includes(el.id));
   const one = selectedEls.length === 1 ? selectedEls[0] : null;
   const inspect = one && edit?.id === one.id ? applyInlineDraft(one, edit) : one;
   const notes = useMemo(() => noteNumbers(pageElements(view)), [pageElements(view)]);
@@ -630,7 +663,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
           );
         elements = [...elements, ...copies];
         ids = copies.map((el) => el.id);
-        setLive(patchElements(doc, elements));
+        setLive(withBoardElements(elements));
         setSelected(ids);
       }
       const orig: Record<string, { x: number; y: number }> = {};
@@ -724,7 +757,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       const constrained = constrainMove(dx, dy, event.shiftKey);
       dx = constrained.dx;
       dy = constrained.dy;
-      const baseElements = live ? pageElements(live) : pageElements(doc);
+      const baseElements = live ? boardElementsFor(live) : boardElementsFor(doc);
       const bounds = selectionRect(
         baseElements.map((el) => {
           const from = current.orig[el.id];
@@ -735,7 +768,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       const guides: SnapGuide[] = [];
       const snapOff = event.metaKey || event.ctrlKey;
       if (bounds && !snapOff) {
-        const peerSnap = snapRectToPeers(bounds, pageElements(doc), new Set(current.ids));
+        const peerSnap = snapRectToPeers(bounds, boardElementsFor(doc), new Set(current.ids));
         dx += peerSnap.dx;
         dy += peerSnap.dy;
         guides.push(...peerSnap.guides);
@@ -747,7 +780,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
         setMoveTooltip({ x: bounds.left + snapped.dx, y: bounds.top + snapped.dy, w: bounds.right - bounds.left, h: bounds.bottom - bounds.top });
       }
       const moved = moveElementsByDelta(baseElements, new Set(current.ids), snapped.dx, snapped.dy, current.orig);
-      setLive(patchElements(doc, refreshConnectorsForElements(moved, new Set(current.ids))));
+      setLive(withBoardElements(refreshConnectorsForElements(moved, new Set(current.ids))));
       return;
     }
     if (current.kind === "resize") {
@@ -889,7 +922,36 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     } else if (action === "insertIcon" && target.kind === "iconTile") {
       addIconFromLibrary(target.iconName);
     } else if (action === "selectAll") {
-      setSelected(pageElements(doc).map((el) => el.id));
+      setSelected(boardElementsFor(doc).map((el) => el.id));
+    } else if (action === "components" && target.kind === "canvasEmpty") {
+      setPaletteView("components");
+    } else if (action === "createComponent") {
+      const applied = applyComponentFromSelection(doc, pageElements(doc), selected);
+      if (applied) {
+        commit(updateActivePage(applied.doc, (page) => ({ ...page, elements: applied.elements })));
+        setSelected([applied.elements[applied.elements.length - 1]!.id]);
+      }
+    } else if (action === "editComponent") {
+      if (target.kind === "componentTile") {
+        setEditScope({ kind: "component", componentId: target.componentId });
+        setSelected([]);
+        return;
+      }
+      const id = target.kind === "canvasElement" || target.kind === "outlineLayer" ? target.elementId : one?.id;
+      const el = id ? pageElements(view).find((item) => item.id === id) : one;
+      const scope = el ? enterScopeForElement(el, pageElements(view)) : null;
+      if (scope?.kind === "component") {
+        setEditScope(scope);
+        setSelected([]);
+      }
+    } else if (action === "detachInstance" && one?.type === "Instance") {
+      const component = findComponent(doc, instanceComponentId(one));
+      if (!component) return;
+      const expanded = detachInstanceElements(one, component);
+      replace([...pageElements(doc).filter((el) => el.id !== one.id), ...expanded]);
+      setSelected(expanded.map((el) => el.id));
+    } else if (action === "deleteComponent" && target.kind === "componentTile") {
+      setDeleteComponentId(target.componentId);
     }
   };
 
@@ -907,6 +969,13 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       const templateId = raw.slice(TEMPLATE_DRAG_PREFIX.length);
       if (!templateId) return;
       addTemplate(templateId, p.x, p.y);
+      return;
+    }
+    if (raw.startsWith(COMPONENT_DRAG_PREFIX)) {
+      const componentId = raw.slice(COMPONENT_DRAG_PREFIX.length);
+      if (!componentId) return;
+      const inst = createInstanceFromComponent(doc, componentId, p.x, p.y, pageElements(doc));
+      if (inst) insertOnBoard(inst, p.x, p.y);
       return;
     }
     const tile = PALETTE_BY_ID[raw];
@@ -1304,7 +1373,14 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   const activePage = getActivePage(view);
   const openTabs = doc.pages.filter((p) => openTabIds.includes(p.id));
   const pageEls = pageElements(view);
-  const boardItems = useMemo(() => boardElements(pageEls, editScope), [pageEls, editScope]);
+  const boardItems = useMemo(() => {
+    if (editScope.kind === "component") {
+      const component = findComponent(view, editScope.componentId);
+      if (!component) return [];
+      return boardElementsForComponent(pageEls, editScope, component.elements);
+    }
+    return boardElements(pageEls, editScope);
+  }, [pageEls, editScope, view]);
   const selectionBand = useMemo(() => {
     const b = selectionBounds(pageEls, selected);
     return b ? { left: b.left, top: b.top, right: b.right, bottom: b.bottom } : null;
@@ -1363,8 +1439,13 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     if (editScope.kind === "group") {
       return <ContainerScopeBar label={t("protoScopeGroup")} onExit={() => setEditScope({ kind: "page" })} />;
     }
+    if (editScope.kind === "component") {
+      const component = findComponent(doc, editScope.componentId);
+      const label = component?.name ?? t("protoScopeComponent");
+      return <ContainerScopeBar label={label} onExit={() => setEditScope({ kind: "page" })} />;
+    }
     return null;
-  }, [editScope, pageEls, replace, t]);
+  }, [editScope, pageEls, replace, t, doc]);
 
   const switchPage = (pageId: string) => {
     commit(setActivePageId(doc, pageId));
@@ -1481,6 +1562,8 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   }, [modifiers, t]);
 
 const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(tile.labelKey, tile.labelParams ?? {})));
+  const docComponents = doc.components ?? [];
+  const filteredComponentList = useMemo(() => filterComponents(query, docComponents), [query, docComponents]);
   const quickTiles = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, quickQuery, t(tile.labelKey, tile.labelParams ?? {}))).slice(0, 12);
   const canGroup = selected.length > 1;
   const canUngroup = selected.some((id) => pageElements(doc).find((el) => el.id === id)?.groupId);
@@ -1498,9 +1581,12 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
       selectionHidden,
       pageCount: doc.pages.length,
       canDeletePage: doc.pages.length > 1,
-      componentsFeatureEnabled: false,
+      componentsFeatureEnabled: true,
+      canCreateComponent: collectSelectionForComponent(pageElements(doc), selected).length > 0,
+      canEditComponent: one?.type === "Instance",
+      canDetachInstance: one?.type === "Instance",
     }),
-    [selected, canGroup, canUngroup, selectionLocked, selectionHidden, doc.pages.length],
+    [selected, canGroup, canUngroup, selectionLocked, selectionHidden, doc.pages.length, one, doc],
   );
 
   return (
@@ -1587,6 +1673,13 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             onAddTile={(tile) => addTile(tile)}
             onAddTemplate={(templateId) => addTemplate(templateId)}
             onAddIcon={(name) => addIconFromLibrary(name)}
+            components={docComponents}
+            filteredComponents={filteredComponentList}
+            onEditComponent={(componentId) => {
+              setEditScope({ kind: "component", componentId });
+              setSelected([]);
+            }}
+            onComponentContextMenu={(componentId, event) => openContextMenu(event.clientX, event.clientY, { kind: "componentTile", componentId })}
           />
         }
         canvas={
@@ -1599,6 +1692,7 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             onCloseTab={(id) => setOpenTabIds((tabs) => tabs.filter((t) => t !== id))}
             canvas={pageCanvas(view)}
             elements={pageElements(view)}
+            components={doc.components ?? []}
             zoom={zoom}
             badges={badges}
             notes={notes}
@@ -1674,10 +1768,47 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             }}
             applyAlign={applyAlign}
             applyDistribute={applyDistribute}
+            components={doc.components ?? []}
+            onInstanceOverride={(masterElementId, propKey, value) => {
+              if (!one || one.type !== "Instance") return;
+              replaceElement(setOverride(one, masterElementId, propKey, value));
+            }}
+            onInstanceResetOverrides={() => {
+              if (!one || one.type !== "Instance") return;
+              replaceElement(resetOverrides(one));
+            }}
+            onInstanceClearOverride={(masterElementId, propKey) => {
+              if (!one || one.type !== "Instance") return;
+              replaceElement(clearOverride(one, masterElementId, propKey));
+            }}
           />
         }
         dialogs={
           <>
+            <Dialog open={deleteComponentId !== null} onOpenChange={(open) => { if (!open) setDeleteComponentId(null); }}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{t("protoCtxDeleteComponent")}</DialogTitle>
+                </DialogHeader>
+                <p className="text-sm text-muted-foreground">
+                  {t("protoComponentInstancesWarning", { count: deleteComponentId ? countInstances(doc, deleteComponentId) : 0 })}
+                </p>
+                <DialogFooter className="flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => setDeleteComponentId(null)}>{t("cancel")}</Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      if (!deleteComponentId) return;
+                      commit(purgeComponent(doc, deleteComponentId));
+                      if (editScope.kind === "component" && editScope.componentId === deleteComponentId) setEditScope({ kind: "page" });
+                      setDeleteComponentId(null);
+                    }}
+                  >
+                    {t("protoCtxDelete")}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
               <DialogContent>
                 <DialogHeader><DialogTitle>{t("save")}</DialogTitle></DialogHeader>

@@ -306,7 +306,7 @@ export function SlidesEditor({ threadId }: { threadId: string }) {
                     .filter((el) => !el.hidden)
                     .map((el) => (
                       <WireframeElementFrame key={el.id} el={el} className="absolute overflow-hidden">
-                        <ElementFace el={el} />
+                        <ElementFace el={el} components={deck.components ?? []} />
                       </WireframeElementFrame>
                     ))}
                 </div>

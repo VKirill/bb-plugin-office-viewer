@@ -25,7 +25,11 @@ export type MenuActionId =
   | "insertTemplate"
   | "insertIcon"
   | "selectAll"
-  | "components";
+  | "components"
+  | "createComponent"
+  | "editComponent"
+  | "detachInstance"
+  | "deleteComponent";
 
 export type MenuTarget =
   | { kind: "canvasElement"; elementId: string }
@@ -35,7 +39,8 @@ export type MenuTarget =
   | { kind: "pageTab"; pageId: string }
   | { kind: "paletteTile"; tileId: string }
   | { kind: "templateTile"; templateId: string }
-  | { kind: "iconTile"; iconName: string };
+  | { kind: "iconTile"; iconName: string }
+  | { kind: "componentTile"; componentId: string };
 
 export type ZOrderOp = "bringToFront" | "bringForward" | "sendBackward" | "sendToBack";
 
@@ -56,6 +61,9 @@ export type MenuBuildContext = {
   pageCount: number;
   canDeletePage: boolean;
   componentsFeatureEnabled?: boolean;
+  canCreateComponent?: boolean;
+  canEditComponent?: boolean;
+  canDetachInstance?: boolean;
 };
 
 export function formatMenuShortcut(template: string, modKey: string): string {
@@ -124,7 +132,13 @@ export function buildMenuItems(target: MenuTarget, ctx: MenuBuildContext): MenuI
         { id: "delete" },
       ];
     case "canvasElement":
-      return [...clipboardItems(ctx, true), ...elementStackItems(ctx).map((item, index) => (index === 0 ? { ...item, separatorBefore: true } : item))];
+      return [
+        ...clipboardItems(ctx, true),
+        { id: "createComponent", disabled: ctx.canCreateComponent !== true, separatorBefore: true },
+        { id: "editComponent", disabled: ctx.canEditComponent !== true },
+        { id: "detachInstance", disabled: ctx.canDetachInstance !== true },
+        ...elementStackItems(ctx).map((item, index) => (index === 0 ? { ...item, separatorBefore: true } : item)),
+      ];
     case "canvasEmpty":
       return [
         { id: "paste", disabled: !ctx.canPaste },
@@ -152,6 +166,11 @@ export function buildMenuItems(target: MenuTarget, ctx: MenuBuildContext): MenuI
       return [{ id: "insertTemplate" }];
     case "iconTile":
       return [{ id: "insertIcon" }];
+    case "componentTile":
+      return [
+        { id: "editComponent" },
+        { id: "deleteComponent", separatorBefore: true },
+      ];
   }
 }
 

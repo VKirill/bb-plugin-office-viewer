@@ -3,6 +3,7 @@ import { studioT } from "../../shared/i18n.ts";
 import {
   SNAP,
   type WireframeCanvas,
+  type WireframeComponent,
   type WireframeElement,
   newElementId,
   nextLabel,
@@ -35,6 +36,7 @@ export type SlidesDeck = {
   theme: DeckTheme;
   slides: Slide[];
   activeSlideId: string;
+  components?: WireframeComponent[];
 };
 
 const propValueSchema = z.union([z.string(), z.number().finite(), z.boolean(), z.array(z.string()), z.array(z.array(z.string()))]);
@@ -89,6 +91,8 @@ const elementTypes = z.enum([
   "Sticky",
   "Marker",
   "Shape",
+  "Connector",
+  "Instance",
 ]);
 
 const elementSchema = z
@@ -128,6 +132,16 @@ const slideSchema = z
   })
   .strict();
 
+const componentSchema = z
+  .object({
+    id: z.string().min(1).max(128),
+    name: z.string().min(1).max(200),
+    w: z.number().positive().max(8192),
+    h: z.number().positive().max(8192),
+    elements: z.array(elementSchema).max(500),
+  })
+  .strict();
+
 const deckSchema = z
   .object({
     format: z.literal(SLIDES_FORMAT),
@@ -136,6 +150,7 @@ const deckSchema = z
     theme: z.object({ mode: z.enum(["light", "dark"]), accent: z.string().min(1).max(32) }).strict(),
     slides: z.array(slideSchema).min(1).max(500),
     activeSlideId: z.string().min(1).max(128),
+    components: z.array(componentSchema).max(200).optional(),
   })
   .strict()
   .refine((doc) => doc.slides.some((slide) => slide.id === doc.activeSlideId), { message: "activeSlideId must match a slide" });

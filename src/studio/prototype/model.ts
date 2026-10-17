@@ -60,6 +60,7 @@ export const ELEMENT_TYPES = [
   "Marker",
   "Shape",
   "Connector",
+  "Instance",
 ] as const;
 
 export type ElementType = (typeof ELEMENT_TYPES)[number];
@@ -112,12 +113,21 @@ export type WireframePage = {
   notes?: string;
 };
 
+export type WireframeComponent = {
+  id: string;
+  name: string;
+  w: number;
+  h: number;
+  elements: WireframeElement[];
+};
+
 export type Wireframe = {
   format: typeof WIREFRAME_FORMAT;
   version: typeof WIREFRAME_VERSION;
   name: string;
   pages: WireframePage[];
   activePageId: string;
+  components?: WireframeComponent[];
 };
 
 export type CatalogEntry = {
@@ -232,6 +242,7 @@ export const CATALOG: readonly CatalogEntry[] = [
   { type: "Sticky", group: "markup", w: 144, h: 120, props: { color: "yellow", text: "Note" } },
   { type: "Marker", group: "markup", w: 32, h: 32, props: { shape: "circle", text: "1", color: "red" } },
   { type: "Shape", group: "flow", w: 120, h: 72, props: { shape: "rectangle", text: "Process", fill: "#ffffff", stroke: "#333333" } },
+  { type: "Instance", group: "dynamic", w: 120, h: 72, props: { componentId: "" } },
   {
     type: "Connector",
     group: "flow",
@@ -320,6 +331,16 @@ const canvasSchema = z
   })
   .strict();
 
+const componentSchema = z
+  .object({
+    id: z.string().min(1).max(128),
+    name: z.string().min(1).max(200),
+    w: z.number().positive().max(8192),
+    h: z.number().positive().max(8192),
+    elements: z.array(elementSchema).max(500),
+  })
+  .strict();
+
 const pageSchema = z
   .object({
     id: z.string().min(1).max(128),
@@ -337,6 +358,7 @@ const wireframeV2Schema = z
     name: z.string().min(1).max(200),
     pages: z.array(pageSchema).min(1).max(200),
     activePageId: z.string().min(1).max(128),
+    components: z.array(componentSchema).max(200).optional(),
   })
   .strict()
   .refine((doc) => doc.pages.some((page) => page.id === doc.activePageId), { message: "activePageId must match a page" });

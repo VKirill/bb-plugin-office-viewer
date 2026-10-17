@@ -9,7 +9,7 @@ import { ConnectorsLayer, connectorHandlePoints } from "./connector-layer";
 import { isConnector } from "./connectors";
 import { cn } from "@/lib/utils";
 import { useT } from "../../shared/i18n";
-import { type WireframeCanvas, type WireframeElement, type WireframePage } from "./model";
+import { type WireframeCanvas, type WireframeComponent, type WireframeElement, type WireframePage } from "./model";
 
 export function PrototypeCanvas({
   canvasPaneRef,
@@ -20,6 +20,7 @@ export function PrototypeCanvas({
   onCloseTab,
   canvas,
   elements,
+  components = [],
   zoom,
   badges,
   notes,
@@ -68,6 +69,7 @@ export function PrototypeCanvas({
   onCloseTab: (id: string) => void;
   canvas: WireframeCanvas;
   elements: WireframeElement[];
+  components?: readonly WireframeComponent[];
   zoom: number;
   badges: boolean;
   notes: Map<string, number>;
@@ -264,7 +266,7 @@ export function PrototypeCanvas({
                       style={{ left: absX, top: absY, width: el.w, height: el.h, ...wireframeElementBoxStyle(el, "base") }}
                     >
                       <div className="size-full overflow-hidden">
-                        <ElementFace el={edit?.id === el.id ? applyInlineDraft(el, edit) : el} allElements={elements} />
+                        <ElementFace el={edit?.id === el.id ? applyInlineDraft(el, edit) : el} allElements={elements} components={components} />
                       </div>
                       {badges ? (
                         <span className={cn("pointer-events-none absolute bottom-full left-0 mb-0.5 max-w-full truncate rounded-sm px-1 text-[9px] leading-3", active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>

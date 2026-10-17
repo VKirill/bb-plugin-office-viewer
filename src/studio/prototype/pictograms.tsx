@@ -301,6 +301,13 @@ const RENDER: Record<string, () => ReactNode> = {
   "arrow-v": () => <Svg><path d="M16 4 V22 M12 18 L16 24 L20 18" stroke={FG} strokeWidth={1.5} fill="none" /></Svg>,
   "marker-circle": () => <Svg><circle cx={16} cy={16} r={8} fill="#ef4444" /><text x={16} y={19} textAnchor="middle" fontSize={8} fill="#fff">1</text></Svg>,
   "marker-drop": () => <Svg><path d="M16 6 C12 12 8 14 8 18 A8 8 0 0 0 24 18 C24 14 20 12 16 6 Z" fill="#ef4444" /><text x={16} y={20} textAnchor="middle" fontSize={7} fill="#fff">1</text></Svg>,
+  instance: () => (
+    <Svg>
+      <rect x={6} y={8} width={20} height={14} rx={2} stroke={FG} strokeWidth={1.25} fill="none" strokeDasharray="3 2" />
+      <rect x={10} y={12} width={8} height={3} rx={0.5} fill={FG} opacity={0.35} />
+      <rect x={10} y={17} width={12} height={2} rx={0.5} fill={FG} opacity={0.25} />
+    </Svg>
+  ),
   connector: () => (
     <Svg>
       <rect x={6} y={10} width={10} height={8} rx={1} stroke={FG} strokeWidth={1.25} />

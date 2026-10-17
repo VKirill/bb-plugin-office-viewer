@@ -49,6 +49,7 @@ export const PALETTE_TILES: readonly PaletteTile[] = [
   { id: "button-link", type: "Button", props: { variant: "link", text: "Link" }, labelKey: "protoTileButtonLink", pictogram: "button-link" },
   { id: "image", type: "Image", props: {}, labelKey: "protoTileImage", pictogram: "image" },
   { id: "dynamic-panel", type: "DynamicPanel", props: {}, labelKey: "protoTileDynamicPanel", pictogram: "dynamic-panel" },
+  { id: "instance", type: "Instance", props: {}, labelKey: "protoTileInstance", pictogram: "instance" },
   { id: "repeater-table", type: "Repeater", props: { layout: "table" }, labelKey: "protoTileRepeaterTable", pictogram: "repeater-table" },
   { id: "repeater-cards", type: "Repeater", props: { layout: "cards" }, labelKey: "protoTileRepeaterCards", pictogram: "repeater-cards" },
   { id: "hotspot", type: "HotSpot", props: {}, labelKey: "protoTileHotSpot", pictogram: "hotspot" },
