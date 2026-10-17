@@ -1,10 +1,9 @@
 ## Now
-- Open and edit `.xlsx`, `.xlsm`, `.csv`, and `.tsv` spreadsheets with formula support, search, range quoting, and underlined URL links that open on Cmd/Ctrl+click.
-- View Word, PowerPoint, and PDF documents with their supported search, navigation, zoom, and chat quoting controls.
+- Edit `.xlsx`, `.xlsm`, `.csv`, and `.tsv` spreadsheets with formula support, search, range quoting, and underlined URL links that open on Cmd/Ctrl+click.
+- View Word, PowerPoint, and PDF documents with supported search, navigation, zoom, and chat quoting controls.
 - View images, video, and audio; annotate and save images, capture video frames, and browse image siblings.
 - Open HTML pages and websites on devices, including WebP page snapshots.
-- Open Office Studio from the thread header; its launcher uses the approved studio and tool logos, with Slides marked as coming soon.
-- Build UI prototypes with live palette previews, inline editing, grouped icon tools, badges, and save/send support; paint on a blank canvas with a smooth brush and eraser, then save or send the result.
+- Open Office Studio from the thread header; its launcher has the approved tool logos, and it builds and sends Axure-style prototypes with a full widget palette and icon library or Paint drawings from a blank canvas (Slides coming soon).
 
 ## Blocked
 - Marketplace PR #583 awaits the maintainer's `v1-change` label.
@@ -14,8 +13,8 @@
 - Build the remaining Office Studio Slides tool and complete the Studio live check.
 
 ## Last verify
-- command: Lane Pilot accepted the spreadsheet link-chip/revert and Office Studio launcher, prototype, and Paint tasks in `lprun_38203a8bf69c43f294a012b07bded797`.
-- result: green (spreadsheet links restored after 0.8.6/0.8.7; Office Studio 0.8.8 and prototype improvements 0.8.9 accepted, including launcher, Paint, inline editing, palette previews, and icon toolbar)
+- command: Lane Pilot acceptance for `lprun_38203a8bf69c43f294a012b07bded797`.
+- result: green (spreadsheet link chips were reverted in 0.8.7; Office Studio 0.8.8 and prototype updates 0.8.9 accepted, including Paint, full Axure widget and icon palettes, canvas/inspector/shell behaviour, pictograms, inline editing, and launcher redesign)
 - when: 2026-10-17
 
 ## Pointers
