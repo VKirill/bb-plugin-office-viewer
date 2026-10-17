@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "task_id": "prototype-inspector-axure",
+  "task_sha256": "75fdce547077b24d3b4e4bd4705c4371a3d3a2b4f6def913fd65512f3d8e5fd9",
+  "attempt": 1,
+  "provider_exit": 0,
+  "report": "complete",
+  "report_sha256": "057df659c9c0bb70e890c915ba5879c8f018b793cb4342930d5137c8223445c7",
+  "owns_check": "passed",
+  "verification": "passed",
+  "review": "not_required",
+  "accepted": true,
+  "accepted_at": "2026-10-17T18:00:00.568Z",
+  "model": "composer-2.5"
+}

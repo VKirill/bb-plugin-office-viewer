@@ -2,6 +2,7 @@ import type { DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEv
 import { applyInlineDraft, type InlineEdit } from "./editing";
 import { ElementFace } from "./elements";
 import { HANDLE_CLASS, HANDLES, editOverlayBox } from "./builder-geometry";
+import { resolveStylePatch, stylePatchToInline } from "./inspector-model";
 import type { CanvasRect, DistanceLine, SnapGuide } from "./canvas-math";
 import { cn } from "@/lib/utils";
 import { t } from "../../shared/i18n";
@@ -221,7 +222,7 @@ export function PrototypeCanvas({
                       key={el.id}
                       data-el={el.id}
                       className={cn("absolute overflow-visible outline outline-1 outline-transparent hover:outline-primary", active && "z-10 outline-2 outline-primary", locked && "opacity-80")}
-                      style={{ left: el.x, top: el.y, width: el.w, height: el.h }}
+                      style={{ left: el.x, top: el.y, width: el.w, height: el.h, ...stylePatchToInline(resolveStylePatch(el, "base")) }}
                     >
                       <div className="size-full overflow-hidden">
                         <ElementFace el={edit?.id === el.id ? applyInlineDraft(el, edit) : el} />

@@ -67,7 +67,7 @@ export function itemListKey(type: ElementType): ItemKey | null {
 
 export function stringList(el: WireframeElement, key: ItemKey): string[] {
   const value = el.props[key];
-  return Array.isArray(value) ? [...value] : [];
+  return Array.isArray(value) && value.every((item) => typeof item === "string") ? [...value] : [];
 }
 
 export function readDraft(el: WireframeElement, target: InlineTarget): string {

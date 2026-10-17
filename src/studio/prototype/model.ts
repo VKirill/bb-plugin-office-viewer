@@ -60,7 +60,25 @@ export const ELEMENT_TYPES = [
 
 export type ElementType = (typeof ELEMENT_TYPES)[number];
 export type PaletteGroup = "common" | "dynamic" | "forms" | "menus" | "content" | "markup" | "flow";
-export type PropValue = string | number | boolean | string[];
+export type PropValue = string | number | boolean | string[] | string[][];
+
+export type ElementStylePatch = {
+  fill?: string;
+  color?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  radius?: number;
+  opacity?: number;
+  fontSize?: number;
+  fontWeight?: string | number;
+  textAlign?: "left" | "center" | "right";
+  shadow?: boolean;
+};
+
+export type ElementStyle = {
+  base?: ElementStylePatch;
+  effects?: Partial<Record<"hover" | "pressed" | "selected" | "disabled" | "focus", ElementStylePatch>>;
+};
 
 export type WireframeElement = {
   id: string;
@@ -75,6 +93,7 @@ export type WireframeElement = {
   hidden?: boolean;
   locked?: boolean;
   groupId?: string;
+  style?: ElementStyle;
 };
 
 export type WireframeCanvas = { width: number; height: number; background: string };
@@ -163,7 +182,38 @@ export const CATALOG: readonly CatalogEntry[] = [
 
 export const CATALOG_BY_TYPE: Record<ElementType, CatalogEntry> = Object.fromEntries(CATALOG.map((entry) => [entry.type, entry])) as Record<ElementType, CatalogEntry>;
 
-const propValueSchema = z.union([z.string(), z.number().finite(), z.boolean(), z.array(z.string())]);
+const stylePatchSchema = z
+  .object({
+    fill: z.string().optional(),
+    color: z.string().optional(),
+    stroke: z.string().optional(),
+    strokeWidth: z.number().finite().optional(),
+    radius: z.number().finite().optional(),
+    opacity: z.number().finite().optional(),
+    fontSize: z.number().finite().optional(),
+    fontWeight: z.union([z.string(), z.number()]).optional(),
+    textAlign: z.enum(["left", "center", "right"]).optional(),
+    shadow: z.boolean().optional(),
+  })
+  .strict();
+
+const elementStyleSchema = z
+  .object({
+    base: stylePatchSchema.optional(),
+    effects: z
+      .object({
+        hover: stylePatchSchema.optional(),
+        pressed: stylePatchSchema.optional(),
+        selected: stylePatchSchema.optional(),
+        disabled: stylePatchSchema.optional(),
+        focus: stylePatchSchema.optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+const propValueSchema = z.union([z.string(), z.number().finite(), z.boolean(), z.array(z.string()), z.array(z.array(z.string()))]);
 
 const elementSchema = z
   .object({
@@ -179,6 +229,7 @@ const elementSchema = z
     hidden: z.boolean().optional(),
     locked: z.boolean().optional(),
     groupId: z.string().min(1).max(128).optional(),
+    style: elementStyleSchema.optional(),
   })
   .strict();
 

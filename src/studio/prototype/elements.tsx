@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { t } from "../../shared/i18n";
+import { readTable } from "./inspector-model";
 import type { PropValue, WireframeElement } from "./model";
 import { isFlowShape, shapePath } from "./shapes";
 
@@ -29,7 +30,7 @@ function flag(props: Record<string, PropValue>, key: string): boolean {
 
 function list(props: Record<string, PropValue>, key: string, fallback: string[]): string[] {
   const value = props[key];
-  return Array.isArray(value) ? value : fallback;
+  return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : fallback;
 }
 
 function variantOf(value: PropValue | undefined): ButtonVariant {
@@ -170,25 +171,24 @@ export function ElementFace({ el }: { el: WireframeElement }) {
     case "Badge":
       return <span className={cn(inert, "inline-flex items-center justify-center rounded-full bg-secondary px-2 text-xs")}>{text(p, "text", "Badge")}</span>;
     case "Table": {
-      const cols = Math.min(12, Math.max(1, Math.round(num(p, "columns", 3))));
-      const rows = Math.min(20, Math.max(1, Math.round(num(p, "rows", 3))));
+      const table = readTable(el);
       return (
         <table className={cn(inert, "border-collapse text-xs")}>
           <thead>
             <tr>
-              {Array.from({ length: cols }, (_, i) => (
+              {table.headers.map((header, i) => (
                 <th key={i} className="border border-border bg-muted px-1 py-0.5 font-medium">
-                  {t("protoCol", { n: i + 1 })}
+                  {header}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: rows }, (_, r) => (
+            {table.cells.map((row, r) => (
               <tr key={r}>
-                {Array.from({ length: cols }, (_, c) => (
+                {row.map((cell, c) => (
                   <td key={c} className="border border-border px-1 py-0.5 text-muted-foreground">
-                    {r + 1},{c + 1}
+                    {cell}
                   </td>
                 ))}
               </tr>
