@@ -47,3 +47,24 @@ graph LR
 - `lprun_38203a8bf69c43f294a012b07bded797`: `studio-launcher`, `studio-launcher-design`, `prototype-builder`, and `paint-canvas` accepted; Slides and the Studio release/live check remain open.
 - `lprun_38203a8bf69c43f294a012b07bded797`: `prototype-inline-edit`, `prototype-palette-previews`, and `prototype-toolbar` accepted; release 0.8.8 shipped. Slides and the Studio live check remain open.
 - `lprun_38203a8bf69c43f294a012b07bded797`: release 0.8.9 accepted; Slides and the Studio live check remain open.
+- `lprun_38203a8bf69c43f294a012b07bded797`: the Axure parity batch was accepted through release 0.9.0; Slides and the Studio live check remain open.
+
+## Axure parity batch (2026-10-17, from axure-re/index.md)
+
+Source: `.bb/chats/thr_wdpmipwdxc/artifacts/axure-re/index.md` (121 screenshots, view-only trial; no code decompiled — Axure licence forbids it).
+
+```mermaid
+graph LR
+  T[prototype-calm-tiles] --> I[prototype-icons-library] --> W[prototype-axure-widgets] --> S[prototype-shell-pages] --> C[prototype-canvas-axure] --> N[prototype-inspector-axure]
+  N --> P[pictograms swap — after design-lead thr_rs5vepqjqk]
+  N --> Q[later: interactions + preview player, connectors, components/masters]
+```
+
+- [x] `prototype-calm-tiles` — borderless tiles, hover/selection highlight
+- [x] `prototype-icons-library` — searchable Hugeicons set, lazy
+- [x] `prototype-axure-widgets` — Default (Common, Dynamic, Forms, Menus and table, Markup) + Flow shapes
+- [x] `prototype-shell-pages` — split builder, pages/outline, 3 columns, rulers, style bar, format v2
+- [x] `prototype-canvas-axure` — marquee, groups, snap guides, distances, context menu, single-key tools, quick insert
+- [x] `prototype-inspector-axure` — Style tab, properties, radio group combo, list editor, table editing, notes
+- [x] pictograms swap (design-lead set)
+- [ ] later: interactions (event → case → action) + preview player, connectors for Flow, components (masters), Sample UI / form patterns

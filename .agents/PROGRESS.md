@@ -19,5 +19,5 @@
 
 ## Pointers
 - Open todos: no todo index exists (`.agents/todos/INDEX.md`).
-- Active plans: [Office Studio](plans/2026-10-17-office-studio.md) (in progress); [chat link chips in BB core](plans/2026-10-17-chat-link-chips-core.md) (planned).
+- Active plans: [Office Studio](plans/2026-10-17-office-studio.md) (in progress; Slides and live check remain); [chat link chips in BB core](plans/2026-10-17-chat-link-chips-core.md) (planned).
 - [Changelog](CHANGELOG.md) — project memory updates.
