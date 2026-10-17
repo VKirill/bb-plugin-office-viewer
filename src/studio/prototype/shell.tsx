@@ -1,10 +1,23 @@
-import type { ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { t } from "../../shared/i18n";
 import { CANVAS_PRESETS, SNAP, snap, type WireframeCanvas, type WireframeElement } from "./model";
+
+const PrototypeOverlayCloseContext = createContext<(() => void) | null>(null);
+
+export function PrototypeOverlayCloseButton() {
+  const onClose = useContext(PrototypeOverlayCloseContext);
+  if (!onClose) return null;
+  const label = t("protoClosePanel");
+  return (
+    <button type="button" className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" onClick={onClose} title={label} aria-label={label}>
+      <Icon name="X" className="size-4" />
+    </button>
+  );
+}
 
 export function PrototypeShell({
   shellRef,
@@ -39,6 +52,36 @@ export function PrototypeShell({
 }) {
   const showLeft = leftOpen && !compact;
   const showRight = rightOpen && !compact;
+  const leftRailRef = useRef<HTMLButtonElement>(null);
+  const rightRailRef = useRef<HTMLButtonElement>(null);
+
+  const closeLeftOverlay = useCallback(() => {
+    setLeftOverlay(false);
+    requestAnimationFrame(() => leftRailRef.current?.focus());
+  }, [setLeftOverlay]);
+
+  const closeRightOverlay = useCallback(() => {
+    setRightOverlay(false);
+    requestAnimationFrame(() => rightRailRef.current?.focus());
+  }, [setRightOverlay]);
+
+  const overlayOpen = compact && (leftOverlay || rightOverlay);
+
+  const closeOpenOverlays = useCallback(() => {
+    if (leftOverlay) closeLeftOverlay();
+    else if (rightOverlay) closeRightOverlay();
+  }, [closeLeftOverlay, closeRightOverlay, leftOverlay, rightOverlay]);
+
+  useEffect(() => {
+    if (!overlayOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeOpenOverlays();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [closeOpenOverlays, overlayOpen]);
 
   return (
     <div ref={shellRef} className="flex h-full min-h-0 flex-col bg-background outline-none">
@@ -46,39 +89,42 @@ export function PrototypeShell({
       {styleBar}
       <div className="relative flex min-h-0 flex-1">
         {compact ? (
-          <>
-            <div className="flex w-10 shrink-0 flex-col items-center gap-1 border-r border-border py-2">
-              <Button type="button" variant="ghost" size="icon" className="size-8" onClick={() => setLeftOverlay(true)} aria-label={t("protoToggleLeft")}>
-                <Icon name="PanelLeft" className="size-4" />
-              </Button>
-            </div>
-            {leftOverlay ? (
-              <div className="absolute inset-y-0 left-0 z-40 flex w-[min(280px,90vw)] shadow-lg">
-                <div className="flex min-h-0 flex-1 flex-col border-r border-border bg-background">{leftPane}</div>
-                <button type="button" className="absolute right-0 top-2 z-50 -translate-x-full rounded-l bg-background px-1 py-2 text-xs shadow" onClick={() => setLeftOverlay(false)}>×</button>
-              </div>
-            ) : null}
-          </>
+          <div className="flex w-10 shrink-0 flex-col items-center gap-1 border-r border-border py-2">
+            <Button ref={leftRailRef} type="button" variant="ghost" size="icon" className="size-8" onClick={() => setLeftOverlay(true)} aria-label={t("protoToggleLeft")}>
+              <Icon name="PanelLeft" className="size-4" />
+            </Button>
+          </div>
         ) : showLeft ? (
           <div className="flex w-[260px] shrink-0 flex-col border-r border-border">{leftPane}</div>
         ) : null}
-        <div className="flex min-w-0 flex-1 flex-col">{canvas}</div>
+        <div className="relative flex min-w-0 flex-1 flex-col">
+          {overlayOpen ? (
+            <button type="button" className="absolute inset-0 z-30 bg-black/10 dark:bg-black/30" aria-label={t("protoClosePanel")} onClick={closeOpenOverlays} />
+          ) : null}
+          {canvas}
+        </div>
         {compact ? (
-          <>
-            <div className="flex w-10 shrink-0 flex-col items-center gap-1 border-l border-border py-2">
-              <Button type="button" variant="ghost" size="icon" className="size-8" onClick={() => setRightOverlay(true)} aria-label={t("protoToggleRight")}>
-                <Icon name="PanelRight" className="size-4" />
-              </Button>
-            </div>
-            {rightOverlay ? (
-              <div className="absolute inset-y-0 right-0 z-40 flex w-[min(280px,90vw)] shadow-lg">
-                <button type="button" className="absolute left-0 top-2 z-50 -translate-x-full rounded-r bg-background px-1 py-2 text-xs shadow" onClick={() => setRightOverlay(false)}>×</button>
-                <div className="flex min-h-0 flex-1 flex-col border-l border-border bg-background">{inspector}</div>
-              </div>
-            ) : null}
-          </>
+          <div className="flex w-10 shrink-0 flex-col items-center gap-1 border-l border-border py-2">
+            <Button ref={rightRailRef} type="button" variant="ghost" size="icon" className="size-8" onClick={() => setRightOverlay(true)} aria-label={t("protoToggleRight")}>
+              <Icon name="PanelRight" className="size-4" />
+            </Button>
+          </div>
         ) : showRight ? (
           <div className="flex w-[260px] shrink-0 flex-col">{inspector}</div>
+        ) : null}
+        {compact && leftOverlay ? (
+          <PrototypeOverlayCloseContext.Provider value={closeLeftOverlay}>
+            <div className="absolute inset-y-0 left-0 z-40 flex w-[min(280px,90vw)] animate-in slide-in-from-left duration-150">
+              <div className="flex min-h-0 flex-1 flex-col border-r border-border bg-background">{leftPane}</div>
+            </div>
+          </PrototypeOverlayCloseContext.Provider>
+        ) : null}
+        {compact && rightOverlay ? (
+          <PrototypeOverlayCloseContext.Provider value={closeRightOverlay}>
+            <div className="absolute inset-y-0 right-0 z-40 flex w-[min(280px,90vw)] animate-in slide-in-from-right duration-150">
+              <div className="flex min-h-0 flex-1 flex-col border-l border-border bg-background">{inspector}</div>
+            </div>
+          </PrototypeOverlayCloseContext.Provider>
         ) : null}
       </div>
       {dialogs}

@@ -7,6 +7,7 @@ import { IconsLibraryPanel } from "./icons-library";
 import { PALETTE_GROUPS } from "./inspector-fields";
 import { tileGroup, tileMatchesQuery, type PaletteTile } from "./palette";
 import { Pictogram } from "./pictograms";
+import { PrototypeOverlayCloseButton } from "./shell";
 import type { PaletteGroup, WireframeElement, WireframePage } from "./model";
 
 export type LeftTopTab = "pages" | "outline";
@@ -78,12 +79,15 @@ export function PrototypeLeftPane({
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-background">
       <div className="flex min-h-0 flex-[2] flex-col border-b border-border">
-        <div className="flex gap-1 border-b border-border p-2">
-          {(["pages", "outline"] as LeftTopTab[]).map((id) => (
-            <button key={id} type="button" className={cn("flex-1 rounded px-2 py-1 text-xs font-medium", topTab === id ? "bg-muted" : "text-muted-foreground")} onClick={() => setTopTab(id)}>
-              {t(id === "pages" ? "protoTabPages" : "protoTabOutline")}
-            </button>
-          ))}
+        <div className="flex items-center gap-1 border-b border-border p-2">
+          <div className="flex min-w-0 flex-1 gap-1">
+            {(["pages", "outline"] as LeftTopTab[]).map((id) => (
+              <button key={id} type="button" className={cn("min-w-0 flex-1 rounded px-2 py-1 text-xs font-medium", topTab === id ? "bg-muted" : "text-muted-foreground")} onClick={() => setTopTab(id)}>
+                {t(id === "pages" ? "protoTabPages" : "protoTabOutline")}
+              </button>
+            ))}
+          </div>
+          <PrototypeOverlayCloseButton />
         </div>
         <div className="min-h-0 flex-1 overflow-auto p-2 text-sm">
           {topTab === "pages" ? (
