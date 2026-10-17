@@ -31,6 +31,7 @@ import { PrototypeToolbar, type ToolbarMenu } from "./toolbar";
 import { PrototypeLeftPane, type LeftTopTab } from "./left-pane";
 import { PrototypeCanvas } from "./canvas";
 import { PrototypeInspector, type InspectorTab } from "./inspector";
+import { assignRadioGroup, createRadioGroup, setRadioChecked } from "./inspector-model";
 import { blobToBase64, loadScreenshotLibrary, noteNumbers, placeOnCanvas, resized, selectionBounds, type Handle } from "./builder-geometry";
 import { PALETTE_BY_ID, PALETTE_TILES, elementFromTile, tileMatchesQuery, type PaletteTile } from "./palette";
 import {
@@ -243,11 +244,18 @@ const [paletteView, setPaletteView] = useState<"elements" | "icons">("elements")
     replace(pageElements(doc).map((el) => (el.id === one.id ? { ...el, ...patch } : el)));
   };
 
+  const updateMany = (mapper: (el: WireframeElement) => WireframeElement) => {
+    replace(pageElements(doc).map((el) => mapper(el)));
+  };
+
+  const replaceElement = (next: WireframeElement) => {
+    replace(pageElements(doc).map((el) => (el.id === next.id ? next : el)));
+  };
+
   const setProp = (key: string, value: PropValue) => {
     if (!one) return;
     if (one.type === "Radio" && key === "checked") {
-      const next = pageElements(doc).map((el) => (el.id === one.id ? { ...el, props: { ...el.props, checked: value } } : el));
-      replace(value === true ? checkRadio(next, one.id) : next);
+      replace(setRadioChecked(pageElements(doc), one.id, value === true));
       return;
     }
     updateOne({ props: { ...one.props, [key]: value } });
@@ -1095,12 +1103,30 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             tab={inspectorTab}
             setTab={setInspectorTab}
             inspect={inspect}
+            selection={selectedEls}
+            elements={pageElements(doc)}
             canvas={pageCanvas(doc)}
             pageNotes={activePage.notes ?? ""}
+            noteMarkers={badges}
+            onNoteMarkers={setBadges}
             onPageNotes={updatePageNotes}
             onCanvas={(patch) => commit(patchCanvas(doc, patch))}
             updateOne={updateOne}
+            updateMany={updateMany}
             setProp={setProp}
+            onReplaceElement={replaceElement}
+            onRadioGroup={(groupId) => {
+              if (!one) return;
+              if (groupId === "__create__") {
+                replace(createRadioGroup(pageElements(doc), [one.id]));
+                return;
+              }
+              replace(assignRadioGroup(pageElements(doc), one.id, groupId));
+            }}
+            onRadioChecked={(checked) => {
+              if (!one) return;
+              replace(setRadioChecked(pageElements(doc), one.id, checked));
+            }}
           />
         }
         dialogs={
