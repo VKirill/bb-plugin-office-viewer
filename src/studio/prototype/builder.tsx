@@ -7,7 +7,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import type { rpcContract } from "../../../server";
 import { studioLocale, useT } from "../../shared/i18n";
+import { patchThreadSession, readThreadSession } from "../session";
 import { getStudioSettings, patchStudioSettings, useStudioSettings } from "../settings-store";
+import { useChatAutosave } from "../use-chat-autosave";
 import {
   CATALOG_BY_TYPE,
   SNAP,
@@ -106,6 +108,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const rpc = useRpc<typeof rpcContract>();
   const composer = useComposer();
   const locale = studioLocale();
+  const restored = readThreadSession(threadId).prototype;
   const rootRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const canvasPaneRef = useRef<HTMLDivElement>(null);
@@ -113,14 +116,14 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const drag = useRef<Drag | null>(null);
   const spaceHeld = useRef(false);
   const clipboard = useRef<WireframeElement[]>([]);
-  const [{ history, index }, setTimeline] = useState(() => ({ history: [blankWireframe()], index: 0 }));
+  const [{ history, index }, setTimeline] = useState(() => ({ history: [restored?.doc ?? blankWireframe()], index: 0 }));
   const doc = history[index]!;
   const [live, setLive] = useState<Wireframe | null>(null);
   const view = live ?? doc;
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>(() => restored?.selected ?? []);
   const badges = settings.protoBadges;
   const snapGrid = settings.protoSnap;
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(() => restored?.zoom ?? 1);
   const [marquee, setMarquee] = useState<CanvasRect | null>(null);
   const [snapGuides, setSnapGuides] = useState<SnapGuide[]>([]);
   const [distanceLines, setDistanceLines] = useState<DistanceLine[]>([]);
@@ -138,7 +141,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [rightOpen, setRightOpen] = useState(true);
   const [leftOverlay, setLeftOverlay] = useState(false);
   const [rightOverlay, setRightOverlay] = useState(false);
-  const [openTabIds, setOpenTabIds] = useState<string[]>(() => [getActivePage(doc).id]);
+  const [openTabIds, setOpenTabIds] = useState<string[]>(() => (restored?.openTabIds.length ? restored.openTabIds : [getActivePage(doc).id]));
   const shellRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
 const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
@@ -148,7 +151,9 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   const [openOpen, setOpenOpen] = useState(false);
   const [menu, setMenu] = useState<ToolbarMenu | null>(null);
   const [savedNames, setSavedNames] = useState<string[]>([]);
-  const [openedStem, setOpenedStem] = useState<string | null>(null);
+  const [openedStem, setOpenedStem] = useState<string | null>(() => restored?.openedStem ?? null);
+  const autosaveRef = useRef<() => Promise<void>>(async () => {});
+  const autosaveStatus = useChatAutosave(JSON.stringify(doc), () => autosaveRef.current());
   const [saveName, setSaveName] = useState(() => t("protoUntitled"));
   const [nameDraft, setNameDraft] = useState(doc.name);
   const [edit, setEdit] = useState<InlineEdit | null>(null);
@@ -171,6 +176,10 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   useEffect(() => {
     setNameDraft(doc.name);
   }, [doc.name]);
+
+  useEffect(() => {
+    patchThreadSession(threadId, { tool: "prototype", prototype: { doc, openedStem, zoom, selected, openTabIds } });
+  }, [threadId, doc, openedStem, zoom, selected, openTabIds]);
 
   useEffect(() => {
     const el = shellRef.current;
@@ -603,6 +612,25 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     commit({ ...doc, name });
     setOpenedStem(saved.name);
     return { ...saved, png };
+  };
+
+  autosaveRef.current = async () => {
+    const name = openedStem ?? t("protoUntitled");
+    let pngBase64: string | undefined;
+    try {
+      pngBase64 = await blobToBase64(await capturePng());
+    } catch {
+      pngBase64 = undefined;
+    }
+    const saved = await rpc.call("saveWireframe", {
+      threadId,
+      name,
+      json: JSON.stringify({ ...doc, name }),
+      pngBase64,
+      overwrite: true,
+      locale,
+    });
+    setOpenedStem(saved.name);
   };
 
   const sendToChat = async (kind: SendKind) => {
@@ -1044,6 +1072,7 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             onSave={() => { setSaveName(openedStem ?? doc.name); setSaveOpen(true); }}
             toggleLeftPane={() => setLeftOpen((o) => !o)}
             toggleRightPane={() => setRightOpen((o) => !o)}
+            autosaveStatus={autosaveStatus}
           />
         }
         styleBar={<PrototypeStyleBar inspect={inspect} canvas={pageCanvas(doc)} onCanvas={(patch) => commit(patchCanvas(doc, patch))} onUpdate={updateOne} />}
