@@ -4,7 +4,7 @@ import { useT } from "../../shared/i18n";
 export function ProtoShortcutsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const t = useT();
   const rows: Array<{ keys: string; text: string }> = [
-    { keys: "R O L T F", text: t("protoShortcutDrawTools") },
+    { keys: "R O L T F E", text: t("protoShortcutDrawTools") },
     { keys: "V", text: t("protoShortcutSelectTool") },
     { keys: "Esc", text: t("protoShortcutEsc") },
     { keys: "Shift", text: t("protoShortcutShift") },

@@ -29,6 +29,7 @@ const SIMPLE_KEY: Partial<Record<ElementType, string>> = {
   Paragraph: "text",
   Sticky: "text",
   Shape: "text",
+  Connector: "label",
   Alert: "title",
   Tooltip: "text",
   SearchField: "placeholder",

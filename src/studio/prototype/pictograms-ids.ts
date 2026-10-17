@@ -63,6 +63,7 @@ const STATIC_IDS = [
   "sticky-4",
   "marker-circle",
   "marker-drop",
+  "connector",
 ] as const;
 
 const FLOW_IDS = FLOW_SHAPES.map((shape) => `flow-${shape}`);

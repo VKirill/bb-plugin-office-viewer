@@ -511,6 +511,8 @@ export function ElementFace({ el }: { el: WireframeElement }) {
         </div>
       );
     }
+    case "Connector":
+      return <div className={cn(inert, "size-full")} />;
     case "Shape": {
       const raw = text(p, "shape", "rectangle");
       const shape = isFlowShape(raw) ? raw : "rectangle";

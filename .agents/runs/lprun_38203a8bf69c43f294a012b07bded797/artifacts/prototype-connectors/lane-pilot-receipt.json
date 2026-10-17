@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "status": "accepted",
+  "lanePilotRunId": "lprun_38203a8bf69c43f294a012b07bded797",
+  "lanePilotTaskId": "prototype-connectors",
+  "attemptId": "lpattempt_1cb0c0482530404885940a25ee036b50",
+  "pmThreadId": "thr_wdpmipwdxc",
+  "writerThreadId": "thr_ee9f6p6kw9",
+  "ownsPaths": [
+    "src/studio/prototype/",
+    "src/studio/slides/",
+    "src/shared/i18n.ts"
+  ],
+  "readFirst": [
+    {
+      "path": ".bb/chats/thr_wdpmipwdxc/artifacts/axure-re/index.md",
+      "windows": []
+    },
+    {
+      "path": "src/studio/prototype/model.ts",
+      "windows": []
+    },
+    {
+      "path": "src/studio/prototype/canvas.tsx",
+      "windows": []
+    },
+    {
+      "path": "src/studio/prototype/shapes.ts",
+      "windows": []
+    }
+  ],
+  "output": "Implemented Axure-style **Connector** elements for flowchart linking.\n\n### Model & geometry\n- New `Connector` element type in `model.ts` (catalog defaults, parse-compatible).\n- `connectors.ts` — anchors, straight/elbow/curved routing, bounds, hit-testing, sync on shape move, detach on delete.\n- `connectors.test.ts` — geometry contract tests.\n\n### UI & tools\n- **E** key and toolbar button (GitBranch) activate connector mode.\n- Palette tile **Соединитель** / **Connector** (flow group) activates the tool.\n- Drag from shape anchors (dots on hover) or shapes to another shape or free point.\n- SVG layer in `connector-layer.tsx` + `canvas.tsx` (arrows, dashes, labels).\n- Selected connectors: draggable start/end/bend handles; double-click edits label.\n- Inspector: routing, arrowheads, dashed, label; Style tab for stroke/color/width.\n\n### Integration\n- `builder.tsx` — draw, move sync, delete detach, live refresh.\n- `presenter.tsx` — connectors on slides.\n- `palette.ts`, `pictograms`, `i18n.ts`, `inspector-fields.ts`, `editing.ts`, `elements.tsx`, `canvas-math.ts`, `proto-shortcuts-sheet.tsx`, `toolbar.tsx`.\n\n### Verification\n- `npx tsc --noEmit` — pass  \n- `node --experimental-strip-types --test 'src/studio/prototype/*.test.ts' 'src/studio/slides/*.test.ts'` — 126 pass",
+  "verification": [
+    {
+      "command": "npx tsc --noEmit",
+      "exitCode": 0,
+      "stdout": "\\\u001b[1G\u001b[0K\\\u001b[1G\u001b[0K\u001b[1mnpm\u001b[22m \u001b[96mnotice\u001b[39m\r\n\u001b[1mnpm\u001b[22m \u001b[96mnotice\u001b[39m New \u001b[31mmajor\u001b[39m version of npm available! \u001b[31m11.16.0\u001b[39m -> \u001b[34m12.2.0\u001b[39m\r\n\u001b[1mnpm\u001b[22m \u001b[96mnotice\u001b[39m Changelog: \u001b[34mhttps://github.com/npm/cli/releases/tag/v12.2.0\u001b[39m\r\n\u001b[1mnpm\u001b[22m \u001b[96mnotice\u001b[39m To update run: \u001b[4mnpm install -g npm@12.2.0\u001b[24m\r\n\u001b[1mnpm\u001b[22m \u001b[96mnotice\u001b[39m\r\n\\\u001b[1G\u001b[0K",
+      "stderr": "",
+      "sandboxBackend": "macos-seatbelt",
+      "policySha256": "44707dbb3124bc20613f7446dcd9110df28a87768d888af2e7660edb8b2cb873",
+      "workspacePath": "/Users/vechkasov/.lane-pilot/worktrees/lpattempt_1cb0c0482530404885940a25ee036b50/bb-plugin-office-viewer"
+    },
+    {
+      "command": "node --experimental-strip-types --test 'src/studio/prototype/*.test.ts' 'src/studio/slides/*.test.ts'",
+      "exitCode": 0,
+      "stdout": "✔ align left/center/right uses the selection bounds (36.203375ms)\r\n✔ align top/middle/bottom and a single element to the canvas (0.131125ms)\r\n✔ distribute spaces three or more; two is a no-op (0.143ms)\r\n✔ marquee intersect vs contain (1.67075ms)\r\n✔ click selection with meta and shift (0.29775ms)\r\n✔ group and ungroup (0.978708ms)\r\n✔ snap guides align edges (0.538125ms)\r\n✔ snapDelta respects grid (0.217042ms)\r\n✔ nudge step sizes (0.230959ms)\r\n✔ distance lines between separated boxes (0.429958ms)\r\n✔ zoom helpers clamp (0.224625ms)\r\n✔ grid step toggle (0.122ms)\r\n✔ drawRect shift square down-right (0.289541ms)\r\n✔ drawRect shift square up-left (0.103167ms)\r\n✔ drawRect alt from center (0.058834ms)\r\n✔ drawRect shift and alt circle (0.039958ms)\r\n✔ snapAngle locks line to 45 degrees (0.067542ms)\r\n✔ constrainMove axis lock (0.056042ms)\r\n✔ resizeBox shift keeps aspect on corner (0.140083ms)\r\n✔ resizeBox alt from center (0.038417ms)\r\n✔ resizeBox lockAspect without shift (0.041625ms)\r\n✔ click drag threshold (0.026167ms)\r\n✔ anchor points sit on element edges (6.769084ms)\r\n✔ elbow routing uses orthogonal segments (0.544625ms)\r\n✔ connector bounds wrap the path (1.704917ms)\r\n✔ refresh moves connector bounds when attached shape moves (0.238416ms)\r\n✔ deleting an attached element leaves a free end at last point (0.193916ms)\r\n✔ pickAnchor chooses facing side (0.064958ms)\r\n✔ distance to polyline is zero on the segment (0.075ms)\r\n✔ refreshConnector updates free coordinates (0.088334ms)\r\n✔ double-click targets: button text and field placeholder (0.967417ms)\r\n✔ Enter on a radio commits the label and adds a grouped radio below (28.80925ms)\r\n✔ checking a radio unchecks others in the group (0.181625ms)\r\n✔ Enter on a checkbox adds another below without exclusivity (0.1075ms)\r\n✔ Enter on a list item inserts an empty item after it (2.16975ms)\r\n✔ Backspace on an empty list item removes it (0.118959ms)\r\n✔ Nav/Tabs/ChoicePicker item index and draft (0.142333ms)\r\n▶ iconSearchWords\r\n  ✔ splits CamelCase and strips Icon suffix (3.209292ms)\r\n  ✔ handles registry-style names (0.084458ms)\r\n✔ iconSearchWords (4.275458ms)\r\n▶ filterIcons\r\n  ✔ returns all when query is empty (0.239833ms)\r\n  ✔ filters by multiple terms (0.33325ms)\r\n  ✔ matches export name substring (0.202ms)\r\n✔ filterIcons (1.365083ms)\r\n▶ parseColour\r\n  ✔ parses short and long hex (1.008833ms)\r\n  ✔ parses rgba and transparent (0.166709ms)\r\n✔ parseColour (1.763167ms)\r\n▶ hsl round trip\r\n  ✔ converts hex to hsl and back (0.151917ms)\r\n✔ hsl round trip (0.207625ms)\r\n▶ normalizeColourInput\r\n  ✔ formats parsed colours (1.014083ms)\r\n✔ normalizeColourInput (1.084042ms)\r\n✔ resolvePickerColour uses fallback when unset (0.103375ms)\r\n✔ parseRgbChannels round-trips (0.132083ms)\r\n✔ collectDocumentColours gathers canvas and element styles (0.313041ms)\r\n✔ mergeStylePatch keeps unrelated fields on element (2.154959ms)\r\n✔ mixed style value detects differences (0.317584ms)\r\n✔ wireframeElementBoxStyle maps element.style opacity for canvas (0.25175ms)\r\n✔ applyStyleToElements updates selection only (0.238917ms)\r\n✔ radio group assign and exclusive check (0.585792ms)\r\n✔ table read write and TSV paste (0.652708ms)\r\n✔ table cell navigation (3.983041ms)\r\n✔ list editor write (6.396625ms)\r\n✔ outline menu includes z-order rename and delete (4.073583ms)\r\n✔ canvas empty menu paste and select all (0.273959ms)\r\n✔ nudgeZOrder swaps with neighbor (2.564875ms)\r\n✔ applyZOrder front and back (0.365458ms)\r\n✔ zOrderOpFromAction maps menu ids (0.158458ms)\r\n✔ parseWireframe round-trips a valid v2 document (18.274209ms)\r\n✔ parseWireframe migrates v1 to v2 with elements preserved (0.396792ms)\r\n✔ every type has catalog defaults and a numbered label (0.848458ms)\r\n✔ snap uses an 8px grid (0.049209ms)\r\n✔ canvas presets match legacy sizes and orientation swap (0.074959ms)\r\n✔ parseWireframe rejects a bad file (0.733125ms)\r\n✔ every palette entry builds a valid element and parses (6.683125ms)\r\n✔ palette tiles use only existing types and cover every type (0.144084ms)\r\n✔ every palette tile has a designed pictogram (0.080625ms)\r\n✔ pictogram source bundle size (0.119084ms)\r\n✔ variants create existing types with their props (0.201ms)\r\n✔ search matches type, id and display name (0.143209ms)\r\n▶ parseLeftPaneSplit\r\n  ✔ returns defaults for bad input (1.016917ms)\r\n  ✔ round-trips persisted fields (0.112334ms)\r\n✔ parseLeftPaneSplit (1.731ms)\r\n▶ resolveLeftPaneHeights\r\n  ✔ enforces minimum section sizes when expanded (0.120667ms)\r\n  ✔ collapses pages to header height (0.049625ms)\r\n  ✔ keyboard nudge changes ratio within bounds (0.076375ms)\r\n✔ resolveLeftPaneHeights (0.336208ms)\r\n▶ topRatioFromHeight\r\n  ✔ clamps extreme ratios (0.061292ms)\r\n✔ topRatioFromHeight (0.113458ms)\r\n▶ shapePath\r\n  ✔ returns a non-empty path for rectangle (0.672334ms)\r\n  ✔ returns a non-empty path for stacked-rectangle (0.0795ms)\r\n  ✔ returns a non-empty path for rounded (0.070875ms)\r\n  ✔ returns a non-empty path for stacked-rounded (0.045917ms)\r\n  ✔ returns a non-empty path for beveled (0.057917ms)\r\n  ✔ returns a non-empty path for diamond (0.043541ms)\r\n  ✔ returns a non-empty path for file (0.048209ms)\r\n  ✔ returns a non-empty path for stacked-file (0.103666ms)\r\n  ✔ returns a non-empty path for bracket (0.063334ms)\r\n  ✔ returns a non-empty path for semicircle (0.090584ms)\r\n  ✔ returns a non-empty path for triangle (0.054125ms)\r\n  ✔ returns a non-empty path for trapezoid (0.037958ms)\r\n  ✔ returns a non-empty path for ellipse (0.043666ms)\r\n  ✔ returns a non-empty path for hexagon (0.034333ms)\r\n  ✔ returns a non-empty path for parallelogram (0.037ms)\r\n  ✔ returns a non-empty path for actor (0.045458ms)\r\n  ✔ returns a non-empty path for database (0.037ms)\r\n  ✔ returns a non-empty path for subroutine (0.038708ms)\r\n  ✔ returns a non-empty path for delay (0.035375ms)\r\n  ✔ returns a non-empty path for document (0.034917ms)\r\n  ✔ returns a non-empty path for multi-document (0.033583ms)\r\n  ✔ returns a non-empty path for off-page (0.031417ms)\r\n  ✔ returns a non-empty path for manual-input (0.028958ms)\r\n  ✔ returns a non-empty path for stored-data (0.028292ms)\r\n  ✔ returns a non-empty path for internal-storage (0.028708ms)\r\n  ✔ returns a non-empty path for offline-storage (0.028291ms)\r\n  ✔ returns a non-empty path for display (0.040416ms)\r\n  ✔ returns a non-empty path for sort (0.026667ms)\r\n  ✔ returns a non-empty path for collate (0.035833ms)\r\n  ✔ returns a non-empty path for summing-junction (0.033291ms)\r\n  ✔ returns a non-empty path for logical-or (0.02975ms)\r\n  ✔ returns a non-empty path for magnetic-tape (0.029666ms)\r\n  ✔ returns a non-empty path for punched-tape (0.061625ms)\r\n  ✔ returns a non-empty path for punched-card (0.041625ms)\r\n  ✔ returns a non-empty path for keying (0.032375ms)\r\n✔ shapePath (3.302959ms)\r\n▶ template catalog\r\n  ✔ has at least 12 form and 14 interface templates (0.416375ms)\r\n  ✔ every template builds valid grouped elements (5.271833ms)\r\n✔ template catalog (6.308709ms)\r\n▶ filterTemplates\r\n  ✔ finds templates by Russian keyword (0.111792ms)\r\n  ✔ finds templates by id fragment (0.05975ms)\r\n✔ filterTemplates (0.249916ms)\r\n▶ previewElementsForTemplate\r\n  ✔ returns elements for library thumbnails (0.073917ms)\r\n✔ previewElementsForTemplate (0.111584ms)\r\n✔ layout presets produce valid slide elements (4.686209ms)\r\n✔ parseSlidesDeck round-trips a new deck (5.595833ms)\r\n✔ duplicateSlide and reorderSlides keep active slide (0.242875ms)\r\n✔ cloneDeck is independent (0.108167ms)\r\n✔ mapElementToPptx covers common element kinds (1.056375ms)\r\n✔ mapSlideToPptxDescriptors returns one entry per visible element (0.127291ms)\r\nℹ tests 126\r\nℹ suites 12\r\nℹ pass 126\r\nℹ fail 0\r\nℹ cancelled 0\r\nℹ skipped 0\r\nℹ todo 0\r\nℹ duration_ms 624.906166\r\n",
+      "stderr": "",
+      "sandboxBackend": "macos-seatbelt",
+      "policySha256": "f70342cf73ff698a070ae9c042b433a9685f10c1fd3c6f72bf0db1e7616beda4",
+      "workspacePath": "/Users/vechkasov/.lane-pilot/worktrees/lpattempt_1cb0c0482530404885940a25ee036b50/bb-plugin-office-viewer"
+    }
+  ],
+  "runV2": {
+    "schemaVersion": 1,
+    "pools": {
+      "provider": 15,
+      "verification": 2
+    },
+    "score": 5,
+    "risk": "medium",
+    "sourceRisk": "medium",
+    "scoreAdapter": "task-risk-v1"
+  },
+  "reasoning": [
+    {
+      "planSha256": "6413224ef763d86edd5156fc64d0bebe1832ecd4db46d51343e40881b974aecb",
+      "sentPlanSha256": "6413224ef763d86edd5156fc64d0bebe1832ecd4db46d51343e40881b974aecb",
+      "sourceLength": 1465,
+      "sentLength": 1465,
+      "jevStatus": "ok",
+      "jevDecision": "medium",
+      "requestedReasoningLevel": "medium",
+      "effectiveReasoningLevel": "medium",
+      "fallbackReason": null,
+      "retryEffort": {
+        "enabled": true,
+        "retryIndex": 0,
+        "before": "medium",
+        "after": "medium",
+        "changed": false
+      },
+      "providerId": "acp-cursor",
+      "model": "composer-2.5",
+      "serviceTier": "default",
+      "requestedServiceTier": "default",
+      "runId": "lprun_38203a8bf69c43f294a012b07bded797",
+      "attemptId": "lpattempt_1cb0c0482530404885940a25ee036b50",
+      "threadId": "thr_ee9f6p6kw9",
+      "effortMode": "automatic",
+      "selectionSource": {
+        "providerId": "acp-cursor",
+        "model": "composer-2.5",
+        "reasoningLevel": "medium",
+        "serviceTier": "default",
+        "reasoningLevelSource": "client-preference"
+      },
+      "dispatchContext": {
+        "memoryText": "Area «feature:office-studio-prototype»: earlier accepted tasks, newest first. Their decisions are in main; keep them unless this task changes them.\n- 2026-10-17T21:51 prototype-context-menus: Prototype: unified mouse model and context menus in outline, pages, tabs, palette and canvas. Right-click opens a fitting context menu everywhere in the prototype builder, and left/right/double click behave the same across canvas, layers, pages and libraries.\n- 2026-10-17T21:19 prototype-modifier-keys: Prototype: draw-by-drag tools and Shift/Alt/Cmd/Space modifiers like Figma/Axure/Photoshop. Shapes are drawn by dragging, and Shift, Alt, Cmd and Space behave as in Figma, Axure and Photoshop when drawing, resizing, moving and rotating.\n- 2026-10-17T20:06 prototype-color-picker-fix: Prototype colour picker: effective defaults, tidy field row, rainbow hue and alpha tracks, portal popover with HEX/RGB. Choosing a colour is clear: the field shows the real colour, the picker has a rainbow hue bar, an alpha bar, HEX/RGB inputs and never runs off the panel.\n- 2026-10-17T20:04 prototype-style-layout: Prototype Style panel: layout polish, no overlapping controls. The Style panel's controls never overlap and read clearly at any panel width.\n- 2026-10-17T19:58 prototype-style-apply-fix: Fix: Style panel opacity (and other style fields) not applied on the canvas. Changing opacity or any other Style field immediately changes the element on the canvas, in PNG export and in Slides.\n- 2026-10-17T19:56 prototype-align-icons: Prototype: real alignment icons in one row and proper tooltips. Alignment and distribution buttons use clear standard icons in one row with proper hover tooltips.\n- 2026-10-17T18:27 prototype-inspector-native: Prototype inspector: native Axure-like Style panel with icons, pickers, fonts and colour picker. The Style tab is a compact native panel: icon align row, geometry grid, collapsible sections, font and weight pickers, text alignment icons and a real colour picker.\n- 2026-10-17T18:25 prototype-screen-size: Prototype: single screen-size dropdown with device presets, compact W/H and colour swatch; tidy toolbar. Screen size is chosen in one place: a device dropdown with presets and orientation, compact W/H and a colour swatch; no duplicate device buttons.\n- 2026-10-17T18:24 prototype-left-split: Prototype left pane: one draggable divider between Pages and Libraries, remove extra separators. The owner drags one divider to give the Libraries section more height; the left column has no stacked extra lines.\n- 2026-10-17T18:18 prototype-templates: Prototype: Templates library with ready forms and UI patterns. The owner inserts ready forms and UI blocks (login, registration, checkout, header, pricing, table with filters…) from a Templates library.\n- 2026-10-17T18:16 prototype-icons-fix: Fix Icons library: load Hugeicons data from the plugin server instead of a bare dynamic import. The Icons library, Icon elements and the icon picker show the actual icons.\n- 2026-10-17T18:15 prototype-overlay-close: Prototype: proper close button and backdrop for side-pane overlays. In a narrow panel the side panes open as overlays with a clean close button that does not overlap the tabs.\nFiles of this area: components/ui/anchored-menu.tsx, src/shared/i18n.ts, src/studio/prototype/INTERACTIONS.md, src/studio/prototype/builder.tsx, src/studio/prototype/canvas-context-menu.tsx, src/studio/prototype/canvas.tsx, src/studio/prototype/icons-library.tsx, src/studio/prototype/left-pane.tsx, src/studio/prototype/menus.test.ts, src/studio/prototype/menus.ts, src/studio/prototype/prototype-context-menu.tsx, src/studio/prototype/shell.tsx, src/studio/prototype/template-tile.tsx, src/studio/prototype/builder-geometry.ts, src/studio/prototype/canvas-math.test.ts, src/studio/prototype/canvas-math.ts, src/studio/prototype/inspector-style-panel.tsx, src/studio/prototype/proto-shortcuts-sheet.tsx, components/ui/popover.tsx, src/studio/prototype/inspector-colour-picker.tsx, src/studio/prototype/inspector-colour.test.ts, src/studio/prototype/inspector-colour.ts, src/studio/prototype/inspector.tsx, components/ui/icon-extended.tsx, components/ui/icon-registry.ts, src/studio/prototype/elements.tsx, src/studio/prototype/inspector-model.test.ts, src/studio/prototype/inspector-model.ts, src/studio/prototype/wireframe-element-frame.tsx, src/studio/slides/editor.tsx, src/studio/slides/presenter.tsx, components/ui/icon-tooltip-button.tsx, components/ui/tooltip.tsx, src/studio/prototype/align-ui.tsx, src/studio/prototype/toolbar.tsx, src/studio/prototype/model.test.ts, src/studio/prototype/model.ts, src/studio/prototype/pane-split.test.ts, src/studio/prototype/pane-split.ts, src/studio/prototype/templates.test.ts\n\n- Invariant: picking a tool and the Back to tools action in the launcher work as before. The Prototype and Paint tools (`src/studio/prototype/` and `src/studio/paint/`) are not changed by launcher work.\n- The `button-outline` palette tile (outline variant) is defined in `src/studio/prototype/palette.ts` and creates the outline button. Its label comes from the i18n key `protoTileButtonOutline` in `src/shared/i18n.ts`; the ru labels are «Кнопка» (outline) and «Основная кнопка» (primary).\n- `src/studio/prototype/icon-inspector.tsx`: selecting an `Icon` element in the prototype builder shows an inspector with a preview, a Change button that opens a dialog picker for the icon name, a size control (16 to 48), and a colour control (foreground, muted, primary, or a custom hex value).",
+        "memoryPicked": [
+          "1af0c25e14e3789cbfc11fe9202f61f9617fdcb938b7bccefb5a456387692c2f",
+          "bfb2bbaec1ae867300ad77322b2069affcb8b31f910899355bc009a1e6c5f125",
+          "4749c1a2f2ca10edde83a709aa0105ce0bc831c11834788a76fbe3363879d6fe"
+        ],
+        "rulesText": "- Перед ответом по задаче Lane Pilot сверяй каждый путь, который собираешься изменить из-за ошибки проверки, с owns_paths; если пути там нет, не меняй файл и сообщи об ошибке диспетчеру.",
+        "rulesPicked": {
+          "total": 19,
+          "picked": [
+            "rule_572535fb78e20b9d"
+          ]
+        },
+        "executionPacket": "Read these before editing; they are the context for this task:\n- .bb/chats/thr_wdpmipwdxc/artifacts/axure-re/index.md (not in the workspace; skip it)\n- src/studio/prototype/model.ts L1-L421 (sha256 8a92a2f7)\n- src/studio/prototype/canvas.tsx L1-L318 (sha256 4a53dd40)",
+        "executionPacketSha256": "ba9d1117dd9eb55ee8fe05299bed4e7595dee7032be2ae0952d6cb1e80d8e94e",
+        "pmReadContext": "",
+        "agent": "Lane Pilot writer",
+        "promptChars": 10841,
+        "helperMode": "roles",
+        "helperRequired": false,
+        "skillPick": {
+          "enabled": true,
+          "skills": [],
+          "picked": [],
+          "projectFolder": [],
+          "hints": [],
+          "sources": {},
+          "reason": null,
+          "materialized": []
+        }
+      }
+    }
+  ],
+  "emergencyFallback": null,
+  "turns": 1
+}

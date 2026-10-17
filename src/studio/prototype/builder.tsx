@@ -18,6 +18,7 @@ import {
   defaultElement,
   newElementId,
   newWireframe,
+  nextLabel,
   parseWireframe,
   type PaletteGroup,
   type PropValue,
@@ -66,6 +67,8 @@ import {
   drawRect,
   elementAtPoint,
   expandToGroups,
+  isConnectorTool,
+  shapeAtPoint,
   groupIds,
   isDragDrawTool,
   marqueeHitTest,
@@ -98,6 +101,19 @@ import {
   type MenuBuildContext,
   type MenuTarget,
 } from "./menus";
+import {
+  anchorAtPoint,
+  anchorPoint,
+  connectorPropsToRecord,
+  createConnectorElement,
+  detachConnectorsOnDelete,
+  isConnector,
+  readConnectorProps,
+  refreshConnector,
+  refreshConnectorsForElements,
+  type ConnectorAnchor,
+  type ConnectorProps,
+} from "./connectors";
 
 const MAX_HISTORY = 60;
 
@@ -117,7 +133,15 @@ type Drag =
       lastY: number;
     }
   | { kind: "marquee"; ox: number; oy: number; contain: boolean }
-  | { kind: "pan"; startX: number; startY: number; scrollLeft: number; scrollTop: number };
+  | { kind: "pan"; startX: number; startY: number; scrollLeft: number; scrollTop: number }
+  | {
+      kind: "connectorDraw";
+      fromElementId?: string;
+      fromAnchor?: ConnectorAnchor;
+      fromX: number;
+      fromY: number;
+    }
+  | { kind: "connectorHandle"; id: string; which: "start" | "end" | "bend" };
 type SendKind = "both" | "png" | "json";
 
 function blankWireframe() {
@@ -159,6 +183,8 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [panning, setPanning] = useState(false);
   const [pendingTool, setPendingTool] = useState<QuickTool | null>(null);
   const [drawPreview, setDrawPreview] = useState<ElementBox | null>(null);
+  const [connectorHoverId, setConnectorHoverId] = useState<string | null>(null);
+  const [connectorDraft, setConnectorDraft] = useState<{ from: { x: number; y: number }; to: { x: number; y: number } } | null>(null);
   const [modifiers, setModifiers] = useState<CanvasModifiers>({ shift: false, alt: false, meta: false, space: false });
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [quickInsertOpen, setQuickInsertOpen] = useState(false);
@@ -248,6 +274,10 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   const replace = (elements: WireframeElement[]) => commit(patchElements(doc, elements));
 
   const addTile = (tile: PaletteTile, x?: number, y?: number) => {
+    if (tile.type === "Connector") {
+      setPendingTool({ type: "Connector" });
+      return;
+    }
     const spec = CATALOG_BY_TYPE[tile.type];
     const el = placeOnCanvas(
       elementFromTile(tile, x ?? (pageCanvas(doc).width - spec.w) / 2, y ?? (pageCanvas(doc).height - spec.h) / 2, pageElements(doc)),
@@ -280,6 +310,8 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   const cancelActiveDrag = () => {
     drag.current = null;
     setDrawPreview(null);
+    setConnectorDraft(null);
+    setConnectorHoverId(null);
     setMarquee(null);
     setSnapGuides([]);
     setMoveTooltip(null);
@@ -329,7 +361,14 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
 
   const updateOne = (patch: Partial<WireframeElement>) => {
     if (!one) return;
-    replace(pageElements(doc).map((el) => (el.id === one.id ? { ...el, ...patch } : el)));
+    const elements = pageElements(doc);
+    replace(
+      elements.map((el) => {
+        if (el.id !== one.id) return el;
+        const next = { ...el, ...patch };
+        return isConnector(next) ? refreshConnector(next, elements) : next;
+      }),
+    );
   };
 
   const updateMany = (mapper: (el: WireframeElement) => WireframeElement) => {
@@ -351,7 +390,9 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
 
   const removeSelected = () => {
     if (!selected.length) return;
-    replace(pageElements(doc).filter((el) => !selected.includes(el.id)));
+    const removed = new Set(selected);
+    const remaining = pageElements(doc).filter((el) => !removed.has(el.id));
+    replace(detachConnectorsOnDelete(remaining, removed));
     setSelected([]);
   };
 
@@ -493,6 +534,49 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     const handle = (event.target as HTMLElement).dataset.handle as Handle | undefined;
     const id = (event.target as HTMLElement).closest("[data-el]")?.getAttribute("data-el");
     const p = boardPoint(event);
+    const connectorHit = (event.target as HTMLElement).closest("[data-connector-hit]")?.getAttribute("data-connector-hit");
+    if (connectorHit) {
+      if (!selected.includes(connectorHit)) setSelected([connectorHit]);
+      const which = (event.target as HTMLElement).dataset.connectorHandle as "start" | "end" | "bend" | undefined;
+      if (which) {
+        drag.current = { kind: "connectorHandle", id: connectorHit, which };
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
+      return;
+    }
+    if (pendingTool && isConnectorTool(pendingTool) && !handle) {
+      const anchorEl = (event.target as HTMLElement).dataset.anchorEl;
+      const anchorName = (event.target as HTMLElement).dataset.anchor as ConnectorAnchor | undefined;
+      const els = pageElements(view);
+      let fromElementId: string | undefined;
+      let fromAnchor: ConnectorAnchor | undefined;
+      let fromX = p.x;
+      let fromY = p.y;
+      if (anchorEl && anchorName) {
+        fromElementId = anchorEl;
+        fromAnchor = anchorName;
+        const shape = els.find((item) => item.id === anchorEl);
+        if (shape) {
+          const pt = anchorPoint(shape, anchorName);
+          fromX = pt.x;
+          fromY = pt.y;
+        }
+      } else {
+        const shape = shapeAtPoint(els, p.x, p.y);
+        if (shape) {
+          fromElementId = shape.id;
+          const picked = anchorAtPoint(shape, p.x, p.y);
+          fromAnchor = picked ?? undefined;
+          const pt = picked ? anchorPoint(shape, picked) : { x: p.x, y: p.y };
+          fromX = pt.x;
+          fromY = pt.y;
+        }
+      }
+      drag.current = { kind: "connectorDraw", fromElementId, fromAnchor, fromX, fromY };
+      setConnectorDraft({ from: { x: fromX, y: fromY }, to: { x: p.x, y: p.y } });
+      event.currentTarget.setPointerCapture(event.pointerId);
+      return;
+    }
     if (pendingTool && isDragDrawTool(pendingTool) && !handle) {
       drag.current = {
         kind: "draw",
@@ -510,7 +594,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       event.currentTarget.setPointerCapture(event.pointerId);
       return;
     }
-    if (pendingTool && !handle) {
+    if (pendingTool && !isConnectorTool(pendingTool) && !handle) {
       addQuickTool(pendingTool, p.x, p.y);
       return;
     }
@@ -555,10 +639,46 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     const p = boardPoint(event);
     syncPointerModifiers(event);
     if (!current) {
+      if (pendingTool && isConnectorTool(pendingTool)) {
+        setConnectorHoverId(shapeAtPoint(pageElements(view), p.x, p.y)?.id ?? null);
+      } else setConnectorHoverId(null);
       if (event.altKey) {
         const hit = elementAtPoint(pageElements(view), p.x, p.y);
         setDistanceLines(hit ? distanceLinesFor(hit, pageElements(view)) : []);
       } else setDistanceLines([]);
+      return;
+    }
+    if (current.kind === "connectorDraw") {
+      setConnectorDraft({ from: { x: current.fromX, y: current.fromY }, to: { x: p.x, y: p.y } });
+      setConnectorHoverId(shapeAtPoint(pageElements(view), p.x, p.y)?.id ?? null);
+      return;
+    }
+    if (current.kind === "connectorHandle") {
+      const base = live ? pageElements(live) : pageElements(doc);
+      setLive(
+        patchElements(
+          doc,
+          base.map((el) => {
+            if (el.id !== current.id || !isConnector(el)) return el;
+            let patch: Partial<ConnectorProps> = {};
+            if (current.which === "bend") {
+              patch = { bendX: p.x, bendY: p.y };
+            } else if (current.which === "start") {
+              const shape = shapeAtPoint(base, p.x, p.y);
+              patch = shape
+                ? { fromId: shape.id, fromAnchor: anchorAtPoint(shape, p.x, p.y) ?? "auto", startX: 0, startY: 0 }
+                : { fromId: "", fromAnchor: "auto", startX: p.x, startY: p.y };
+            } else {
+              const shape = shapeAtPoint(base, p.x, p.y);
+              patch = shape
+                ? { toId: shape.id, toAnchor: anchorAtPoint(shape, p.x, p.y) ?? "auto", endX: 0, endY: 0 }
+                : { toId: "", toAnchor: "auto", endX: p.x, endY: p.y };
+            }
+            const next = { ...el, props: { ...el.props, ...connectorPropsToRecord(patch) } };
+            return refreshConnector(next, base);
+          }),
+        ),
+      );
       return;
     }
     if (current.kind === "draw") {
@@ -614,7 +734,8 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       if (bounds) {
         setMoveTooltip({ x: bounds.left + snapped.dx, y: bounds.top + snapped.dy, w: bounds.right - bounds.left, h: bounds.bottom - bounds.top });
       }
-      setLive(patchElements(doc, moveElementsByDelta(baseElements, new Set(current.ids), snapped.dx, snapped.dy, current.orig)));
+      const moved = moveElementsByDelta(baseElements, new Set(current.ids), snapped.dx, snapped.dy, current.orig);
+      setLive(patchElements(doc, refreshConnectorsForElements(moved, new Set(current.ids))));
       return;
     }
     if (current.kind === "resize") {
@@ -634,6 +755,31 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     setSnapGuides([]);
     setMoveTooltip(null);
     syncPointerModifiers(event);
+    if (current?.kind === "connectorDraw") {
+      setConnectorDraft(null);
+      setConnectorHoverId(null);
+      const p = boardPoint(event);
+      const els = pageElements(doc);
+      const targetShape = shapeAtPoint(els, p.x, p.y);
+      const toAnchor = targetShape ? anchorAtPoint(targetShape, p.x, p.y) ?? undefined : undefined;
+      const connector = createConnectorElement(
+        newElementId(),
+        nextLabel("Connector", els),
+        els,
+        { elementId: current.fromElementId, anchor: current.fromAnchor, x: current.fromX, y: current.fromY },
+        { elementId: targetShape?.id, anchor: toAnchor, x: p.x, y: p.y },
+      );
+      const next = [...els, refreshConnector(connector, [...els, connector])];
+      replace(next);
+      setSelected([connector.id]);
+      return;
+    }
+    if (current?.kind === "connectorHandle") {
+      setConnectorHoverId(null);
+      if (live) commit(live);
+      else setLive(null);
+      return;
+    }
     if (current?.kind === "draw") {
       const p = boardPoint(event);
       setDrawPreview(null);
@@ -1083,7 +1229,12 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
         replace(pageElements(doc).map((el) => (el.id === one.id ? resizeByArrow(el, event.key, step) : el)));
         return;
       }
-      replace(pageElements(doc).map((el) => (selected.includes(el.id) ? { ...el, x: el.x + dx, y: el.y + dy } : el)));
+      replace(
+        refreshConnectorsForElements(
+          pageElements(doc).map((el) => (selected.includes(el.id) ? { ...el, x: el.x + dx, y: el.y + dy } : el)),
+          new Set(selected),
+        ),
+      );
       return;
     }
     if (event.key === "Escape") {
@@ -1313,6 +1464,8 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             toggleLeftPane={() => setLeftOpen((o) => !o)}
             toggleRightPane={() => setRightOpen((o) => !o)}
             autosaveStatus={autosaveStatus}
+            connectorToolActive={isConnectorTool(pendingTool)}
+            onToggleConnectorTool={() => setPendingTool((tool) => (isConnectorTool(tool) ? null : { type: "Connector" }))}
           />
         }
         styleBar={<PrototypeStyleBar inspect={inspect} canvas={pageCanvas(doc)} onCanvas={(patch) => commit(patchCanvas(doc, patch))} onUpdate={updateOne} />}
@@ -1382,6 +1535,9 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             insertMode={pendingTool !== null}
             drawPreview={drawPreview}
             modifierHint={modifierHint}
+            connectorTool={isConnectorTool(pendingTool)}
+            connectorHoverId={connectorHoverId}
+            connectorDraft={connectorDraft}
             onOpenShortcuts={() => setShortcutsOpen(true)}
             onPanePointerDown={onPanePointerDown}
             onPanePointerMove={onPanePointerMove}

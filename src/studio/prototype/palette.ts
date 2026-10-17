@@ -89,6 +89,13 @@ export const PALETTE_TILES: readonly PaletteTile[] = [
   { id: "sticky-4", type: "Sticky", props: { color: "pink" }, labelKey: "protoTileSticky4", pictogram: "sticky-4" },
   { id: "marker-circle", type: "Marker", props: { shape: "circle" }, labelKey: "protoTileMarkerCircle", pictogram: "marker-circle" },
   { id: "marker-drop", type: "Marker", props: { shape: "drop" }, labelKey: "protoTileMarkerDrop", pictogram: "marker-drop" },
+  {
+    id: "connector",
+    type: "Connector",
+    props: {},
+    labelKey: "protoTileConnector",
+    pictogram: "connector",
+  },
   ...FLOW_TILES,
 ];
 

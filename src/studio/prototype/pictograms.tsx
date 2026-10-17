@@ -301,6 +301,18 @@ const RENDER: Record<string, () => ReactNode> = {
   "arrow-v": () => <Svg><path d="M16 4 V22 M12 18 L16 24 L20 18" stroke={FG} strokeWidth={1.5} fill="none" /></Svg>,
   "marker-circle": () => <Svg><circle cx={16} cy={16} r={8} fill="#ef4444" /><text x={16} y={19} textAnchor="middle" fontSize={8} fill="#fff">1</text></Svg>,
   "marker-drop": () => <Svg><path d="M16 6 C12 12 8 14 8 18 A8 8 0 0 0 24 18 C24 14 20 12 16 6 Z" fill="#ef4444" /><text x={16} y={20} textAnchor="middle" fontSize={7} fill="#fff">1</text></Svg>,
+  connector: () => (
+    <Svg>
+      <rect x={6} y={10} width={10} height={8} rx={1} stroke={FG} strokeWidth={1.25} />
+      <rect x={16} y={14} width={10} height={8} rx={1} stroke={FG} strokeWidth={1.25} />
+      <path d="M11 14 V18 H18 V18" stroke={PRIMARY} strokeWidth={1.5} markerEnd="url(#pict-conn-arrow)" />
+      <defs>
+        <marker id="pict-conn-arrow" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto">
+          <path d="M0,0 L4,2 L0,4 z" fill={PRIMARY} />
+        </marker>
+      </defs>
+    </Svg>
+  ),
 };
 
 for (const shape of FLOW_SHAPES) {

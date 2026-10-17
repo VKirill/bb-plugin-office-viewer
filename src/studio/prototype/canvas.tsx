@@ -4,6 +4,8 @@ import { ElementFace } from "./elements";
 import { HANDLE_CLASS, HANDLES, editOverlayBox } from "./builder-geometry";
 import { wireframeElementBoxStyle } from "./inspector-model";
 import type { CanvasRect, DistanceLine, ElementBox, SnapGuide } from "./canvas-math";
+import { ConnectorsLayer, connectorHandlePoints } from "./connector-layer";
+import { isConnector } from "./connectors";
 import { cn } from "@/lib/utils";
 import { useT } from "../../shared/i18n";
 import { type WireframeCanvas, type WireframeElement, type WireframePage } from "./model";
@@ -35,6 +37,9 @@ export function PrototypeCanvas({
   insertMode,
   drawPreview = null,
   modifierHint = null,
+  connectorTool = false,
+  connectorHoverId = null,
+  connectorDraft = null,
   onOpenShortcuts = () => {},
   onPanePointerDown,
   onPanePointerMove,
@@ -78,6 +83,9 @@ export function PrototypeCanvas({
   insertMode: boolean;
   drawPreview?: ElementBox | null;
   modifierHint?: string | null;
+  connectorTool?: boolean;
+  connectorHoverId?: string | null;
+  connectorDraft?: { from: { x: number; y: number }; to: { x: number; y: number } } | null;
   onOpenShortcuts?: () => void;
   onPanePointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPanePointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
@@ -233,7 +241,7 @@ export function PrototypeCanvas({
                     style={{ left: drawPreview.x, top: drawPreview.y, width: drawPreview.w, height: drawPreview.h }}
                   />
                 ) : null}
-                {elements.filter((el) => !el.hidden).map((el) => {
+                {elements.filter((el) => !el.hidden && !isConnector(el)).map((el) => {
                   const active = selected.includes(el.id);
                   const mark = notes.get(el.id);
                   const locked = el.locked === true;
@@ -280,6 +288,29 @@ export function PrototypeCanvas({
                     </div>
                   );
                 })}
+                <ConnectorsLayer
+                  elements={elements}
+                  selected={selected}
+                  connectorTool={connectorTool}
+                  hoverElementId={connectorHoverId}
+                  draftLine={connectorDraft}
+                />
+                {one && isConnector(one) ? (
+                  <div data-proto-skip className="pointer-events-none absolute inset-0 z-20">
+                    {(() => {
+                      const handles = connectorHandlePoints(one, elements);
+                      return (
+                        <>
+                          <span data-connector-handle="start" className="pointer-events-auto absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary bg-background" style={{ left: handles.start.x, top: handles.start.y }} />
+                          <span data-connector-handle="end" className="pointer-events-auto absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary bg-background" style={{ left: handles.end.x, top: handles.end.y }} />
+                          {handles.bend ? (
+                            <span data-connector-handle="bend" className="pointer-events-auto absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-primary bg-background" style={{ left: handles.bend.x, top: handles.bend.y }} />
+                          ) : null}
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : null}
                 {moveTooltip ? (
                   <div
                     data-proto-skip

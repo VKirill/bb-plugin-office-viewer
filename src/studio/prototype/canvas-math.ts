@@ -1,4 +1,5 @@
 // Canvas geometry: marquee, snapping, groups, nudge, distances, zoom helpers.
+import { hitConnector, isConnector } from "./connectors.ts";
 import type { ElementType, WireframeElement } from "./model.ts";
 import { SNAP, snap } from "./model.ts";
 
@@ -30,6 +31,7 @@ export const CANVAS_TOOL_KEYS: Record<string, QuickTool> = {
   l: { type: "Line", props: { orientation: "horizontal", stroke: "#333333", dashed: false } },
   t: { type: "Text", props: { text: "Text" } },
   f: { type: "Shape", props: { shape: "rectangle", text: "Process", fill: "#ffffff", stroke: "#333333" } },
+  e: { type: "Connector" },
   d: { type: "DynamicPanel", props: { states: ["State 1", "State 2"], active: "State 1" } },
   h: { type: "HotSpot", props: { note: "" } },
   m: { type: "Marker", props: { shape: "circle", text: "1", color: "red" } },
@@ -321,13 +323,30 @@ export function gridStep(useFineGrid: boolean): number {
   return useFineGrid ? FINE_GRID : SNAP;
 }
 
+export function shapeAtPoint(elements: readonly WireframeElement[], x: number, y: number): WireframeElement | null {
+  for (let i = elements.length - 1; i >= 0; i--) {
+    const el = elements[i]!;
+    if (el.hidden || isConnector(el)) continue;
+    if (x >= el.x && x <= el.x + el.w && y >= el.y && y <= el.y + el.h) return el;
+  }
+  return null;
+}
+
 export function elementAtPoint(elements: readonly WireframeElement[], x: number, y: number): WireframeElement | null {
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i]!;
     if (el.hidden) continue;
+    if (isConnector(el)) {
+      if (hitConnector(el, elements, x, y)) return el;
+      continue;
+    }
     if (x >= el.x && x <= el.x + el.w && y >= el.y && y <= el.y + el.h) return el;
   }
   return null;
+}
+
+export function isConnectorTool(tool: QuickTool | null): boolean {
+  return tool?.type === "Connector";
 }
 
 export const CLICK_DRAG_THRESHOLD = 4;
