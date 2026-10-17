@@ -2,13 +2,14 @@
 title: Office Viewer API
 type: component
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-17
 status: active
 confidence: medium
 tags: [api, rpc, routes]
 sources:
   - server.ts
   - src/server/locate.ts
+  - src/html/capture.ts
   - app.tsx
   - src/spreadsheet/opener.tsx
   - src/media/media.tsx
@@ -18,26 +19,27 @@ sources:
 
 # Office Viewer API
 
-TL;DR: The plugin exposes six typed BB RPC methods and two GET routes for PDF.js assets; frontend openers call RPC through BB's plugin SDK (`server.ts:39-79`; `server.ts:118-132`).
+TL;DR: The plugin exposes typed RPC methods and GET routes for PDF.js and screenshot assets; frontend openers call RPC through BB's plugin SDK (`server.ts:39-79`; `server.ts:129-153`; `src/html/capture.ts:6`).
 
 ## How it works
 
-The server declares request/response schemas with Zod in `rpcContract`, then registers implementations through `bb.rpc.register` (`server.ts:18-79`; `server.ts:132-233`). File methods accept a `source`, relative or absolute `path`, and optional `locale`; the resolver maps the source to a host and absolute path (`server.ts:18-29`; `src/server/locate.ts:91-133`).
+The server declares request/response schemas with Zod in `rpcContract`, then registers implementations through `bb.rpc.register` (`server.ts:18-79`; `server.ts:154-233`). File methods accept a `source`, relative or absolute `path`, and optional `locale`; the resolver maps the source to a host and absolute path (`server.ts:18-29`; `src/server/locate.ts:91-133`).
 
 ## Modes
 
-RPC is called through BB's plugin SDK from the frontend; the PDF.js asset routes are GET requests mounted on the plugin HTTP server (`server.ts:118-132`). No app-level user authorization logic appears in the route or handler registration (`server.ts:114-132`).
+RPC is called through BB's plugin SDK from the frontend; PDF.js and screenshot assets are GET requests mounted on the plugin HTTP server (`server.ts:125-153`; `src/html/capture.ts:6`). These handlers contain no app-level authorization check (`server.ts:132-153`).
 
 ## Failures and compensation
 
-Invalid RPC payloads fail schema validation; location, missing-file, host-unavailable, parse and write errors propagate through their handlers, with selected file errors rewritten to include host/path context (`server.ts:18-37`; `server.ts:102-112`; `server.ts:142-231`). `save` returns `conflict` if the file hash changed before the read or conditional write; it does not overwrite that version (`server.ts:210-231`). PDF.js asset requests return 304 when the request ETag matches the package version (`server.ts:121-129`).
+Invalid RPC payloads fail schema validation; location, missing-file, host-unavailable, parse and write errors propagate through their handlers, with selected file errors rewritten to include host/path context (`server.ts:18-37`; `server.ts:113-123`; `server.ts:172-261`). `save` returns `conflict` if the file hash changed before the read or conditional write; it does not overwrite that version (`server.ts:240-261`). Asset requests return 304 when the request ETag matches the library version (`server.ts:132-150`).
 
 ## Routes
 
 | Method | Path | Caller | Purpose | Auth |
 |---|---|---|---|---|
-| GET | `/pdfjs/pdf.min.mjs` | PDF opener's dynamic PDF.js import | Serves PDF.js library module with ETag (`server.ts:118-129`; `src/pdf/pdf.tsx:1-3`). | No app-level auth check in this handler (`server.ts:121-129`). |
-| GET | `/pdfjs/pdf.worker.min.mjs` | PDF.js worker loader | Serves PDF.js worker module with ETag (`server.ts:118-129`; `src/pdf/pdf.tsx:1-3`). | No app-level auth check in this handler (`server.ts:121-129`). |
+| GET | `/pdfjs/pdf.min.mjs` | PDF opener's dynamic PDF.js import | Serves PDF.js library module with ETag (`server.ts:129-140`; `src/pdf/pdf.tsx:51-59`). | No app-level auth check in this handler (`server.ts:132-140`). |
+| GET | `/pdfjs/pdf.worker.min.mjs` | PDF.js worker loader | Serves PDF.js worker module with ETag (`server.ts:129-140`; `src/pdf/pdf.tsx:51-59`). | No app-level auth check in this handler (`server.ts:132-140`). |
+| GET | `/capture/modern-screenshot.js` | HTML capture agent | Serves screenshot library to sandboxed pages (`server.ts:143-153`; `src/html/capture.ts:6`). | No app-level auth check in this handler (`server.ts:143-153`). |
 
 ## RPC methods
 
@@ -66,7 +68,7 @@ Invalid RPC payloads fail schema validation; location, missing-file, host-unavai
 
 ## Public API
 
-The public surface is the RPC contract and the two GET paths listed above; implementations and callers are cited in those tables (`server.ts:39-79`; `server.ts:118-132`).
+The public surface is the RPC contract and the three GET paths listed above; implementations and callers are cited in those tables (`server.ts:39-79`; `server.ts:129-153`).
 
 ## Package shape
 
@@ -82,8 +84,8 @@ Zod validates contract inputs/outputs; BB Plugin SDK supplies RPC and HTTP regis
 
 ## Gotchas
 
-- The PDF.js paths are registered as GET routes inside plugin initialization, not as RPC methods (`server.ts:118-132`).
-- The API page describes handler-level behavior; authentication enforcement is provided by the BB host transport, whose internal policy is outside this repository (`server.ts:114-132`).
+- Asset paths are registered as GET routes inside plugin initialization, not as RPC methods (`server.ts:129-153`).
+- The page documents handler-level behavior; this repository does not show the BB host transport's authorization policy (`server.ts:125-153`).
 
 <!-- lane-pilot:backlinks -->
 ## Referenced by

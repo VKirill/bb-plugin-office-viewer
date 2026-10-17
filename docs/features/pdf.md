@@ -2,9 +2,9 @@
 title: PDF viewing
 type: component
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-17
 status: active
-confidence: medium
+confidence: low
 tags: [pdf, search, documents]
 sources:
   - src/pdf/pdf.tsx
@@ -39,14 +39,15 @@ Render PDF pages in a continuous viewer, with search and selection features that
 
 - The app opener handles only the `.pdf` extension (`src/pdf/pdf.tsx:27-30`; `app.tsx:39-44`).
 - Download uses the original preview URL; the viewer does not provide PDF editing (`src/pdf/pdf.tsx:239-298`).
-- PDF.js assets are served by explicit GET routes for `pdf.min.mjs` and `pdf.worker.min.mjs` (`server.ts:118-129`).
+- PDF.js assets are served by explicit GET routes for `pdf.min.mjs` and `pdf.worker.min.mjs` (`server.ts:129-140`).
 
 ## Public API
 
 | Import or call | File | Purpose |
 |---|---|---|
 | `PdfOpener` | `src/pdf/pdf.tsx:239-298` | PDF viewer UI and lifecycle. |
-| `PDF_EXTENSIONS` | `src/pdf/pdf.tsx:27-30` | PDF extension registration. |
+| `PDF_EXTENSIONS` | `src/pdf/pdf.tsx:17` | PDF extension registration. |
+| `findHits` | `src/pdf/pdf.tsx:75-96` | Locate case-folded search matches and map them to text-layer item spans on each page. |
 | RPC `open` | `server.ts:41-44`; `server.ts:167-177` | Resolve the file and create a preview URL. |
 | GET `/pdfjs/pdf.min.mjs` | `server.ts:121-129` | Serve PDF.js library module. |
 | GET `/pdfjs/pdf.worker.min.mjs` | `server.ts:121-129` | Serve PDF.js worker module. |

@@ -1,6 +1,6 @@
 ---
 title: Office Viewer — project facts
-updated: 2026-10-13
+updated: 2026-10-17
 sources:
   - package.json
   - app.tsx
@@ -8,6 +8,7 @@ sources:
   - src/server/locate.ts
   - docs/architecture.md
   - docs/gotchas.md
+  - docs/features/html-layout.md
 ---
 
 # Office Viewer — project facts
@@ -21,7 +22,7 @@ sources:
 ## Entry points
 
 - Frontend slot registration: `app.tsx`; opener implementations under `src/` (`app.tsx:14-52`). [Feature pages](docs/features/spreadsheets.md)
-- Backend RPC, GET routes and file writes: `server.ts:114-233`. [API](docs/api.md)
+- Backend RPC, GET routes and file writes: `server.ts:125-261`. [API](docs/api.md)
 - File source resolution: `src/server/locate.ts:91-133`.
 
 ## Critical invariants
@@ -34,7 +35,7 @@ sources:
 
 - TypeScript ES modules; React JSX; `@/*` aliases map to project root (`tsconfig.json:1-23`).
 - Each UI opener calls the typed BB RPC client; backend contract schemas live in `server.ts:18-79`.
-- Feature behavior and limits: [Spreadsheets](docs/features/spreadsheets.md), [Office documents](docs/features/office-documents.md), [PDF](docs/features/pdf.md), [Media](docs/features/media.md).
+- Feature behavior and limits: [Spreadsheets](docs/features/spreadsheets.md), [Office documents](docs/features/office-documents.md), [PDF](docs/features/pdf.md), [HTML layout](docs/features/html-layout.md), [Media](docs/features/media.md).
 
 ## Common gotchas
 

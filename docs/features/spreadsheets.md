@@ -2,7 +2,7 @@
 title: Spreadsheet editing
 type: component
 created: 2026-10-13
-updated: 2026-10-13
+updated: 2026-10-17
 status: active
 confidence: medium
 tags: [spreadsheets, editing, formulas]
@@ -18,6 +18,8 @@ sources:
   - app.tsx
   - src/spreadsheet/grid.tsx
   - src/spreadsheet/xlsx-patch.test.ts
+  - src/spreadsheet/functions.ts
+  - src/spreadsheet/formula-input.tsx
 ---
 
 # Spreadsheet editing
@@ -33,6 +35,7 @@ Open spreadsheet files in BB, inspect/search/copy cells, quote a selected range 
 1. BB routes extensions registered by `app.tsx` to `SpreadsheetOpener` (`app.tsx:5-7`; `app.tsx:14-20`).
 2. The opener calls RPC `open`, fetches the preview URL, decodes its bytes, parses through `parseWorkbook`, and constructs the formula model (`src/spreadsheet/opener.tsx:103-162`; `src/spreadsheet/sheet.ts:155-176`; `src/spreadsheet/engine.ts:55-113`).
 3. The grid renders visible cells and selection; formula and cell inputs are normalized into engine inputs, and dependent formulas recalculate in the model (`src/spreadsheet/grid.tsx:58-117`; `src/spreadsheet/engine.ts:139-182`).
+   `FormulaInput` shows function completion for the token at the caret, cycles candidates with arrow keys, accepts with Tab or Enter, and dismisses with Escape (`src/spreadsheet/formula-input.tsx:28-100`). The catalog supplies English and Russian names, argument signatures and hints (`src/spreadsheet/functions.ts:1-67`).
 4. Search traverses cells in row-major order; quote actions format the selected range as a Markdown table and insert it into the chat composer (`src/spreadsheet/sheet.ts:178-193`; `src/spreadsheet/edits.ts:97-142`; `src/spreadsheet/opener.tsx:103-162`).
 5. Save serializes touched cells, sends edits with the original SHA-256, then updates the opened file only if the server still reads that hash (`src/spreadsheet/engine.ts:198-239`; `server.ts:210-234`).
 
@@ -51,6 +54,9 @@ On parse, load, engine or save errors, the opener displays an error state; a has
 - Save uses optimistic concurrency: both the server read and final write use the expected SHA-256 (`server.ts:210-234`).
 - XLSX patching validates sheet index and name and refuses array formulas and cells without references (`src/spreadsheet/xlsx-patch.ts:246-278`; tests at `src/spreadsheet/xlsx-patch.test.ts:82-130`).
 - Unsupported formulas display cached file text instead of the engine error (`src/spreadsheet/engine.ts:104-112`; `src/spreadsheet/engine.ts:118-132`).
+- `initEngine` initializes the WASM module once per browser module instance; later calls return without reinitializing it (`src/spreadsheet/engine.ts:11-20`).
+- For XLSX input, an empty cell edit clears, `=...` is a formula, English or Russian boolean words become booleans, valid dates in date cells become serial numbers, and numeric input accepts commas, spaces and a trailing percent sign. CSV input remains text (`src/spreadsheet/edits.ts:34-53`).
+- Formula reference insertion formats single cells, ranges, whole rows or columns and quotes sheet names that are not valid bare identifiers (`src/spreadsheet/formula.ts:85-95`; `src/spreadsheet/formula.ts:97-102`).
 
 ## Public API
 
@@ -59,6 +65,10 @@ On parse, load, engine or save errors, the opener displays an error state; a has
 | `SpreadsheetOpener` | `src/spreadsheet/opener.tsx:103-162` | BB UI for opening, editing and quoting a workbook. |
 | `parseWorkbook`, `findCells`, `editMode` | `src/spreadsheet/sheet.ts:9-13`; `src/spreadsheet/sheet.ts:155-193` | Parse workbook data, select save mode and search. |
 | `buildWorkbook`, `applyInput`, `editsForSave` | `src/spreadsheet/engine.ts:55-113`; `src/spreadsheet/engine.ts:139-182`; `src/spreadsheet/engine.ts:198-239` | Build model, apply values and produce save edits. |
+| `initEngine` | `src/spreadsheet/engine.ts:16-20` | Initialize IronCalc WASM once. |
+| `FUNCTIONS` | `src/spreadsheet/functions.ts:8-67` | Formula autocomplete catalog with English and Russian names and argument hints. |
+| `FormulaInput` | `src/spreadsheet/formula-input.tsx:28-87` | Formula editor and completion interaction. |
+| `parseInput`, `referenceText` | `src/spreadsheet/edits.ts:35-53`; `src/spreadsheet/formula.ts:89-95` | Convert entered text to edit values and format selected references. |
 | `parseCsv`, `serializeCsv`, `applyCsvEdits` | `src/spreadsheet/csv.ts:43-131` | CSV and TSV decoding, serialization and edits. |
 | `patchXlsx` | `src/spreadsheet/xlsx-patch.ts:246-278` | Patch edited cells in an XLSX package. |
 
