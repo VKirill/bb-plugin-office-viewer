@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { IconTooltipButton } from "@/components/ui/icon-tooltip-button";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -79,7 +79,10 @@ export function InspectorStylePanel({
   applyDistribute: (axis: DistributeAxis) => void;
 }) {
   const t = useT();
-  const [lockAspect, setLockAspect] = useState(false);
+  const [lockAspect, setLockAspect] = useState(() => inspect?.props.lockAspect === true);
+  useEffect(() => {
+    setLockAspect(inspect?.props.lockAspect === true);
+  }, [inspect?.id, inspect?.props.lockAspect]);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     geometry: true,
     text: true,
@@ -150,7 +153,15 @@ export function InspectorStylePanel({
                 });
               }}
             />
-            <IconTooltipButton label={t("protoLockAspect")} pressed={lockAspect} onClick={() => setLockAspect((on) => !on)}>
+            <IconTooltipButton
+              label={t("protoLockAspect")}
+              pressed={lockAspect}
+              onClick={() => {
+                const next = !lockAspect;
+                setLockAspect(next);
+                setProp("lockAspect", next);
+              }}
+            >
               <Icon name={lockAspect ? "Lock" : "SquareUnlock02"} className="size-4" />
             </IconTooltipButton>
             <ScrubField

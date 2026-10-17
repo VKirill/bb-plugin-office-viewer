@@ -56,13 +56,18 @@ import { alignElements, distributeElements, type AlignEdge, type DistributeAxis 
 import { ICON_DRAG_PREFIX, iconDisplayLabel } from "./icons";
 import { TEMPLATE_DRAG_PREFIX, insertTemplateElements } from "./templates";
 import {
+  activeModifierLabels,
   arrowNudge,
   CANVAS_TOOL_KEYS,
+  CLICK_DRAG_THRESHOLD,
   clickSelection,
+  constrainMove,
   distanceLinesFor,
+  drawRect,
   elementAtPoint,
   expandToGroups,
   groupIds,
+  isDragDrawTool,
   marqueeHitTest,
   moveElementsByDelta,
   normalizeRect,
@@ -71,8 +76,10 @@ import {
   selectionRect,
   snapDelta,
   snapRectToPeers,
+  type CanvasModifiers,
   type CanvasRect,
   type DistanceLine,
+  type ElementBox,
   type QuickTool,
   type SnapGuide,
   ungroupIds,
@@ -81,6 +88,7 @@ import {
   zoomToBounds,
   zoomToFit,
 } from "./canvas-math";
+import { ProtoShortcutsSheet } from "./proto-shortcuts-sheet";
 import { PrototypeContextMenu, type ContextMenuAction } from "./canvas-context-menu";
 
 const MAX_HISTORY = 60;
@@ -88,6 +96,18 @@ const MAX_HISTORY = 60;
 type Drag =
   | { kind: "move"; ids: string[]; ox: number; oy: number; orig: Record<string, { x: number; y: number }> }
   | { kind: "resize"; id: string; handle: Handle; orig: WireframeElement }
+  | {
+      kind: "draw";
+      tool: QuickTool;
+      ax: number;
+      ay: number;
+      panX: number;
+      panY: number;
+      ex: number;
+      ey: number;
+      lastX: number;
+      lastY: number;
+    }
   | { kind: "marquee"; ox: number; oy: number; contain: boolean }
   | { kind: "pan"; startX: number; startY: number; scrollLeft: number; scrollTop: number };
 type SendKind = "both" | "png" | "json";
@@ -130,6 +150,9 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [moveTooltip, setMoveTooltip] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [panning, setPanning] = useState(false);
   const [pendingTool, setPendingTool] = useState<QuickTool | null>(null);
+  const [drawPreview, setDrawPreview] = useState<ElementBox | null>(null);
+  const [modifiers, setModifiers] = useState<CanvasModifiers>({ shift: false, alt: false, meta: false, space: false });
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [quickInsertOpen, setQuickInsertOpen] = useState(false);
   const [quickQuery, setQuickQuery] = useState("");
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -232,6 +255,34 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     );
     replace([...pageElements(doc), el]);
     setSelected([el.id]);
+  };
+
+  const placeDrawnElement = (tool: QuickTool, box: ElementBox) => {
+    const base = defaultElement(tool.type, box.x, box.y, pageElements(doc));
+    const el = placeOnCanvas(
+      { ...base, props: { ...base.props, ...(tool.props ?? {}) }, w: box.w, h: box.h },
+      pageCanvas(doc),
+    );
+    replace([...pageElements(doc), el]);
+    setSelected([el.id]);
+  };
+
+  const cancelActiveDrag = () => {
+    drag.current = null;
+    setDrawPreview(null);
+    setMarquee(null);
+    setSnapGuides([]);
+    setMoveTooltip(null);
+    setLive(null);
+  };
+
+  const syncPointerModifiers = (event: { shiftKey: boolean; altKey: boolean; metaKey: boolean; ctrlKey: boolean }) => {
+    setModifiers((m) => ({
+      ...m,
+      shift: event.shiftKey,
+      alt: event.altKey,
+      meta: event.metaKey || event.ctrlKey,
+    }));
   };
 
   const addTemplate = (templateId: string, x?: number, y?: number) => {
@@ -432,10 +483,28 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     if (event.button !== 0) return;
     if (spaceHeld.current) return;
     if ((event.target as HTMLElement).closest("input")) return;
+    syncPointerModifiers(event);
     setContextMenu(null);
     const handle = (event.target as HTMLElement).dataset.handle as Handle | undefined;
     const id = (event.target as HTMLElement).closest("[data-el]")?.getAttribute("data-el");
     const p = boardPoint(event);
+    if (pendingTool && isDragDrawTool(pendingTool) && !handle) {
+      drag.current = {
+        kind: "draw",
+        tool: pendingTool,
+        ax: p.x,
+        ay: p.y,
+        panX: 0,
+        panY: 0,
+        ex: p.x,
+        ey: p.y,
+        lastX: p.x,
+        lastY: p.y,
+      };
+      setDrawPreview(null);
+      event.currentTarget.setPointerCapture(event.pointerId);
+      return;
+    }
     if (pendingTool && !handle) {
       addQuickTool(pendingTool, p.x, p.y);
       return;
@@ -449,10 +518,23 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       const target = pageElements(view).find((item) => item.id === id);
       if (target?.locked) return;
       const picked = clickSelection(selected, id, event.metaKey || event.ctrlKey, event.shiftKey);
-      const ids = expandToGroups(pageElements(view), picked);
+      let ids = expandToGroups(pageElements(view), picked);
       setSelected(ids);
+      let elements = pageElements(doc);
+      if (event.altKey) {
+        const copies = elements
+          .filter((el) => ids.includes(el.id))
+          .map((el) =>
+            placeOnCanvas({ ...structuredClone(el), id: newElementId(), x: el.x, y: el.y }, pageCanvas(doc)),
+          );
+        elements = [...elements, ...copies];
+        ids = copies.map((el) => el.id);
+        setLive(patchElements(doc, elements));
+        setSelected(ids);
+      }
       const orig: Record<string, { x: number; y: number }> = {};
-      for (const el of pageElements(view)) if (ids.includes(el.id)) orig[el.id] = { x: el.x, y: el.y };
+      const source = live ? pageElements(live) : elements;
+      for (const el of source) if (ids.includes(el.id)) orig[el.id] = { x: el.x, y: el.y };
       drag.current = { kind: "move", ids, ox: p.x, oy: p.y, orig };
       event.currentTarget.setPointerCapture(event.pointerId);
       return;
@@ -466,11 +548,33 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   const onBoardPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const current = drag.current;
     const p = boardPoint(event);
+    syncPointerModifiers(event);
     if (!current) {
       if (event.altKey) {
         const hit = elementAtPoint(pageElements(view), p.x, p.y);
         setDistanceLines(hit ? distanceLinesFor(hit, pageElements(view)) : []);
       } else setDistanceLines([]);
+      return;
+    }
+    if (current.kind === "draw") {
+      if (spaceHeld.current) {
+        current.panX += p.x - current.lastX;
+        current.panY += p.y - current.lastY;
+      } else {
+        current.ex = p.x;
+        current.ey = p.y;
+      }
+      current.lastX = p.x;
+      current.lastY = p.y;
+      const box = drawRect(
+        current.ax + current.panX,
+        current.ay + current.panY,
+        current.ex,
+        current.ey,
+        current.tool.type,
+        { shift: event.shiftKey, alt: event.altKey },
+      );
+      setDrawPreview(box);
       return;
     }
     if (current.kind === "marquee") {
@@ -480,31 +584,42 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     if (current.kind === "move") {
       let dx = p.x - current.ox;
       let dy = p.y - current.oy;
+      const constrained = constrainMove(dx, dy, event.shiftKey);
+      dx = constrained.dx;
+      dy = constrained.dy;
+      const baseElements = live ? pageElements(live) : pageElements(doc);
       const bounds = selectionRect(
-        pageElements(doc).map((el) => {
+        baseElements.map((el) => {
           const from = current.orig[el.id];
           return from ? { ...el, x: from.x + dx, y: from.y + dy } : el;
         }),
         current.ids,
       );
       const guides: SnapGuide[] = [];
-      if (bounds) {
+      const snapOff = event.metaKey || event.ctrlKey;
+      if (bounds && !snapOff) {
         const peerSnap = snapRectToPeers(bounds, pageElements(doc), new Set(current.ids));
         dx += peerSnap.dx;
         dy += peerSnap.dy;
         guides.push(...peerSnap.guides);
       }
-      const grid = snapGrid ? settings.protoGridStep : null;
+      const grid = snapGrid && !snapOff ? settings.protoGridStep : null;
       const snapped = snapDelta(dx, dy, grid);
       setSnapGuides(guides);
       if (bounds) {
         setMoveTooltip({ x: bounds.left + snapped.dx, y: bounds.top + snapped.dy, w: bounds.right - bounds.left, h: bounds.bottom - bounds.top });
       }
-      setLive(patchElements(doc, moveElementsByDelta(pageElements(doc), new Set(current.ids), snapped.dx, snapped.dy, current.orig)));
+      setLive(patchElements(doc, moveElementsByDelta(baseElements, new Set(current.ids), snapped.dx, snapped.dy, current.orig)));
       return;
     }
     if (current.kind === "resize") {
-      setLive(patchElements(doc, pageElements(doc).map((el) => (el.id === current.id ? resized(current.orig, current.handle, p.x, p.y) : el))));
+      const mods = { shift: event.shiftKey, alt: event.altKey };
+      setLive(
+        patchElements(
+          doc,
+          pageElements(doc).map((el) => (el.id === current.id ? resized(current.orig, current.handle, p.x, p.y, mods) : el)),
+        ),
+      );
     }
   };
 
@@ -513,6 +628,26 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     drag.current = null;
     setSnapGuides([]);
     setMoveTooltip(null);
+    syncPointerModifiers(event);
+    if (current?.kind === "draw") {
+      const p = boardPoint(event);
+      setDrawPreview(null);
+      const dist = Math.hypot(p.x - current.ax, p.y - current.ay);
+      if (dist < CLICK_DRAG_THRESHOLD) {
+        addQuickTool(current.tool, current.ax, current.ay);
+      } else {
+        const box = drawRect(
+          current.ax + current.panX,
+          current.ay + current.panY,
+          current.ex,
+          current.ey,
+          current.tool.type,
+          { shift: event.shiftKey, alt: event.altKey },
+        );
+        placeDrawnElement(current.tool, box);
+      }
+      return;
+    }
     if (current?.kind === "marquee") {
       const p = boardPoint(event);
       const rect = normalizeRect(current.ox, current.oy, p.x, p.y);
@@ -911,6 +1046,23 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       replace(pageElements(doc).map((el) => (selected.includes(el.id) ? { ...el, x: el.x + dx, y: el.y + dy } : el)));
       return;
     }
+    if (event.key === "Escape") {
+      if (drag.current) {
+        event.preventDefault();
+        cancelActiveDrag();
+        return;
+      }
+      if (pendingTool) {
+        event.preventDefault();
+        setPendingTool(null);
+        return;
+      }
+    }
+    if (event.key === "?" || (event.shiftKey && event.key === "/")) {
+      event.preventDefault();
+      setShortcutsOpen(true);
+      return;
+    }
     if (quickInsertOpen && event.key === "Escape") {
       event.preventDefault();
       setQuickInsertOpen(false);
@@ -1013,6 +1165,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       if (event.code === "Space") {
         event.preventDefault();
         spaceHeld.current = event.type === "keydown";
+        setModifiers((m) => ({ ...m, space: event.type === "keydown" }));
       }
     };
     window.addEventListener("keydown", block);
@@ -1022,6 +1175,37 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       window.removeEventListener("keyup", block);
     };
   }, []);
+
+  useEffect(() => {
+    const sync = (event: globalThis.KeyboardEvent) => {
+      const tag = (event.target as HTMLElement).closest("input, textarea, [role=dialog]");
+      if (tag) return;
+      setModifiers((m) => ({
+        ...m,
+        shift: event.shiftKey,
+        alt: event.altKey,
+        meta: event.metaKey || event.ctrlKey,
+      }));
+    };
+    window.addEventListener("keydown", sync);
+    window.addEventListener("keyup", sync);
+    return () => {
+      window.removeEventListener("keydown", sync);
+      window.removeEventListener("keyup", sync);
+    };
+  }, []);
+
+  const modifierHint = useMemo(() => {
+    const labels = activeModifierLabels(modifiers);
+    if (!labels.length) return null;
+    const text: Record<(typeof labels)[number], string> = {
+      shift: t("protoModifierShift"),
+      alt: t("protoModifierAlt"),
+      meta: t("protoModifierMeta"),
+      space: t("protoModifierSpace"),
+    };
+    return labels.map((label) => text[label]).join(" · ");
+  }, [modifiers, t]);
 
 const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(tile.labelKey, tile.labelParams ?? {})));
   const quickTiles = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, quickQuery, t(tile.labelKey, tile.labelParams ?? {}))).slice(0, 12);
@@ -1133,6 +1317,9 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             moveTooltip={moveTooltip}
             panning={panning}
             insertMode={pendingTool !== null}
+            drawPreview={drawPreview}
+            modifierHint={modifierHint}
+            onOpenShortcuts={() => setShortcutsOpen(true)}
             onPanePointerDown={onPanePointerDown}
             onPanePointerMove={onPanePointerMove}
             onPanePointerUp={onPanePointerUp}
@@ -1213,6 +1400,7 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
           </>
         }
       />
+      <ProtoShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <PrototypeContextMenu
         open={contextMenu !== null}
         x={contextMenu?.x ?? 0}

@@ -1,6 +1,7 @@
 import type { domToBlob } from "modern-screenshot";
 import { SCREENSHOT_LIBRARY } from "../../html/capture";
 import { stringList, type InlineTarget } from "./editing";
+import { resizeBox, type DrawModifiers } from "./canvas-math";
 import { SNAP, snap, type WireframeCanvas, type WireframeElement } from "./model";
 
 export const MIN_SIZE = SNAP;
@@ -44,16 +45,28 @@ export async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary);
 }
 
-export function resized(el: WireframeElement, handle: Handle, x: number, y: number): WireframeElement {
-  let left = el.x;
-  let top = el.y;
-  let right = el.x + el.w;
-  let bottom = el.y + el.h;
-  if (handle.includes("w")) left = Math.min(snap(x), right - MIN_SIZE);
-  if (handle.includes("e")) right = Math.max(snap(x), left + MIN_SIZE);
-  if (handle.includes("n")) top = Math.min(snap(y), bottom - MIN_SIZE);
-  if (handle.includes("s")) bottom = Math.max(snap(y), top + MIN_SIZE);
-  return { ...el, x: left, y: top, w: Math.max(MIN_SIZE, snap(right - left)), h: Math.max(MIN_SIZE, snap(bottom - top)) };
+export function resized(
+  el: WireframeElement,
+  handle: Handle,
+  x: number,
+  y: number,
+  modifiers: DrawModifiers = { shift: false, alt: false },
+): WireframeElement {
+  const box = resizeBox(
+    { x: el.x, y: el.y, w: el.w, h: el.h },
+    handle,
+    snap(x),
+    snap(y),
+    modifiers,
+    { type: el.type, props: el.props as Record<string, string | number | boolean | string[] | undefined> },
+  );
+  return {
+    ...el,
+    x: snap(box.x),
+    y: snap(box.y),
+    w: Math.max(MIN_SIZE, snap(box.w)),
+    h: Math.max(MIN_SIZE, snap(box.h)),
+  };
 }
 
 export function placeOnCanvas(el: WireframeElement, canvas: WireframeCanvas): WireframeElement {
