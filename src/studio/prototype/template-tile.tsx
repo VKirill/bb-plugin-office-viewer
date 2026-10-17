@@ -1,4 +1,4 @@
-import { useMemo, useRef, type DragEvent } from "react";
+import { useMemo, useRef, type DragEvent, type MouseEvent } from "react";
 import { ElementFace } from "./elements";
 import type { PrototypeTemplate } from "./templates";
 import { TEMPLATE_DRAG_PREFIX, previewElementsForTemplate, templatePreviewBounds } from "./templates";
@@ -23,7 +23,17 @@ export function TemplatePreview({ templateId }: { templateId: string }) {
   );
 }
 
-export function TemplateTileButton({ template, label, onAdd }: { template: PrototypeTemplate; label: string; onAdd: () => void }) {
+export function TemplateTileButton({
+  template,
+  label,
+  onAdd,
+  onContextMenu,
+}: {
+  template: PrototypeTemplate;
+  label: string;
+  onAdd: () => void;
+  onContextMenu?: (event: MouseEvent) => void;
+}) {
   const previewRef = useRef<HTMLDivElement>(null);
   return (
     <button
@@ -35,6 +45,7 @@ export function TemplateTileButton({ template, label, onAdd }: { template: Proto
         if (previewRef.current) event.dataTransfer.setDragImage(previewRef.current, 36, 28);
       }}
       onClick={onAdd}
+      onContextMenu={onContextMenu}
       className="flex cursor-grab flex-col rounded-lg px-1 pb-1 pt-1 hover:bg-state-hover"
     >
       <div ref={previewRef} className="flex h-11 items-center justify-center">

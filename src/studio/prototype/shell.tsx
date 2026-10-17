@@ -97,7 +97,14 @@ export function PrototypeShell({
   }, [closeOpenOverlays, overlayOpen]);
 
   return (
-    <div ref={shellRef} className="flex h-full min-h-0 flex-col bg-background outline-none">
+    <div
+      ref={shellRef}
+      className="flex h-full min-h-0 flex-col bg-background outline-none"
+      onContextMenu={(event) => {
+        if ((event.target as HTMLElement).closest("input, textarea, [contenteditable='true']")) return;
+        event.preventDefault();
+      }}
+    >
       {toolbar}
       {styleBar}
       <div className="relative flex min-h-0 flex-1">

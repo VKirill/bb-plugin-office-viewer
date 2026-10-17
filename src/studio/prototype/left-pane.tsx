@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -22,6 +32,8 @@ import {
   type LeftPaneSplitState,
   type SplitDividerKey,
 } from "./pane-split";
+import { clickSelection, expandToGroups } from "./canvas-math";
+import type { MenuTarget } from "./menus";
 import type { PaletteGroup, WireframeElement, WireframePage } from "./model";
 
 export type PaletteLibraryView = "elements" | "templates" | "icons";
@@ -41,7 +53,11 @@ export function PrototypeLeftPane({
   onReorderPages,
   elements,
   selected,
-  onSelectElement,
+  onSelectElements,
+  onOpenContextMenu,
+  renameElementId,
+  renamePageId,
+  onRenameHandled,
   onToggleHidden,
   onToggleLocked,
   onReorderElements,
@@ -69,7 +85,11 @@ export function PrototypeLeftPane({
   onReorderPages: (from: number, to: number) => void;
   elements: WireframeElement[];
   selected: string[];
-  onSelectElement: (id: string) => void;
+  onSelectElements: (ids: string[]) => void;
+  onOpenContextMenu: (x: number, y: number, target: MenuTarget) => void;
+  renameElementId: string | null;
+  renamePageId: string | null;
+  onRenameHandled: () => void;
   onToggleHidden: (id: string) => void;
   onToggleLocked: (id: string) => void;
   onReorderElements: (from: number, to: number) => void;
@@ -100,6 +120,32 @@ export function PrototypeLeftPane({
   useEffect(() => {
     writeLeftPaneSplit(split);
   }, [split]);
+
+  useEffect(() => {
+    if (!renamePageId) return;
+    const page = pages.find((item) => item.id === renamePageId);
+    if (!page) return;
+    setTopTab("pages");
+    setPageEdit(renamePageId);
+    setPageDraft(page.name);
+    onRenameHandled();
+  }, [renamePageId, pages, onRenameHandled]);
+
+  useEffect(() => {
+    if (!renameElementId) return;
+    const el = elements.find((item) => item.id === renameElementId);
+    if (!el) return;
+    setTopTab("outline");
+    setElEdit(renameElementId);
+    setElDraft(el.label);
+    onRenameHandled();
+  }, [renameElementId, elements, onRenameHandled]);
+
+  const openMenu = (event: ReactMouseEvent, target: MenuTarget) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onOpenContextMenu(event.clientX, event.clientY, target);
+  };
 
   useEffect(() => {
     const node = paneRef.current;
@@ -159,7 +205,14 @@ export function PrototypeLeftPane({
   );
 
   return (
-    <div ref={paneRef} className="flex h-full min-h-0 w-full flex-col bg-background">
+    <div
+      ref={paneRef}
+      className="flex h-full min-h-0 w-full flex-col bg-background"
+      onContextMenu={(event) => {
+        if ((event.target as HTMLElement).closest("input, textarea, button")) return;
+        event.preventDefault();
+      }}
+    >
       <section className="flex min-h-0 shrink-0 flex-col overflow-hidden" style={{ height: layout.top }}>
         <div className="flex items-center gap-1 p-2">
           <button
@@ -196,6 +249,7 @@ export function PrototypeLeftPane({
                     dragPage.current = null;
                   }}
                   className={cn("flex items-center gap-1 rounded px-1 py-0.5", page.id === activePageId && "bg-muted")}
+                  onContextMenu={(event) => openMenu(event, { kind: "page", pageId: page.id })}
                 >
                   <button type="button" className="min-w-0 flex-1 truncate text-left" onClick={() => onSelectPage(page.id)} onDoubleClick={() => { setPageEdit(page.id); setPageDraft(page.name); }}>
                     {pageEdit === page.id ? (
@@ -238,8 +292,21 @@ export function PrototypeLeftPane({
                       dragEl.current = null;
                     }}
                     className={cn("flex items-center gap-1 rounded px-1 py-0.5", selected.includes(el.id) && "bg-muted")}
+                    onContextMenu={(event) => {
+                      if (!selected.includes(el.id)) {
+                        onSelectElements(expandToGroups(elements, [el.id]));
+                      }
+                      openMenu(event, { kind: "outlineLayer", elementId: el.id });
+                    }}
                   >
-                    <button type="button" className="min-w-0 flex-1 truncate text-left text-xs" onClick={() => onSelectElement(el.id)} onDoubleClick={() => { setElEdit(el.id); setElDraft(el.label); }}>
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 truncate text-left text-xs"
+                      onClick={(event) => {
+                        onSelectElements(expandToGroups(elements, clickSelection(selected, el.id, event.metaKey || event.ctrlKey, event.shiftKey)));
+                      }}
+                      onDoubleClick={() => { setElEdit(el.id); setElDraft(el.label); }}
+                    >
                       {elEdit === el.id ? (
                         <Input autoFocus className="h-7" value={elDraft} onChange={(event) => setElDraft(event.target.value)} onBlur={() => { onRenameElement(el.id, elDraft.trim() || el.label); setElEdit(null); }} />
                       ) : (
@@ -307,14 +374,24 @@ export function PrototypeLeftPane({
           {paletteView === "elements" ? <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("protoSearch")} className="mb-2 h-8" /> : null}
           {paletteView === "templates" ? <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("protoSearchTemplates")} className="mb-2 h-8" /> : null}
         {paletteView === "icons" ? (
-          <IconsLibraryPanel className="min-h-0 flex-1" onPick={onAddIcon} />
+          <IconsLibraryPanel
+            className="min-h-0 flex-1"
+            onPick={onAddIcon}
+            onIconContextMenu={(iconName, event) => openMenu(event, { kind: "iconTile", iconName })}
+          />
         ) : paletteView === "templates" ? (
           <div className="min-h-0 flex-1 overflow-auto">
             <div className="mb-3">
               <div className="mb-1 text-xs font-medium text-muted-foreground">{t("protoTemplateGroupForms")}</div>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1">
                 {filteredFormTemplates.map((template) => (
-                  <TemplateTileButton key={template.id} template={template} label={t(template.labelKey)} onAdd={() => onAddTemplate(template.id)} />
+                  <TemplateTileButton
+                    key={template.id}
+                    template={template}
+                    label={t(template.labelKey)}
+                    onAdd={() => onAddTemplate(template.id)}
+                    onContextMenu={(event) => openMenu(event, { kind: "templateTile", templateId: template.id })}
+                  />
                 ))}
               </div>
             </div>
@@ -322,7 +399,13 @@ export function PrototypeLeftPane({
               <div className="mb-1 text-xs font-medium text-muted-foreground">{t("protoTemplateGroupInterface")}</div>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1">
                 {filteredInterfaceTemplates.map((template) => (
-                  <TemplateTileButton key={template.id} template={template} label={t(template.labelKey)} onAdd={() => onAddTemplate(template.id)} />
+                  <TemplateTileButton
+                    key={template.id}
+                    template={template}
+                    label={t(template.labelKey)}
+                    onAdd={() => onAddTemplate(template.id)}
+                    onContextMenu={(event) => openMenu(event, { kind: "templateTile", templateId: template.id })}
+                  />
                 ))}
               </div>
             </div>
@@ -342,7 +425,13 @@ export function PrototypeLeftPane({
                   {open ? (
                     <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1">
                       {items.map((tile) => (
-                        <PaletteTileButton key={tile.id} tile={tile} label={t(tile.labelKey, tile.labelParams ?? {})} onAdd={() => onAddTile(tile)} />
+                        <PaletteTileButton
+                          key={tile.id}
+                          tile={tile}
+                          label={t(tile.labelKey, tile.labelParams ?? {})}
+                          onAdd={() => onAddTile(tile)}
+                          onContextMenu={(event) => openMenu(event, { kind: "paletteTile", tileId: tile.id })}
+                        />
                       ))}
                     </div>
                   ) : null}
@@ -358,7 +447,17 @@ export function PrototypeLeftPane({
   );
 }
 
-function PaletteTileButton({ tile, onAdd, label }: { tile: PaletteTile; onAdd: () => void; label: string }) {
+function PaletteTileButton({
+  tile,
+  onAdd,
+  label,
+  onContextMenu,
+}: {
+  tile: PaletteTile;
+  onAdd: () => void;
+  label: string;
+  onContextMenu?: (event: React.MouseEvent) => void;
+}) {
   const previewRef = useRef<HTMLDivElement>(null);
   const boxW = 40;
   const boxH = 40;
@@ -372,6 +471,7 @@ function PaletteTileButton({ tile, onAdd, label }: { tile: PaletteTile; onAdd: (
         if (previewRef.current) event.dataTransfer.setDragImage(previewRef.current, boxW / 2, boxH / 2);
       }}
       onClick={onAdd}
+      onContextMenu={onContextMenu}
       className="flex cursor-grab flex-col rounded-lg px-1 pb-1 pt-1 hover:bg-state-hover"
     >
       <div ref={previewRef} className="flex h-11 items-center justify-center text-foreground">
