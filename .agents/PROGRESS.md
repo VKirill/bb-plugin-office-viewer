@@ -18,4 +18,4 @@
 ## Pointers
 - Open todos: none (`.agents/todos/INDEX.md` does not exist).
 - Active plans: none.
-- [Changelog](CHANGELOG.md)
+- [Changelog](CHANGELOG.md) — project memory updates.
