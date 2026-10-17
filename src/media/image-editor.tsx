@@ -13,6 +13,7 @@ import {
   Copy01Icon,
   CropIcon,
   Cursor01Icon,
+  EraserIcon,
   Download01Icon,
   FlipHorizontalIcon,
   FlipVerticalIcon,
@@ -30,6 +31,7 @@ import {
   ZoomInIcon,
   ZoomOutIcon,
 } from "@hugeicons/core-free-icons";
+import { getStroke } from "perfect-freehand";
 import { useComposer } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -37,28 +39,22 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { t } from "../shared/i18n";
+import { eraseShapesAt, PAINT_SIZES, type PaintShape } from "../studio/paint/paint-model";
 
-type Tool = "select" | "rect" | "ellipse" | "arrow" | "line" | "pen" | "marker" | "text" | "step" | "blur" | "crop";
+type Tool = "select" | "rect" | "ellipse" | "arrow" | "line" | "pen" | "marker" | "text" | "step" | "blur" | "crop" | "eraser";
 type Box = { x: number; y: number; w: number; h: number };
-type Common = { id: string; color: string; /** Stroke width in image pixels. */ size: number };
-type Shape = Common &
-  (
-    | ({ type: "rect" | "ellipse" | "blur"; fill: boolean } & Box)
-    | { type: "arrow" | "line"; x1: number; y1: number; x2: number; y2: number }
-    | { type: "pen" | "marker"; points: number[] }
-    | { type: "text"; x: number; y: number; text: string; fill: boolean }
-    | { type: "step"; x: number; y: number; n: number }
-  );
+type Shape = PaintShape;
 /** One undo step; `rev` tells saved states apart after the history is trimmed. */
 type Doc = { image: HTMLCanvasElement; shapes: Shape[]; rev: number };
 type Drag =
   | { kind: "draw"; shape: Shape; x0: number; y0: number }
   | { kind: "move"; id: string; x0: number; y0: number; orig: Shape; moved: boolean }
   | { kind: "handle"; id: string; handle: string; orig: Shape }
-  | { kind: "crop"; x0: number; y0: number };
+  | { kind: "crop"; x0: number; y0: number }
+  | { kind: "erase" };
 
 export type ImageFormat = "png" | "jpeg" | "webp";
-export type WriteImage = (name: string, blob: Blob, overwrite: boolean) => Promise<{ name: string; absPath: string }>;
+export type WriteImage = (name: string, blob: Blob, overwrite: boolean, meta?: { shapes: PaintShape[] }) => Promise<{ name: string; absPath: string }>;
 
 const COLORS = ["#ef4444", "#f97316", "#facc15", "#22c55e", "#3b82f6", "#a855f7", "#111827", "#ffffff"];
 const SIZES = [1, 2, 3.5];
@@ -80,6 +76,35 @@ const TOOLS: { tool: Tool; key: string; icon: IconSvgElement | null; label: stri
   { tool: "blur", key: "b", icon: BlurIcon, label: "toolBlur" },
   { tool: "crop", key: "c", icon: CropIcon, label: "toolCrop" },
 ];
+const PAINT_TOOLS: { tool: Tool; key: string; icon: IconSvgElement | null; label: string }[] = [
+  { tool: "select", key: "v", icon: Cursor01Icon, label: "toolSelect" },
+  { tool: "rect", key: "r", icon: SquareIcon, label: "toolRect" },
+  { tool: "ellipse", key: "o", icon: CircleIcon, label: "toolEllipse" },
+  { tool: "arrow", key: "a", icon: ArrowUpRight01Icon, label: "toolArrow" },
+  { tool: "line", key: "l", icon: MinusSignIcon, label: "toolLine" },
+  { tool: "pen", key: "p", icon: Pen01Icon, label: "toolPen" },
+  { tool: "marker", key: "m", icon: HighlighterIcon, label: "toolMarker" },
+  { tool: "eraser", key: "e", icon: EraserIcon, label: "toolEraser" },
+  { tool: "text", key: "t", icon: TextIcon, label: "toolText" },
+  { tool: "step", key: "n", icon: null, label: "toolStep" },
+  { tool: "blur", key: "b", icon: BlurIcon, label: "toolBlur" },
+];
+
+function getSvgPathFromStroke(points: number[][], closed = true): string {
+  if (points.length < 4) return "";
+  const avg = (a: number, b: number) => (a + b) / 2;
+  let a = points[0]!;
+  let b = points[1]!;
+  const c = points[2]!;
+  let d = `M${a[0]!.toFixed(2)},${a[1]!.toFixed(2)} Q${b[0]!.toFixed(2)},${b[1]!.toFixed(2)} ${avg(b[0]!, c[0]!).toFixed(2)},${avg(b[1]!, c[1]!).toFixed(2)} T`;
+  for (let i = 2; i < points.length - 1; i++) {
+    a = points[i]!;
+    b = points[i + 1]!;
+    d += `${avg(a[0]!, b[0]!).toFixed(2)},${avg(a[1]!, b[1]!).toFixed(2)} `;
+  }
+  if (closed) d += "Z";
+  return d;
+}
 
 let nextId = 0;
 const newId = () => `s${++nextId}`;
@@ -114,9 +139,9 @@ function contrast(hex: string) {
   return lum > 0.6 ? "#111827" : "#ffffff";
 }
 
-const fontSize = (s: Common) => Math.max(12, s.size * 5);
-const stepRadius = (s: Common) => s.size * 2.6 + 6;
-const textPad = (s: Common) => fontSize(s) * 0.35;
+const fontSize = (s: { size: number }) => Math.max(12, s.size * 5);
+const stepRadius = (s: { size: number }) => s.size * 2.6 + 6;
+const textPad = (s: { size: number }) => fontSize(s) * 0.35;
 
 let measurer: CanvasRenderingContext2D | null = null;
 function textBox(s: Extract<Shape, { type: "text" }>): Box {
@@ -184,7 +209,7 @@ function snap(x0: number, y0: number, x1: number, y1: number) {
   return { x: x0 + Math.cos(angle) * length, y: y0 + Math.sin(angle) * length };
 }
 
-function ShapeView({ s, hitWidth }: { s: Shape; hitWidth: number }) {
+function ShapeView({ s, hitWidth, smooth }: { s: Shape; hitWidth: number; smooth?: boolean }) {
   const hit = (d: ReactNode) => <g data-id={s.id}>{d}</g>;
   switch (s.type) {
     case "rect":
@@ -218,6 +243,18 @@ function ShapeView({ s, hitWidth }: { s: Shape; hitWidth: number }) {
     case "marker": {
       const width = s.type === "marker" ? s.size * 5 : s.size;
       const points = s.points.join(" ");
+      if (smooth && s.type === "pen") {
+        const input: number[][] = [];
+        for (let i = 0; i + 1 < s.points.length; i += 2) input.push([s.points[i]!, s.points[i + 1]!]);
+        const outline = getStroke(input, { size: Math.max(1, s.size), thinning: 0.5, smoothing: 0.5, streamline: 0.5, last: true });
+        const d = getSvgPathFromStroke(outline);
+        return hit(
+          <>
+            {d ? <path d={d} fill={s.color} /> : <polyline points={points} fill="none" stroke={s.color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" />}
+            <polyline points={points} fill="none" stroke="transparent" strokeWidth={Math.max(width, hitWidth)} />
+          </>,
+        );
+      }
       return hit(
         <>
           <polyline points={points} fill="none" stroke={s.color} strokeOpacity={s.type === "marker" ? 0.4 : 1} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" />
@@ -368,6 +405,10 @@ export function ImageEditor({
   onClose,
   onSaved,
   onDone,
+  variant = "annotate",
+  initialShapes,
+  defaultSaveStem,
+  persistOnSend = false,
 }: {
   image: HTMLCanvasElement;
   /** Original file name; copies are named after it. */
@@ -379,15 +420,23 @@ export function ImageEditor({
   onSaved: (result: { name: string; absPath: string }, overwrite: boolean) => void;
   /** Inside BB's image preview: hands the PNG back instead of saving files. */
   onDone?: (png: Blob) => Promise<void>;
+  /** Paint keeps a blank canvas, eraser and smooth pen; annotate is the file and chat editor. */
+  variant?: "annotate" | "paint";
+  initialShapes?: PaintShape[];
+  defaultSaveStem?: string;
+  persistOnSend?: boolean;
 }) {
+  const paint = variant === "paint";
+  const tools = paint ? PAINT_TOOLS : TOOLS;
   const composer = useComposer();
-  const [{ history, index }, setTimeline] = useState(() => ({ history: [{ image, shapes: [] as Shape[], rev: ++nextRev }], index: 0 }));
+  const [{ history, index }, setTimeline] = useState(() => ({ history: [{ image, shapes: (initialShapes ?? []) as Shape[], rev: ++nextRev }], index: 0 }));
   const doc = history[index]!;
   const [live, setLive] = useState<Shape[] | null>(null);
   const shapes = live ?? doc.shapes;
-  const [tool, setTool] = useState<Tool>("arrow");
+  const [tool, setTool] = useState<Tool>(paint ? "pen" : "arrow");
   const [color, setColor] = useState(COLORS[0]!);
   const [sizeStep, setSizeStep] = useState(1);
+  const [paintSize, setPaintSize] = useState(4);
   const [fill, setFill] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -409,7 +458,7 @@ export function ImageEditor({
   const W = doc.image.width, H = doc.image.height;
   const scale = zoom ?? fit;
   const unit = Math.max(2, Math.round(Math.max(W, H) / 400));
-  const strokeSize = unit * SIZES[sizeStep]!;
+  const strokeSize = paint ? paintSize : unit * SIZES[sizeStep]!;
   const dirty = doc.rev !== savedRev;
 
   useEffect(() => rootRef.current?.focus(), []);
@@ -448,6 +497,7 @@ export function ImageEditor({
   };
   const pickColor = (next: string) => { setColor(next); patchSelected({ color: next }); };
   const pickSize = (step: number) => { setSizeStep(step); patchSelected({ size: unit * SIZES[step]! }); };
+  const pickPaintSize = (size: number) => { setPaintSize(size); patchSelected({ size }); };
   const toggleFill = () => {
     const next = !fill;
     setFill(next);
@@ -483,6 +533,12 @@ export function ImageEditor({
       setCrop({ x, y, w: 0, h: 0 });
       return;
     }
+    if (tool === "eraser") {
+      drag.current = { kind: "erase" };
+      setSelected(null);
+      setLive(eraseShapesAt(shapes, x, y, strokeSize));
+      return;
+    }
     if (tool === "select") {
       setSelected(hitShape?.id ?? null);
       if (hitShape) drag.current = { kind: "move", id: hitShape.id, x0: x, y0: y, orig: hitShape, moved: false };
@@ -503,6 +559,7 @@ export function ImageEditor({
       setSelected(shape.id);
       return;
     }
+    if (tool !== "rect" && tool !== "ellipse" && tool !== "blur" && tool !== "arrow" && tool !== "line" && tool !== "pen" && tool !== "marker") return;
     const base = { id: newId(), color, size: strokeSize };
     const shape: Shape =
       tool === "arrow" || tool === "line"
@@ -521,6 +578,10 @@ export function ImageEditor({
     const { x, y } = point(event);
     if (current.kind === "crop") {
       setCrop(normalize(current.x0, current.y0, x, y, event.shiftKey));
+      return;
+    }
+    if (current.kind === "erase") {
+      setLive((prev) => eraseShapesAt(prev ?? doc.shapes, x, y, strokeSize));
       return;
     }
     if (current.kind === "move") {
@@ -567,6 +628,11 @@ export function ImageEditor({
       setCrop((box) => (box && box.w > 4 && box.h > 4 ? box : null));
       return;
     }
+    if (current.kind === "erase") {
+      if (!live || live.length === doc.shapes.length) { setLive(null); return; }
+      setShapes(live);
+      return;
+    }
     if (current.kind === "move" && !current.moved) { setLive(null); return; }
     if (current.kind === "draw") {
       const b = bounds(current.shape);
@@ -611,7 +677,7 @@ export function ImageEditor({
   const sendToChat = async () => {
     // VK core function `image-editor`: a real attachment in the draft instead of a path in the text.
     const attach = (composer as typeof composer & { experimental_vkAttachFiles?: (files: File[]) => Promise<void> }).experimental_vkAttachFiles;
-    if (typeof attach === "function") {
+    if (typeof attach === "function" && !(persistOnSend && write)) {
       setBusy(true);
       try {
         await attach.call(composer, [new File([await render("png", 1, 1)], `${stem}-edited.png`, { type: "image/png" })]);
@@ -629,10 +695,24 @@ export function ImageEditor({
     let clipboard = false;
     try {
       const png = render("png", 1, 1);
+      if (persistOnSend) {
+        const blob = await png;
+        const saved = await write(`${defaultSaveStem ?? stem}.png`, blob, Boolean(defaultSaveStem), { shapes });
+        if (typeof attach === "function") {
+          await attach.call(composer, [new File([blob], `${saved.name}.png`, { type: "image/png" })]);
+        } else {
+          composer.updateText((draft) => `${draft.trim() ? `${draft.trimEnd()}\n\n` : ""}${t("paintSendFallback", { png: saved.absPath })}\n\n`);
+          composer.focus();
+        }
+        setSavedRev(doc.rev);
+        onSaved(saved, Boolean(defaultSaveStem));
+        toast.success(t("paintSentChat"));
+        return;
+      }
       if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
         clipboard = await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]).then(() => true, () => false);
       }
-      const saved = await write(`${stem}-edited.png`, await png, false);
+      const saved = await write(`${stem}-edited.png`, await png, false, { shapes });
       composer.updateText((draft) => `${draft.trim() ? `${draft.trimEnd()}\n\n` : ""}${t("chatImageNote", { path: saved.absPath })}\n\n`);
       composer.focus();
       setSavedRev(doc.rev);
@@ -691,7 +771,7 @@ export function ImageEditor({
       setShapes(shapes.map((s) => (s.id === selectedShape.id ? translate(s, dx, dy) : s)));
       return;
     }
-    const found = TOOLS.find((item) => item.key === key);
+    const found = tools.find((item) => item.key === key);
     if (found) { setTool(found.tool); if (found.tool !== "crop") setCrop(null); return; }
     const digit = Number(event.key);
     if (digit >= 1 && digit <= COLORS.length) pickColor(COLORS[digit - 1]!);
@@ -736,12 +816,13 @@ export function ImageEditor({
   })();
   const selectionBox = selectedShape && !editing ? bounds(selectedShape) : null;
   const toolLabel = (item: (typeof TOOLS)[number]) => `${t(item.label as "toolSelect")} (${item.key.toUpperCase()})`;
+  const paletteHex = /^#[0-9a-fA-F]{6}$/.test(color) ? color : "#ef4444";
 
   return (
     <div ref={rootRef} className="@container flex h-full min-h-0 flex-col bg-background outline-none" tabIndex={0} onKeyDown={onKeyDown}>
       <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border px-2 py-1">
         <div className="flex flex-wrap items-center gap-0.5">
-          {TOOLS.map((item) => (
+          {tools.map((item) => (
             <Tb key={item.tool} label={toolLabel(item)} active={tool === item.tool} onClick={() => { setTool(item.tool); if (item.tool !== "crop") setCrop(null); }}>
               {item.icon ? <ToolIcon icon={item.icon} /> : <span className="flex size-4 items-center justify-center rounded-full border-[1.6px] border-current text-[9px] font-bold">1</span>}
             </Tb>
@@ -762,23 +843,49 @@ export function ImageEditor({
               style={{ backgroundColor: c }}
             />
           ))}
+          {paint ? (
+            <input
+              type="color"
+              value={paletteHex}
+              aria-label={t("paintCustomColor")}
+              title={t("paintCustomColor")}
+              onChange={(event) => pickColor(event.target.value)}
+              className="size-5 shrink-0 cursor-pointer rounded-full border border-black/20 bg-transparent p-0"
+            />
+          ) : null}
         </div>
         <div className="mx-1 h-5 w-px bg-border" />
-        {SIZES.map((_, step) => (
-          <Tb key={step} label={t(step === 0 ? "sizeS" : step === 1 ? "sizeM" : "sizeL")} active={sizeStep === step} onClick={() => pickSize(step)}>
-            <span className="block rounded-full bg-current" style={{ width: 4 + step * 4, height: 4 + step * 4 }} />
-          </Tb>
-        ))}
+        {paint ? (
+          <label className="flex items-center gap-1 text-xs text-muted-foreground" title={t("paintSize")}>
+            <span className="tabular-nums">{paintSize}</span>
+            <input type="range" min={1} max={24} value={paintSize} aria-label={t("paintSize")} onChange={(event) => pickPaintSize(Number(event.target.value))} className="w-20" />
+            {PAINT_SIZES.map((size) => (
+              <Tb key={size} label={String(size)} active={paintSize === size} onClick={() => pickPaintSize(size)}>
+                <span className="block rounded-full bg-current" style={{ width: 4 + Math.min(12, size) / 2, height: 4 + Math.min(12, size) / 2 }} />
+              </Tb>
+            ))}
+          </label>
+        ) : (
+          SIZES.map((_, step) => (
+            <Tb key={step} label={t(step === 0 ? "sizeS" : step === 1 ? "sizeM" : "sizeL")} active={sizeStep === step} onClick={() => pickSize(step)}>
+              <span className="block rounded-full bg-current" style={{ width: 4 + step * 4, height: 4 + step * 4 }} />
+            </Tb>
+          ))
+        )}
         <Tb label={t("fillToggle")} active={fill} onClick={toggleFill}>
           <span className={cn("block size-3.5 rounded-sm border-[1.6px] border-current", fill && "bg-current/40")} />
         </Tb>
         <div className="mx-1 h-5 w-px bg-border" />
         <Tb label={`${t("undo")} (⌘Z)`} disabled={index === 0} onClick={undo}><ToolIcon icon={Undo02Icon} /></Tb>
         <Tb label={`${t("redo")} (⇧⌘Z)`} disabled={index >= history.length - 1} onClick={redo}><ToolIcon icon={Redo02Icon} /></Tb>
-        <Tb label={t("rotateLeft")} disabled={busy} onClick={() => void reshape("left")}><ToolIcon icon={RotateLeftIcon} /></Tb>
-        <Tb label={t("rotateRight")} disabled={busy} onClick={() => void reshape("right")}><ToolIcon icon={RotateRightIcon} /></Tb>
-        <Tb label={t("flipH")} disabled={busy} onClick={() => void reshape("flipX")}><ToolIcon icon={FlipHorizontalIcon} /></Tb>
-        <Tb label={t("flipV")} disabled={busy} onClick={() => void reshape("flipY")}><ToolIcon icon={FlipVerticalIcon} /></Tb>
+        {paint ? null : (
+          <>
+            <Tb label={t("rotateLeft")} disabled={busy} onClick={() => void reshape("left")}><ToolIcon icon={RotateLeftIcon} /></Tb>
+            <Tb label={t("rotateRight")} disabled={busy} onClick={() => void reshape("right")}><ToolIcon icon={RotateRightIcon} /></Tb>
+            <Tb label={t("flipH")} disabled={busy} onClick={() => void reshape("flipX")}><ToolIcon icon={FlipHorizontalIcon} /></Tb>
+            <Tb label={t("flipV")} disabled={busy} onClick={() => void reshape("flipY")}><ToolIcon icon={FlipVerticalIcon} /></Tb>
+          </>
+        )}
         <div className="mx-1 h-5 w-px bg-border" />
         <Tb label={t("zoomOut")} onClick={() => setZoom(Math.max(0.05, scale / 1.25))}><ToolIcon icon={ZoomOutIcon} /></Tb>
         <button type="button" className="h-8 min-w-12 rounded-md px-1 text-xs tabular-nums text-muted-foreground hover:bg-state-hover" title={t("zoomFit")} onClick={() => setZoom(zoom === null ? 1 : null)}>
@@ -814,7 +921,7 @@ export function ImageEditor({
             <svg
               ref={svgRef}
               viewBox={`0 0 ${W} ${H}`}
-              className={cn("absolute inset-0 size-full touch-none select-none", tool === "select" ? "cursor-default" : tool === "text" ? "cursor-text" : "cursor-crosshair")}
+              className={cn("absolute inset-0 size-full touch-none select-none", tool === "select" ? "cursor-default" : tool === "text" ? "cursor-text" : tool === "eraser" ? "cursor-cell" : "cursor-crosshair")}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
@@ -826,7 +933,7 @@ export function ImageEditor({
                 if (shapes.some((s) => s.id === id && s.type === "text")) startEditing(id!);
               }}
             >
-              {shapes.map((s) => (s.id === editing ? null : <ShapeView key={s.id} s={s} hitWidth={14 / scale} />))}
+              {shapes.map((s) => (s.id === editing ? null : <ShapeView key={s.id} s={s} hitWidth={14 / scale} smooth={paint} />))}
               {selectionBox ? (
                 <rect data-overlay="" x={selectionBox.x} y={selectionBox.y} width={selectionBox.w} height={selectionBox.h} fill="none" stroke="#3b82f6" strokeWidth={1 / scale} strokeDasharray={`${4 / scale} ${3 / scale}`} pointerEvents="none" />
               ) : null}
@@ -883,6 +990,8 @@ export function ImageEditor({
           if (!open) requestAnimationFrame(() => rootRef.current?.focus());
         }}
         stem={stem}
+        defaultName={defaultSaveStem}
+        simple={paint}
         size={{ w: W, h: H }}
         overwriteFormat={overwriteFormat}
         canWrite={write !== null}
@@ -902,9 +1011,9 @@ export function ImageEditor({
               return;
             }
             const overwrite = target === "overwrite";
-            const saved = await write!(overwrite ? name : `${fileName}.${EXT[format]}`, blob, overwrite);
+            const saved = await write!(overwrite ? name : `${fileName}.${EXT[format]}`, blob, overwrite, { shapes });
             setSavedRev(doc.rev);
-            toast.success(overwrite ? t("imageOverwritten") : t("imageSavedAs", { name: saved.name }));
+            toast.success(overwrite ? t("imageOverwritten") : t(paint ? "paintSavedAs" : "imageSavedAs", { name: saved.name }));
             onSaved(saved, overwrite);
           } catch (cause) {
             toast.error(cause instanceof Error ? cause.message : String(cause));
@@ -922,6 +1031,8 @@ function SaveDialog({
   open,
   onOpenChange,
   stem,
+  defaultName,
+  simple,
   size,
   overwriteFormat,
   canWrite,
@@ -930,6 +1041,8 @@ function SaveDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   stem: string;
+  defaultName?: string;
+  simple?: boolean;
   size: { w: number; h: number };
   overwriteFormat: ImageFormat | null;
   canWrite: boolean;
@@ -938,8 +1051,9 @@ function SaveDialog({
   const [format, setFormat] = useState<ImageFormat>(overwriteFormat ?? "png");
   const [quality, setQuality] = useState(0.9);
   const [factor, setFactor] = useState(1);
-  const [fileName, setFileName] = useState(`${stem}-edited`);
-  useEffect(() => { if (open) setFileName(`${stem}-edited`); }, [open, stem]);
+  const initialName = defaultName ?? `${stem}-edited`;
+  const [fileName, setFileName] = useState(initialName);
+  useEffect(() => { if (open) setFileName(defaultName ?? `${stem}-edited`); }, [open, stem, defaultName]);
   const chip = (active: boolean) => cn("h-7 rounded-md border px-2 text-xs", active ? "border-foreground bg-foreground text-background" : "border-input hover:bg-state-hover");
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -956,35 +1070,39 @@ function SaveDialog({
               <span className="text-muted-foreground">.{EXT[format]}</span>
             </div>
           </label>
-          <div className="grid gap-1">
-            <span className="text-xs text-muted-foreground">{t("format")}</span>
-            <div className="flex gap-1">
-              {(["png", "jpeg", "webp"] as const).map((f) => (
-                <button key={f} type="button" className={chip(format === f)} onClick={() => setFormat(f)}>{f.toUpperCase()}</button>
-              ))}
-            </div>
-          </div>
-          {format !== "png" ? (
-            <label className="grid gap-1">
-              <span className="text-xs text-muted-foreground">{t("quality")}: {Math.round(quality * 100)}%</span>
-              <input type="range" min={0.4} max={1} step={0.05} value={quality} onChange={(event) => setQuality(Number(event.target.value))} />
-            </label>
-          ) : null}
-          <div className="grid gap-1">
-            <span className="text-xs text-muted-foreground">{t("scale")}</span>
-            <div className="flex gap-1">
-              {[1, 0.75, 0.5, 0.25].map((f) => (
-                <button key={f} type="button" className={chip(factor === f)} onClick={() => setFactor(f)}>{f * 100}%</button>
-              ))}
-            </div>
-          </div>
+          {simple ? null : (
+            <>
+              <div className="grid gap-1">
+                <span className="text-xs text-muted-foreground">{t("format")}</span>
+                <div className="flex gap-1">
+                  {(["png", "jpeg", "webp"] as const).map((f) => (
+                    <button key={f} type="button" className={chip(format === f)} onClick={() => setFormat(f)}>{f.toUpperCase()}</button>
+                  ))}
+                </div>
+              </div>
+              {format !== "png" ? (
+                <label className="grid gap-1">
+                  <span className="text-xs text-muted-foreground">{t("quality")}: {Math.round(quality * 100)}%</span>
+                  <input type="range" min={0.4} max={1} step={0.05} value={quality} onChange={(event) => setQuality(Number(event.target.value))} />
+                </label>
+              ) : null}
+              <div className="grid gap-1">
+                <span className="text-xs text-muted-foreground">{t("scale")}</span>
+                <div className="flex gap-1">
+                  {[1, 0.75, 0.5, 0.25].map((f) => (
+                    <button key={f} type="button" className={chip(factor === f)} onClick={() => setFactor(f)}>{f * 100}%</button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
         <DialogFooter className="flex-wrap gap-2">
-          <Button variant="outline" onClick={() => onSave({ format, quality, factor, fileName, target: "download" })}>{t("download")}</Button>
+          {simple ? null : <Button variant="outline" onClick={() => onSave({ format, quality, factor, fileName, target: "download" })}>{t("download")}</Button>}
           {canWrite && overwriteFormat === format ? (
-            <Button variant="outline" onClick={() => { if (window.confirm(t("overwriteConfirm"))) onSave({ format, quality, factor, fileName, target: "overwrite" }); }}>{t("overwriteOriginal")}</Button>
+            <Button variant="outline" onClick={() => { if (simple || window.confirm(t("overwriteConfirm"))) onSave({ format, quality, factor, fileName, target: "overwrite" }); }}>{simple ? t("protoOverwrite") : t("overwriteOriginal")}</Button>
           ) : null}
-          {canWrite ? <Button disabled={!fileName.trim()} onClick={() => onSave({ format, quality, factor, fileName: fileName.trim(), target: "copy" })}>{t("saveCopy")}</Button> : null}
+          {canWrite ? <Button disabled={!fileName.trim()} onClick={() => onSave({ format, quality, factor, fileName: fileName.trim(), target: "copy" })}>{simple ? t("save") : t("saveCopy")}</Button> : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>
