@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { t } from "../../shared/i18n";
+import { useT } from "../../shared/i18n";
 import type { PropValue } from "./model";
 import { PROTO_ICON_SIZES, isProtoIconCustomColor } from "./icons";
 import { IconsLibraryPanel } from "./icons-library";
@@ -23,6 +23,7 @@ export function IconInspector({
   onSize: (value: number) => void;
   onColor: (value: string) => void;
 }) {
+  const t = useT();
   const [pickerOpen, setPickerOpen] = useState(false);
   const themeColor = isProtoIconCustomColor(color) ? "custom" : color;
   const customHex = isProtoIconCustomColor(color) ? color : "#000000";

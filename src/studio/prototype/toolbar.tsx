@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
-import { t, type I18nKey } from "../../shared/i18n";
+import { useT, type I18nKey } from "../../shared/i18n";
 import type { AlignEdge, DistributeAxis } from "./align";
 
 export type ToolbarMenu = "file" | "send" | "zoom" | "more";
@@ -78,6 +78,7 @@ export function PrototypeToolbar({
   toggleLeftPane: () => void;
   toggleRightPane: () => void;
 }) {
+  const t = useT();
   return (
     <div ref={barRef} className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border px-2 py-1">
       <div className="relative" data-toolbar-menu>

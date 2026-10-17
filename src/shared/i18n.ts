@@ -1,4 +1,5 @@
 // UI strings follow BB's interface language (`<html lang>`); English by default.
+import { useSyncExternalStore } from "react";
 
 const en = {
   loading: "Loading…",
@@ -226,6 +227,64 @@ const en = {
   studioBack: "Back to tools",
   studioHintSaved: "Saved to the chat files",
   studioHintSend: "Sent to the chat as a screenshot or file",
+  studioSettings: "Office Studio settings",
+  studioLanguage: "Interface language",
+  studioLanguageAuto: "Same as BB",
+  studioLanguageRu: "Russian",
+  studioLanguageEn: "English",
+  studioSettingsPrototype: "Prototype",
+  studioSettingsPaint: "Paint",
+  studioGridStep: "Grid step",
+  studioShowGrid: "Show grid",
+  studioSnapGrid: "Snap to grid",
+  studioDefaultBadges: "Badges on by default",
+  studioDefaultScreen: "Default screen size",
+  studioBrushColor: "Default brush colour",
+  studioBrushSize: "Default brush size",
+  studioUnitsPx: "px",
+  protoUntitled: "Untitled",
+  protoPageN: "Page {n}",
+  protoDefDescription: "Description",
+  protoDefContent: "Content",
+  protoDefMessage: "Message",
+  protoDefPlaceholder: "Placeholder",
+  protoDefSearch: "Search",
+  protoDefChooseFile: "Choose file",
+  protoDefOption1: "Option 1",
+  protoDefOption2: "Option 2",
+  protoDefItem1: "Item 1",
+  protoDefItem2: "Item 2",
+  protoDefItem3: "Item 3",
+  protoDefState1: "State 1",
+  protoDefState2: "State 2",
+  protoDefCol1: "Col 1",
+  protoDefCol2: "Col 2",
+  protoDefTab1: "Tab 1",
+  protoDefTab2: "Tab 2",
+  protoDefHome: "Home",
+  protoDefAbout: "About",
+  protoDefContact: "Contact",
+  protoDefParent: "Parent",
+  protoDefChildA: "  Child A",
+  protoDefChildB: "  Child B",
+  protoDefFileMenu: "File",
+  protoDefEditMenu: "Edit",
+  protoDefViewMenu: "View",
+  protoDefSection: "Section",
+  protoDefPage: "Page",
+  protoDefProcess: "Process",
+  protoDefDatePh: "mm/dd/yyyy",
+  protoDefLink: "Link",
+  protoDefHeading: "Heading",
+  slidesDefTitle: "Title",
+  slidesDefSubtitle: "Subtitle",
+  slidesDefHeading: "Heading",
+  slidesDefBody: "Body text goes here.",
+  slidesDefTwoColumns: "Two columns",
+  slidesDefLeftColumn: "Left column",
+  slidesDefRightColumn: "Right column",
+  slidesDefCaption: "Caption",
+  slidesSlideN: "Slide {n}",
   slidesLayoutTitle: "Title slide",
   slidesLayoutTitleBody: "Title and body",
   slidesLayoutTwoColumn: "Two columns",
@@ -805,6 +864,64 @@ const ru: Record<I18nKey, string> = {
   studioBack: "К инструментам",
   studioHintSaved: "Сохраняется в файлы чата",
   studioHintSend: "В чат — скриншотом или файлом",
+  studioSettings: "Настройки Office Studio",
+  studioLanguage: "Язык интерфейса",
+  studioLanguageAuto: "Как в BB",
+  studioLanguageRu: "Русский",
+  studioLanguageEn: "English",
+  studioSettingsPrototype: "Прототип",
+  studioSettingsPaint: "Рисование",
+  studioGridStep: "Шаг сетки",
+  studioShowGrid: "Показывать сетку",
+  studioSnapGrid: "Привязка к сетке",
+  studioDefaultBadges: "Бейджи по умолчанию",
+  studioDefaultScreen: "Размер экрана по умолчанию",
+  studioBrushColor: "Цвет кисти по умолчанию",
+  studioBrushSize: "Толщина кисти по умолчанию",
+  studioUnitsPx: "px",
+  protoUntitled: "Без названия",
+  protoPageN: "Страница {n}",
+  protoDefDescription: "Описание",
+  protoDefContent: "Содержимое",
+  protoDefMessage: "Сообщение",
+  protoDefPlaceholder: "Подсказка",
+  protoDefSearch: "Поиск",
+  protoDefChooseFile: "Выбрать файл",
+  protoDefOption1: "Вариант 1",
+  protoDefOption2: "Вариант 2",
+  protoDefItem1: "Пункт 1",
+  protoDefItem2: "Пункт 2",
+  protoDefItem3: "Пункт 3",
+  protoDefState1: "Состояние 1",
+  protoDefState2: "Состояние 2",
+  protoDefCol1: "Столбец 1",
+  protoDefCol2: "Столбец 2",
+  protoDefTab1: "Вкладка 1",
+  protoDefTab2: "Вкладка 2",
+  protoDefHome: "Главная",
+  protoDefAbout: "О нас",
+  protoDefContact: "Контакты",
+  protoDefParent: "Родитель",
+  protoDefChildA: "  Дочерний A",
+  protoDefChildB: "  Дочерний B",
+  protoDefFileMenu: "Файл",
+  protoDefEditMenu: "Правка",
+  protoDefViewMenu: "Вид",
+  protoDefSection: "Раздел",
+  protoDefPage: "Страница",
+  protoDefProcess: "Процесс",
+  protoDefDatePh: "дд.мм.гггг",
+  protoDefLink: "Ссылка",
+  protoDefHeading: "Заголовок",
+  slidesDefTitle: "Заголовок",
+  slidesDefSubtitle: "Подзаголовок",
+  slidesDefHeading: "Заголовок",
+  slidesDefBody: "Текст слайда.",
+  slidesDefTwoColumns: "Две колонки",
+  slidesDefLeftColumn: "Левая колонка",
+  slidesDefRightColumn: "Правая колонка",
+  slidesDefCaption: "Подпись",
+  slidesSlideN: "Слайд {n}",
   slidesLayoutTitle: "Титульный",
   slidesLayoutTitleBody: "Заголовок и текст",
   slidesLayoutTwoColumn: "Два столбца",
@@ -1157,12 +1274,54 @@ const ru: Record<I18nKey, string> = {
 };
 
 export type Locale = "en" | "ru";
+export type LanguagePref = "auto" | Locale;
+
+export const I18N_EN = en;
+export const I18N_RU = ru;
 
 /** BB's own UI is English, so a Russian browser also counts: the Russifier plugin only translates strings it knows. */
 export function detectLocale(): Locale {
   const lang = globalThis.document?.documentElement?.lang ?? "";
   const browser = globalThis.navigator?.languages?.[0] ?? globalThis.navigator?.language ?? "";
   return lang.toLowerCase().startsWith("ru") || browser.toLowerCase().startsWith("ru") ? "ru" : "en";
+}
+
+let languagePref: LanguagePref = "auto";
+const languageListeners = new Set<() => void>();
+
+export function getLanguagePref(): LanguagePref {
+  return languagePref;
+}
+
+export function setLanguagePref(next: LanguagePref): void {
+  if (next === languagePref) return;
+  languagePref = next;
+  for (const listener of languageListeners) listener();
+}
+
+export function studioLocale(): Locale {
+  return languagePref === "auto" ? detectLocale() : languagePref;
+}
+
+export function subscribeLanguage(listener: () => void): () => void {
+  languageListeners.add(listener);
+  return () => {
+    languageListeners.delete(listener);
+  };
+}
+
+export function useLocale(): Locale {
+  return useSyncExternalStore(subscribeLanguage, studioLocale, studioLocale);
+}
+
+/** Studio UI: follows Office Studio language. File openers must keep calling `t()` (BB/browser locale). */
+export function useT(): (key: I18nKey, vars?: Record<string, string | number>) => string {
+  const locale = useLocale();
+  return (key, vars = {}) => t(key, vars, locale);
+}
+
+export function studioT(key: I18nKey, vars: Record<string, string | number> = {}): string {
+  return t(key, vars, studioLocale());
 }
 
 const MOD = /Mac|iPhone|iPad/i.test(globalThis.navigator?.platform ?? globalThis.navigator?.userAgent ?? "") ? "⌘" : "Ctrl";

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
-import { t } from "../../shared/i18n";
+import { useT } from "../../shared/i18n";
 import {
   INSPECTOR_COLOUR_PRESETS,
   formatHex,
@@ -25,6 +25,7 @@ export function InspectorColourPicker({
   mixed?: boolean;
   onChange: (value: string) => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const rgba = parseColour(value ?? "#000000") ?? { r: 0, g: 0, b: 0, a: 1 };

@@ -1,5 +1,6 @@
 // Paint document: blank-canvas sidecar plus an object-eraser hit test.
 import { z } from "zod";
+import { studioT } from "../../shared/i18n.ts";
 
 export const PAINT_FORMAT = "bb-paint" as const;
 export const PAINT_VERSION = 1;
@@ -77,7 +78,7 @@ const paintSchema = z
   })
   .strict();
 
-export function newPaintDoc(name = "Untitled", canvas: PaintCanvas = { ...PAINT_SIZE_PRESETS.wide, background: PAINT_BACKGROUNDS.white }): PaintDoc {
+export function newPaintDoc(name = studioT("protoUntitled"), canvas: PaintCanvas = { ...PAINT_SIZE_PRESETS.wide, background: PAINT_BACKGROUNDS.white }): PaintDoc {
   return { format: PAINT_FORMAT, version: PAINT_VERSION, name, canvas, shapes: [] };
 }
 

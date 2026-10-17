@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { t } from "../../shared/i18n";
+import { useT } from "../../shared/i18n";
 import type { Field } from "./inspector-fields";
 import { INSPECTOR_FIELDS } from "./inspector-fields";
 import { InspectorListDialog } from "./inspector-list-dialog";
@@ -64,6 +64,7 @@ export function PrototypeInspector({
   applyAlign: (edge: AlignEdge) => void;
   applyDistribute: (axis: DistributeAxis) => void;
 }) {
+  const t = useT();
   const [styleTarget, setStyleTarget] = useState<StyleTarget>("base");
   const [listOpen, setListOpen] = useState(false);
   const listKey = inspect ? listPropKey(inspect.type) : null;
@@ -219,6 +220,7 @@ function NumField({ label, value, onChange, mixed }: { label: string; value: num
 }
 
 function FieldEditor({ field, value, onChange }: { field: Field; value: PropValue | undefined; onChange: (value: PropValue) => void }) {
+  const t = useT();
   if (field.kind === "boolean") {
     return (
       <label className="flex items-center gap-2">

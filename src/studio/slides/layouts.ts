@@ -1,4 +1,4 @@
-import type { I18nKey } from "../../shared/i18n.ts";
+import { studioT, type I18nKey } from "../../shared/i18n.ts";
 import {
   type DeckTheme,
   type Slide,
@@ -33,24 +33,24 @@ export function layoutElements(layout: SlideLayout, theme: DeckTheme): Wireframe
 
   if (layout === "title") {
     return [
-      headingElement("Title", pad, SLIDE_HEIGHT * 0.35, innerW, 96, existing),
-      textElement("Subtitle", pad, SLIDE_HEIGHT * 0.35 + 112, innerW, 48, existing),
+      headingElement(studioT("slidesDefTitle"), pad, SLIDE_HEIGHT * 0.35, innerW, 96, existing),
+      textElement(studioT("slidesDefSubtitle"), pad, SLIDE_HEIGHT * 0.35 + 112, innerW, 48, existing),
     ];
   }
 
   if (layout === "title-body") {
     return [
-      headingElement("Heading", pad, pad, innerW, 72, existing),
-      textElement("Body text goes here.", pad, pad + 96, innerW, SLIDE_HEIGHT - pad * 2 - 96, existing),
+      headingElement(studioT("slidesDefHeading"), pad, pad, innerW, 72, existing),
+      textElement(studioT("slidesDefBody"), pad, pad + 96, innerW, SLIDE_HEIGHT - pad * 2 - 96, existing),
     ];
   }
 
   if (layout === "two-column") {
     const colW = (innerW - 32) / 2;
     return [
-      headingElement("Two columns", pad, pad, innerW, 56, existing),
-      textElement("Left column", pad, pad + 80, colW, SLIDE_HEIGHT - pad - 80, existing),
-      textElement("Right column", pad + colW + 32, pad + 80, colW, SLIDE_HEIGHT - pad - 80, existing),
+      headingElement(studioT("slidesDefTwoColumns"), pad, pad, innerW, 56, existing),
+      textElement(studioT("slidesDefLeftColumn"), pad, pad + 80, colW, SLIDE_HEIGHT - pad - 80, existing),
+      textElement(studioT("slidesDefRightColumn"), pad + colW + 32, pad + 80, colW, SLIDE_HEIGHT - pad - 80, existing),
     ];
   }
 
@@ -58,7 +58,7 @@ export function layoutElements(layout: SlideLayout, theme: DeckTheme): Wireframe
     const imgH = Math.round(SLIDE_HEIGHT * 0.55);
     return [
       imagePlaceholder(pad, pad, innerW, imgH, existing),
-      textElement("Caption", pad, pad + imgH + 24, innerW, 64, existing),
+      textElement(studioT("slidesDefCaption"), pad, pad + imgH + 24, innerW, 64, existing),
     ];
   }
 

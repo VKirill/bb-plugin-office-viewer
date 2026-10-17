@@ -1,5 +1,6 @@
 // Palette tiles: element types, prop variants, and flow shapes.
-import type { I18nKey } from "../../shared/i18n";
+import type { I18nKey } from "../../shared/i18n.ts";
+import { localizeProps } from "../localize.ts";
 import { CATALOG_BY_TYPE, defaultElement, type ElementType, type PaletteGroup, type PropValue, type WireframeElement } from "./model.ts";
 import { FLOW_SHAPES, type FlowShape } from "./shapes.ts";
 
@@ -113,7 +114,7 @@ export function tileMatchesQuery(tile: PaletteTile, query: string, name: string)
 
 export function elementFromTile(tile: PaletteTile, x: number, y: number, existing: readonly WireframeElement[] = []): WireframeElement {
   let el = defaultElement(tile.type, x, y, existing);
-  el = { ...el, props: { ...el.props, ...structuredClone(tile.props) } };
+  el = { ...el, props: localizeProps({ ...el.props, ...structuredClone(tile.props) }) };
   if (el.type === "Line" && el.props.orientation === "vertical") el = { ...el, w: 8, h: 160 };
   if (el.type === "Arrow" && el.props.orientation === "vertical") el = { ...el, w: 24, h: 120 };
   if (el.type === "Menu" && el.props.orientation === "vertical") el = { ...el, w: 140, h: 160 };

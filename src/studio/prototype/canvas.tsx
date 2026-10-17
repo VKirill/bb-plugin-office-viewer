@@ -5,7 +5,7 @@ import { HANDLE_CLASS, HANDLES, editOverlayBox } from "./builder-geometry";
 import { resolveStylePatch, stylePatchToInline } from "./inspector-model";
 import type { CanvasRect, DistanceLine, SnapGuide } from "./canvas-math";
 import { cn } from "@/lib/utils";
-import { t } from "../../shared/i18n";
+import { useT } from "../../shared/i18n";
 import { type WireframeCanvas, type WireframeElement, type WireframePage } from "./model";
 
 export function PrototypeCanvas({
@@ -87,6 +87,7 @@ export function PrototypeCanvas({
   skipBlur: React.MutableRefObject<boolean>;
   onPaneClick: () => void;
 }) {
+  const t = useT();
   const ticks = (max: number, step = 100) => {
     const out: number[] = [];
     for (let v = 0; v <= max; v += step) out.push(v);

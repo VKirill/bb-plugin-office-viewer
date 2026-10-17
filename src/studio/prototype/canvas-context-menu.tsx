@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { t } from "../../shared/i18n";
+import { useT } from "../../shared/i18n";
 
 export type ContextMenuAction =
   | "cut"
@@ -39,6 +39,7 @@ export function PrototypeContextMenu({
   onAction: (action: ContextMenuAction) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

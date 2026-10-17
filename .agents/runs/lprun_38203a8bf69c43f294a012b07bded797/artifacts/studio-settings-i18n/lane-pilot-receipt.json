@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "status": "accepted",
+  "lanePilotRunId": "lprun_38203a8bf69c43f294a012b07bded797",
+  "lanePilotTaskId": "studio-settings-i18n",
+  "attemptId": "lpattempt_79837de0c0dd4f83866c082e86dd94fc",
+  "pmThreadId": "thr_wdpmipwdxc",
+  "writerThreadId": "thr_5djq6qx6gh",
+  "ownsPaths": [
+    "src/studio/",
+    "src/shared/i18n.ts",
+    "src/shared/",
+    "app.tsx",
+    "components/ui/"
+  ],
+  "readFirst": [
+    {
+      "path": "src/shared/i18n.ts",
+      "windows": []
+    },
+    {
+      "path": "src/studio/studio-panel.tsx",
+      "windows": []
+    },
+    {
+      "path": "src/studio/prototype/toolbar.tsx",
+      "windows": []
+    }
+  ],
+  "output": "app.tsx  \nsrc/shared/i18n.ts  \nsrc/studio/header-action.tsx  \nsrc/studio/i18n-coverage.test.ts  \nsrc/studio/localize.ts  \nsrc/studio/paint/paint-model.ts  \nsrc/studio/paint/paint.tsx  \nsrc/studio/prototype/builder.tsx  \nsrc/studio/prototype/canvas-context-menu.tsx  \nsrc/studio/prototype/canvas.tsx  \nsrc/studio/prototype/elements.tsx  \nsrc/studio/prototype/icon-inspector.tsx  \nsrc/studio/prototype/icons-library.tsx  \nsrc/studio/prototype/inspector-colour-picker.tsx  \nsrc/studio/prototype/inspector-fields.ts  \nsrc/studio/prototype/inspector-list-dialog.tsx  \nsrc/studio/prototype/inspector-model.ts  \nsrc/studio/prototype/inspector-style-panel.tsx  \nsrc/studio/prototype/inspector-table-editor.tsx  \nsrc/studio/prototype/inspector.tsx  \nsrc/studio/prototype/left-pane.tsx  \nsrc/studio/prototype/model.ts  \nsrc/studio/prototype/palette.ts  \nsrc/studio/prototype/shell.tsx  \nsrc/studio/prototype/toolbar.tsx  \nsrc/studio/settings-dialog.tsx  \nsrc/studio/settings-store.ts  \nsrc/studio/slides/editor.tsx  \nsrc/studio/slides/layouts.ts  \nsrc/studio/slides/model.ts  \nsrc/studio/slides/presenter.tsx  \nsrc/studio/slides/slide-board.tsx  \nsrc/studio/studio-panel.tsx",
+  "verification": [
+    {
+      "command": "npm install --no-audit --no-fund --ignore-scripts && npx tsc --noEmit",
+      "exitCode": 0,
+      "stdout": "\\\u001b[1G\u001b[0K|\u001b[1G\u001b[0K/\u001b[1G\u001b[0K-\u001b[1G\u001b[0K\r\nadded 4 packages in 850ms\r\n-\u001b[1G\u001b[0K\u001b[1mnpm\u001b[22m \u001b[96mnotice\u001b[39m\r\n\u001b[1mnpm\u001b[22m \u001b[96mnotice\u001b[39m New \u001b[31mmajor\u001b[39m version of npm available! \u001b[31m11.16.0\u001b[39m -> \u001b[34m12.2.0\u001b[39m\r\n\u001b[1mnpm\u001b[22m \u001b[96mnotice\u001b[39m Changelog: \u001b[34mhttps://github.com/npm/cli/releases/tag/v12.2.0\u001b[39m\r\n\u001b[1mnpm\u001b[22m \u001b[96mnotice\u001b[39m To update run: \u001b[4mnpm install -g npm@12.2.0\u001b[24m\r\n\u001b[1mnpm\u001b[22m \u001b[96mnotice\u001b[39m\r\n-\u001b[1G\u001b[0K\\\u001b[1G\u001b[0K",
+      "stderr": "",
+      "sandboxBackend": "macos-seatbelt",
+      "policySha256": "68ff195b92b8d10f81b2fa78e68081fcb37f158056117bbef1b152cc270382cf",
+      "workspacePath": "/Users/vechkasov/.lane-pilot/worktrees/lpattempt_83ad91f5c4c9487693a7e34471905469/bb-plugin-office-viewer"
+    },
+    {
+      "command": "node --experimental-strip-types --test src/studio/i18n-coverage.test.ts src/studio/studio-panel.test.ts 'src/studio/prototype/*.test.ts'",
+      "exitCode": 0,
+      "stdout": "✔ every i18n key has RU and EN values (0.956042ms)\r\n✔ studio tsx has no hard-coded UI words (3.731583ms)\r\n✔ align left/center/right uses the selection bounds (0.792459ms)\r\n✔ align top/middle/bottom and a single element to the canvas (0.087334ms)\r\n✔ distribute spaces three or more; two is a no-op (0.128917ms)\r\n✔ marquee intersect vs contain (1.424458ms)\r\n✔ click selection with meta and shift (0.077125ms)\r\n✔ group and ungroup (0.218792ms)\r\n✔ snap guides align edges (0.1495ms)\r\n✔ snapDelta respects grid (0.076209ms)\r\n✔ nudge step sizes (0.055167ms)\r\n✔ distance lines between separated boxes (0.106416ms)\r\n✔ zoom helpers clamp (0.082292ms)\r\n✔ grid step toggle (0.053916ms)\r\n✔ double-click targets: button text and field placeholder (9.004833ms)\r\n✔ Enter on a radio commits the label and adds a grouped radio below (2.387416ms)\r\n✔ checking a radio unchecks others in the group (0.138417ms)\r\n✔ Enter on a checkbox adds another below without exclusivity (0.095958ms)\r\n✔ Enter on a list item inserts an empty item after it (19.746084ms)\r\n✔ Backspace on an empty list item removes it (0.453625ms)\r\n✔ Nav/Tabs/ChoicePicker item index and draft (0.57225ms)\r\n▶ iconSearchWords\r\n  ✔ splits CamelCase and strips Icon suffix (9.372708ms)\r\n  ✔ handles registry-style names (0.13425ms)\r\n✔ iconSearchWords (10.990917ms)\r\n▶ filterIcons\r\n  ✔ returns all when query is empty (0.090167ms)\r\n  ✔ filters by multiple terms (0.0905ms)\r\n  ✔ matches export name substring (0.090916ms)\r\n✔ filterIcons (0.366541ms)\r\n▶ parseColour\r\n  ✔ parses short and long hex (6.577084ms)\r\n  ✔ parses rgba and transparent (0.542ms)\r\n✔ parseColour (9.949042ms)\r\n▶ hsl round trip\r\n  ✔ converts hex to hsl and back (0.455209ms)\r\n✔ hsl round trip (0.583416ms)\r\n▶ normalizeColourInput\r\n  ✔ formats parsed colours (0.103833ms)\r\n✔ normalizeColourInput (0.205958ms)\r\n✔ mergeStylePatch keeps unrelated fields on element (0.85ms)\r\n✔ mixed style value detects differences (0.116833ms)\r\n✔ applyStyleToElements updates selection only (0.091667ms)\r\n✔ radio group assign and exclusive check (0.24825ms)\r\n✔ table read write and TSV paste (11.819208ms)\r\n✔ table cell navigation (2.087666ms)\r\n✔ list editor write (0.156ms)\r\n✔ parseWireframe round-trips a valid v2 document (30.866625ms)\r\n✔ parseWireframe migrates v1 to v2 with elements preserved (26.999166ms)\r\n✔ every type has catalog defaults and a numbered label (0.909625ms)\r\n✔ snap uses an 8px grid (0.320125ms)\r\n✔ canvas presets match legacy sizes and orientation swap (0.16775ms)\r\n✔ parseWireframe rejects a bad file (0.846542ms)\r\n✔ every palette entry builds a valid element and parses (14.994333ms)\r\n✔ palette tiles use only existing types and cover every type (0.719208ms)\r\n✔ every palette tile has a designed pictogram (0.099625ms)\r\n✔ pictogram source bundle size (2.200917ms)\r\n✔ variants create existing types with their props (0.203167ms)\r\n✔ search matches type, id and display name (0.084875ms)\r\n▶ parseLeftPaneSplit\r\n  ✔ returns defaults for bad input (1.258292ms)\r\n  ✔ round-trips persisted fields (0.094209ms)\r\n✔ parseLeftPaneSplit (1.98575ms)\r\n▶ resolveLeftPaneHeights\r\n  ✔ enforces minimum section sizes when expanded (0.122333ms)\r\n  ✔ collapses pages to header height (0.053625ms)\r\n  ✔ keyboard nudge changes ratio within bounds (0.078042ms)\r\n✔ resolveLeftPaneHeights (0.348375ms)\r\n▶ topRatioFromHeight\r\n  ✔ clamps extreme ratios (0.061209ms)\r\n✔ topRatioFromHeight (0.112625ms)\r\n▶ shapePath\r\n  ✔ returns a non-empty path for rectangle (1.581041ms)\r\n  ✔ returns a non-empty path for stacked-rectangle (2.117417ms)\r\n  ✔ returns a non-empty path for rounded (0.132458ms)\r\n  ✔ returns a non-empty path for stacked-rounded (0.060958ms)\r\n  ✔ returns a non-empty path for beveled (0.059417ms)\r\n  ✔ returns a non-empty path for diamond (0.043459ms)\r\n  ✔ returns a non-empty path for file (0.048459ms)\r\n  ✔ returns a non-empty path for stacked-file (0.063292ms)\r\n  ✔ returns a non-empty path for bracket (0.066875ms)\r\n  ✔ returns a non-empty path for semicircle (0.081583ms)\r\n  ✔ returns a non-empty path for triangle (0.053958ms)\r\n  ✔ returns a non-empty path for trapezoid (0.037417ms)\r\n  ✔ returns a non-empty path for ellipse (0.041542ms)\r\n  ✔ returns a non-empty path for hexagon (0.041375ms)\r\n  ✔ returns a non-empty path for parallelogram (0.034333ms)\r\n  ✔ returns a non-empty path for actor (0.044042ms)\r\n  ✔ returns a non-empty path for database (0.037084ms)\r\n  ✔ returns a non-empty path for subroutine (0.037666ms)\r\n  ✔ returns a non-empty path for delay (0.036792ms)\r\n  ✔ returns a non-empty path for document (0.033458ms)\r\n  ✔ returns a non-empty path for multi-document (0.042041ms)\r\n  ✔ returns a non-empty path for off-page (0.029334ms)\r\n  ✔ returns a non-empty path for manual-input (0.027625ms)\r\n  ✔ returns a non-empty path for stored-data (0.029875ms)\r\n  ✔ returns a non-empty path for internal-storage (0.041167ms)\r\n  ✔ returns a non-empty path for offline-storage (0.028541ms)\r\n  ✔ returns a non-empty path for display (0.034125ms)\r\n  ✔ returns a non-empty path for sort (0.027ms)\r\n  ✔ returns a non-empty path for collate (0.04625ms)\r\n  ✔ returns a non-empty path for summing-junction (0.033916ms)\r\n  ✔ returns a non-empty path for logical-or (0.028792ms)\r\n  ✔ returns a non-empty path for magnetic-tape (0.029667ms)\r\n  ✔ returns a non-empty path for punched-tape (0.031042ms)\r\n  ✔ returns a non-empty path for punched-card (0.029709ms)\r\n  ✔ returns a non-empty path for keying (0.03075ms)\r\n✔ shapePath (6.269542ms)\r\n▶ template catalog\r\n  ✔ has at least 12 form and 14 interface templates (1.134125ms)\r\n  ✔ every template builds valid grouped elements (10.912167ms)\r\n✔ template catalog (12.688375ms)\r\n▶ filterTemplates\r\n  ✔ finds templates by Russian keyword (0.147875ms)\r\n  ✔ finds templates by id fragment (0.07675ms)\r\n✔ filterTemplates (0.320833ms)\r\n▶ previewElementsForTemplate\r\n  ✔ returns elements for library thumbnails (0.089042ms)\r\n✔ previewElementsForTemplate (0.136583ms)\r\n✔ studioToolOf maps prototype, paint and slides (0.669625ms)\r\n✔ studioToolOf is null without a known tool (0.070209ms)\r\nℹ tests 97\r\nℹ suites 12\r\nℹ pass 97\r\nℹ fail 0\r\nℹ cancelled 0\r\nℹ skipped 0\r\nℹ todo 0\r\nℹ duration_ms 728.079375\r\n",
+      "stderr": "",
+      "sandboxBackend": "macos-seatbelt",
+      "policySha256": "3e8c73503abb62ee01a3edc4a1a595d077c1de50afaf0b414262388b543a056f",
+      "workspacePath": "/Users/vechkasov/.lane-pilot/worktrees/lpattempt_83ad91f5c4c9487693a7e34471905469/bb-plugin-office-viewer"
+    }
+  ],
+  "runV2": {
+    "schemaVersion": 1,
+    "pools": {
+      "provider": 15,
+      "verification": 2
+    },
+    "score": 5,
+    "risk": "medium",
+    "sourceRisk": "medium",
+    "scoreAdapter": "task-risk-v1"
+  },
+  "reasoning": [
+    {
+      "planSha256": "f7cc06558245d48cb522a7be340ce29068166f5c627f5604ee1be2a72211ca68",
+      "sentPlanSha256": "f7cc06558245d48cb522a7be340ce29068166f5c627f5604ee1be2a72211ca68",
+      "sourceLength": 2166,
+      "sentLength": 2166,
+      "jevStatus": "ok",
+      "jevDecision": "medium",
+      "requestedReasoningLevel": "medium",
+      "effectiveReasoningLevel": "medium",
+      "fallbackReason": null,
+      "retryEffort": {
+        "enabled": true,
+        "retryIndex": 0,
+        "before": "medium",
+        "after": "medium",
+        "changed": false
+      },
+      "providerId": "acp-cursor",
+      "model": "grok-4.6",
+      "serviceTier": "default",
+      "requestedServiceTier": "default",
+      "runId": "lprun_38203a8bf69c43f294a012b07bded797",
+      "attemptId": "lpattempt_79837de0c0dd4f83866c082e86dd94fc",
+      "threadId": "thr_5djq6qx6gh",
+      "effortMode": "automatic",
+      "selectionSource": {
+        "providerId": "acp-cursor",
+        "model": "grok-4.6",
+        "reasoningLevel": "medium",
+        "serviceTier": "default",
+        "reasoningLevelSource": "client-preference"
+      },
+      "dispatchContext": {
+        "memoryText": "- `components/ui/icon-extended.tsx` and `components/ui/icon-registry.ts` register the builtin brand icon names `Figma`, `Notion`, `Slack`, `Telegram`, `Youtube`, `GoogleDoc` and `GoogleDrive`, alongside the existing names, which are unchanged. The test in `src/spreadsheet/link-chip.test.ts` checks against `EXTENDED_ICON_NAMES`.\n- Full plugin backups use a versioned JSON payload (`kind: 'bb-project-folders-backup'`, version 1) containing settings and all 11 durable tables: folders, folder_paths, thread_places, folder_rules, project_rules, project_order, execution_defaults, session_policies, preferences, item_styles, and folder_archives. Imports preserve row IDs and run in one transaction; invalid backups and imports during an active move or archive are rejected. Transient tables (exports, pending_exports, project_moves, thread_moves, section_moves) are excluded. This adds no schema changes and preserves the existing appearance-only export/import flow.\n- Errand, QA, and reviewer helper threads are read-only for repository files; specialists may write under `.agents/`. Writers retain full worktree access. Wait backstops report helper edits as `repo_edited` with changed files and do not revert them.",
+        "memoryPicked": [
+          "87e45859f07768b26a7fae7d074ee391ab826ee1b27556bbcf3f88140fe13d71",
+          "a1e24df18c9424b7d28552a47384aeafc3bb57aef551ddef568e5654b8b2653f",
+          "d86da4f3ab41999c5f5c25ee3cfa928584b004ab91c199582af9cfac872e28c2"
+        ],
+        "rulesText": "- Перед ответом по задаче Lane Pilot сверяй каждый путь, который собираешься изменить из-за ошибки проверки, с owns_paths; если пути там нет, не меняй файл и сообщи об ошибке диспетчеру.",
+        "rulesPicked": {
+          "total": 19,
+          "picked": [
+            "rule_572535fb78e20b9d"
+          ]
+        },
+        "executionPacket": "Read these before editing; they are the context for this task:\n- .agents/plans/2026-10-17-office-studio.md (not in the workspace; skip it)\n- app.tsx L1-L69 (sha256 3e8ffce8)\n- src/html/site.tsx L1-L133 (sha256 a3f9b0d2)\n- src/shared/i18n.ts L1-L447 (sha256 96275cc7)",
+        "executionPacketSha256": "71182b96b58fc7742424d0331f98fb0b5970ded3b32768c21791b1058699555f",
+        "pmReadContext": "{\"summary\":\"The task 'studio-launcher' (risk low, lane studio, feature area office-studio) adds an Office Studio entry point to the Office Viewer plugin. Goal: an icon button in the thread header opens an Office Studio tab in the right panel, where the owner picks Prototype, Paint or Slides. The plan file (.agents/plans/2026-10-17-office-studio.md) is marked 'in progress' and lists studio-launcher as the first of four tasks (studio-launcher → prototype-builder → paint-canvas → slides later). Design decisions in the plan: own DOM canvas for prototypes, A2UI-style component names, *.wireframe.json files in thread storage, Paint extending src/media/image-editor.tsx, and Slides as phase 2. The contract's expected outputs are src/studio/studio-panel.tsx, src/studio/header-action.tsx, src/studio/tools.tsx, src/studio/studio-panel.test.ts, app.tsx and src/shared/i18n.ts. Interfaces: STUDIO_PANEL = \\\"studio\\\" panel action id; tools.tsx exports PrototypeTool and PaintTool taking {threadId}; studioToolOf(params) returns \\\"prototype\\\" | \\\"paint\\\" | \\\"slides\\\" | null. Invariants: existing openers, the Website-on-devices panel and the image editor stay unchanged. Out of scope: the prototype builder and paint implementations. Verification: npx tsc --noEmit and node --experimental-strip-types --test src/studio/studio-panel.test.ts. Only excerpts of app.tsx, src/html/site.tsx, src/shared/i18n.ts and the plan were supplied. Nothing in the excerpts shows whether src/studio/ or the icon-registry/icon-extended files exist yet.\",\"keyFacts\":[\"Plan .agents/plans/2026-10-17-office-studio.md: status 'in progress'; owner request dated 2026-10-17 wants an Office Viewer icon right of the thread header (next to Git History) opening a tools tab.\",\"Plan task list: [ ] studio-launcher is 'header icon + panel tab «Office Studio» with tool cards'; next are prototype-builder, paint-canvas, then slides (phase 2) and components/states v2, then release + live check.\",\"Plan decision: Paint extends src/media/image-editor.tsx (blank canvas, eraser, palette, perfect-freehand); prototypes use an own DOM canvas; files stored as *.wireframe.json under thread storage <storageRoot>/Prototypes/.\",\"app.tsx registers file openers via app.slots.fileOpener (ids spreadsheet, media, word, slides, pdf, html) and imports from ./src/*; the file does not yet register any Office Studio entry.\",\"app.tsx registers threadPanelAction({ id: SITE_PANEL, title: t(\\\"siteDevices\\\"), icon: \\\"Globe\\\", layout: \\\"flush\\\", component: SitePanel }), so the panel-action pattern to copy is visible.\",\"app.tsx optionally registers a browser toolbar button (experimental_browserToolbarAction, BB 0.46+) and a VK image-editor button (experimental_vkImageEditor id 'image-editor'), each guarded by typeof checks for older hosts.\",\"src/html/site.tsx exports SITE_PANEL = \\\"site\\\" and SitePanel({ params }: PluginThreadPanelProps); it reads params.url and falls back to localStorage key \\\"office-viewer:site-address\\\" for tabs opened from the panel's + menu.\",\"src/html/site.tsx BrowserDevicesButton opens the panel via navigate.openThreadPanel({ actionId: SITE_PANEL, title, params: { url } }), which is the pattern a header action would likely follow.\",\"src/html/site.tsx imports useBbNavigate, useRpc, PluginThreadPanelProps from @get-bb/plugin-sdk/app, uses HugeiconsIcon with @hugeicons/core-free-icons, and the shadcn components Button and Input from @/components/ui/.\",\"src/shared/i18n.ts defines an en object and a ru: Record<I18nKey, string> object; I18nKey = keyof typeof en, so every key added in en must also be added in ru or the type check fails.\",\"i18n has existing site keys: siteDevices, siteAddress, siteEmpty, siteInvalid, siteOpenDevices, siteBrowser, siteBackToBrowser; no studio/Office Studio keys appear in the excerpt, so they must be added.\",\"The i18n excerpt ends at the start of the ru block (around 'fillToggle'), so the rest of ru and whether a placeholder such as 'soon' exists in en is not visible.\",\"Contract acceptance: an icon button in the thread header opens the tab; Office Studio also appears in the panel + menu; launcher shows Prototype, Paint and Slides, with Slides disabled and marked 'soon'; RU and EN texts; picking a tool shows it in the same tab with a way back to the tools.\",\"Contract owns paths src/studio/, app.tsx, src/shared/i18n.ts, components/ui/icon-registry.ts and components/ui/icon-extended.tsx; it must not touch docs/, README.md, PROJECT.md, package.json or CHANGELOG.md.\",\"Contract invariants: existing openers, the Website-on-devices panel and the image editor must not change behaviour.\",\"The contract's stated verification is a typecheck (npx tsc --noEmit, 300s) and the studio test (node --experimental-strip-types --test src/studio/studio-panel.test.ts, 120s).\"],\"openQuestions\":[\"Does src/studio/ already exist, or is it created from scratch? The excerpts do not show the directory.\",\"How does the thread header actually host an icon button? The excerpts show no header slot; the plugin SDK API for a header action (for example a threadHeaderAction slot analogous to threadPanelAction) is not shown and must be checked in @get-bb/plugin-sdk.\",\"Which icon should the header button use? The contract owns components/ui/icon-registry.ts and icon-extended.tsx, but their contents were not supplied, so it is unclear whether an Office Studio icon must be added there or an existing one reused.\",\"What is the shape of the studio panel's params, and how is studioToolOf(params) meant to map them? The contract names the function but the excerpts do not show how params are passed or what the tool-card interaction looks like.\",\"How is 'a way back to the tools' implemented: a local state toggle inside the panel tab, or a navigation call? Not specified.\",\"How should the Slides card be marked 'soon'? The contract requires the text but the excerpts show no existing 'soon' i18n key, so a new key is needed and its exact EN/RU wording is open.\",\"Does the panel + menu discovery come automatically from registering the threadPanelAction, or does it need a separate registration? Not shown in the excerpts.\",\"How does the test file src/studio/studio-panel.test.ts exercise studioToolOf and the panel without a DOM, and does the repo's test setup support --experimental-strip-types for .tsx imports? Not visible.\",\"The plan file's 'Decisions' table and chat-attachment design (composer.experimental_vkAttachFiles) relate to later tasks; whether any of them constrain the launcher is not stated.\",\"The file is named .agents/plans/...; the contract's read_first list and the plan's status 'in progress' do not say whether the prototype-builder or paint-canvas tasks have started, so the coordination with the existing src/media/image-editor.tsx is unclear.\"]}",
+        "agent": "Lane Pilot writer",
+        "promptChars": 10102,
+        "helperMode": "roles",
+        "helperRequired": false,
+        "skillPick": {
+          "enabled": true,
+          "skills": [],
+          "picked": [],
+          "projectFolder": [],
+          "hints": [],
+          "sources": {},
+          "reason": null,
+          "materialized": []
+        }
+      }
+    }
+  ],
+  "emergencyFallback": null,
+  "turns": 2
+}

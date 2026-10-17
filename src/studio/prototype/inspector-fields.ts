@@ -1,4 +1,4 @@
-import type { I18nKey } from "../../shared/i18n";
+import type { I18nKey } from "../../shared/i18n.ts";
 import type { ElementType, PaletteGroup } from "./model";
 import { FLOW_SHAPES } from "./shapes";
 

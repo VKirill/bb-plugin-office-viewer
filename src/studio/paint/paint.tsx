@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { rpcContract } from "../../../server";
 import { ImageEditor, type WriteImage } from "../../media/image-editor";
-import { detectLocale, t } from "../../shared/i18n";
+import { studioLocale, useT } from "../../shared/i18n";
 import {
   PAINT_BACKGROUNDS,
   PAINT_FORMAT,
@@ -50,8 +50,9 @@ function clampSize(value: number): number {
 }
 
 export function PaintCanvas({ threadId }: { threadId: string }) {
+  const t = useT();
   const rpc = useRpc<typeof rpcContract>();
-  const locale = detectLocale();
+  const locale = studioLocale();
   const [session, setSession] = useState<Session | null>(null);
   const [preset, setPreset] = useState<keyof typeof PAINT_SIZE_PRESETS | "custom">("wide");
   const [custom, setCustom] = useState<{ width: number; height: number }>({ ...PAINT_SIZE_PRESETS.wide });
@@ -61,7 +62,8 @@ export function PaintCanvas({ threadId }: { threadId: string }) {
 
   const size = preset === "custom" ? custom : PAINT_SIZE_PRESETS[preset];
 
-  const start = (canvas: PaintCanvas, name = "Untitled", shapes: PaintShape[] = [], openedStem: string | null = null) => {
+  const untitled = t("protoUntitled");
+  const start = (canvas: PaintCanvas, name = untitled, shapes: PaintShape[] = [], openedStem: string | null = null) => {
     setSession({
       id: `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
       image: blankCanvas(canvas.width, canvas.height, canvas.background),
@@ -74,7 +76,7 @@ export function PaintCanvas({ threadId }: { threadId: string }) {
 
   const write: WriteImage = async (name, blob, overwrite, meta) => {
     if (!session) throw new Error(t("saveFailed"));
-    const stem = name.replace(/\.[^.]+$/, "") || "Untitled";
+    const stem = name.replace(/\.[^.]+$/, "") || untitled;
     const doc = parsePaintDoc({
       format: PAINT_FORMAT,
       version: PAINT_VERSION,
@@ -130,7 +132,7 @@ export function PaintCanvas({ threadId }: { threadId: string }) {
         write={write}
         variant="paint"
         initialShapes={session.shapes}
-        defaultSaveStem={session.openedStem ?? "Untitled"}
+        defaultSaveStem={session.openedStem ?? untitled}
         persistOnSend
         onClose={() => setSession(null)}
         overwriteFormat={session.openedStem ? "png" : null}

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
-import { t, type I18nKey } from "../../shared/i18n";
+import { useT, type I18nKey } from "../../shared/i18n";
 import {
   CANVAS_BACKGROUND_PRESETS,
   CANVAS_PRESET_ENTRIES,
@@ -20,6 +20,7 @@ import {
 const PrototypeOverlayCloseContext = createContext<(() => void) | null>(null);
 
 export function PrototypeOverlayCloseButton() {
+  const t = useT();
   const onClose = useContext(PrototypeOverlayCloseContext);
   if (!onClose) return null;
   const label = t("protoClosePanel");
@@ -61,6 +62,7 @@ export function PrototypeShell({
   inspector: ReactNode;
   dialogs: ReactNode;
 }) {
+  const t = useT();
   const showLeft = leftOpen && !compact;
   const showRight = rightOpen && !compact;
   const leftRailRef = useRef<HTMLButtonElement>(null);
@@ -154,6 +156,7 @@ export function PrototypeStyleBar({
   onCanvas: (patch: Partial<WireframeCanvas>) => void;
   onUpdate: (patch: Partial<WireframeElement>) => void;
 }) {
+  const t = useT();
   if (!inspect) {
     return <PageCanvasStyleBar canvas={canvas} onCanvas={onCanvas} />;
   }
@@ -176,6 +179,7 @@ export function PrototypeStyleBar({
 }
 
 function PageCanvasStyleBar({ canvas, onCanvas }: { canvas: WireframeCanvas; onCanvas: (patch: Partial<WireframeCanvas>) => void }) {
+  const t = useT();
   const [sizeOpen, setSizeOpen] = useState(false);
   const [bgOpen, setBgOpen] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);

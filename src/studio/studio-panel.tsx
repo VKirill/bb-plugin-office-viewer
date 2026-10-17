@@ -2,8 +2,9 @@ import { useState, type ComponentType } from "react";
 import type { PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
-import { t } from "../shared/i18n";
+import { useT } from "../shared/i18n";
 import { OfficeStudioLogo, PaintLogo, PrototypeLogo, SlidesLogo } from "./logos";
+import { StudioSettingsButton } from "./settings-dialog";
 import { studioToolOf, type StudioTool } from "./studio-tool";
 import { StudioToolView } from "./tools";
 
@@ -28,16 +29,18 @@ const TOOLS: { id: StudioTool; Logo: ComponentType<{ className?: string }>; titl
 ];
 
 export function StudioPanel({ threadId, params }: PluginThreadPanelProps) {
+  const t = useT();
   const [picked, setPicked] = useState<StudioTool | null>(() => studioToolOf(params));
 
   if (picked) {
     return (
       <div className="flex h-full min-h-0 flex-col bg-background">
-        <div className="flex min-h-10 shrink-0 items-center border-b border-border px-2 py-1">
+        <div className="flex min-h-10 shrink-0 items-center justify-between border-b border-border px-2 py-1">
           <Button type="button" variant="ghost" size="sm" className="h-8 gap-1 px-2" aria-label={t("studioBack")} onClick={() => setPicked(null)}>
             <Icon name="ChevronLeft" className="size-4" />
             {t("studioBack")}
           </Button>
+          <StudioSettingsButton />
         </div>
         <StudioToolView tool={picked} threadId={threadId} />
       </div>
@@ -49,10 +52,11 @@ export function StudioPanel({ threadId, params }: PluginThreadPanelProps) {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 p-4 @xl:gap-6 @xl:p-5">
         <header className="flex items-center gap-3 px-1">
           <OfficeStudioLogo className="size-10 shrink-0 rounded-[27%] shadow-sm" />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h2 className="text-[15px] font-semibold leading-5 tracking-[-0.01em] text-foreground">{t("studio")}</h2>
             <p className="mt-0.5 text-xs leading-4 text-muted-foreground">{t("studioSubtitle")}</p>
           </div>
+          <StudioSettingsButton />
         </header>
         <section aria-labelledby="studio-tools-label">
           <h3 id="studio-tools-label" className="mb-2 px-1 text-xs font-medium leading-4 text-muted-foreground">{t("studioToolsLabel")}</h3>

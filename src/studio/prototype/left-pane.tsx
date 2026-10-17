@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { t } from "../../shared/i18n";
+import { useT } from "../../shared/i18n";
 import { IconsLibraryPanel } from "./icons-library";
 import { PALETTE_GROUPS } from "./inspector-fields";
 import { tileGroup, tileMatchesQuery, type PaletteTile } from "./palette";
@@ -85,6 +85,7 @@ export function PrototypeLeftPane({
   onAddTemplate: (templateId: string) => void;
   onAddIcon: (name: string) => void;
 }) {
+  const t = useT();
   const [pageEdit, setPageEdit] = useState<string | null>(null);
   const [pageDraft, setPageDraft] = useState("");
   const [elEdit, setElEdit] = useState<string | null>(null);

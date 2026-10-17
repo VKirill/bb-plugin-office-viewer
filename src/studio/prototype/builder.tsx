@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { rpcContract } from "../../../server";
-import { detectLocale, t } from "../../shared/i18n";
+import { studioLocale, useT } from "../../shared/i18n";
+import { getStudioSettings, patchStudioSettings, useStudioSettings } from "../settings-store";
 import {
   CATALOG_BY_TYPE,
   SNAP,
+  canvasPresetDimensions,
   cloneWireframe,
   defaultElement,
   newElementId,
@@ -58,7 +60,6 @@ import {
   distanceLinesFor,
   elementAtPoint,
   expandToGroups,
-  gridStep,
   groupIds,
   marqueeHitTest,
   moveElementsByDelta,
@@ -89,15 +90,22 @@ type Drag =
   | { kind: "pan"; startX: number; startY: number; scrollLeft: number; scrollTop: number };
 type SendKind = "both" | "png" | "json";
 
+function blankWireframe() {
+  const settings = getStudioSettings();
+  return newWireframe(undefined, { ...canvasPresetDimensions(settings.protoPreset), background: "#ffffff" });
+}
+
 function pageElements(doc: Wireframe) { return getActivePage(doc).elements; }
 function pageCanvas(doc: Wireframe) { return getActivePage(doc).canvas; }
 function patchElements(doc: Wireframe, elements: WireframeElement[]) { return updateActivePage(doc, (p) => ({ ...p, elements })); }
 function patchCanvas(doc: Wireframe, patch: Partial<Wireframe["pages"][0]["canvas"]>) { return updateActivePage(doc, (p) => ({ ...p, canvas: { ...p.canvas, ...patch } })); }
 
 export function PrototypeBuilder({ threadId }: { threadId: string }) {
+  const t = useT();
+  const settings = useStudioSettings();
   const rpc = useRpc<typeof rpcContract>();
   const composer = useComposer();
-  const locale = detectLocale();
+  const locale = studioLocale();
   const rootRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const canvasPaneRef = useRef<HTMLDivElement>(null);
@@ -105,15 +113,14 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const drag = useRef<Drag | null>(null);
   const spaceHeld = useRef(false);
   const clipboard = useRef<WireframeElement[]>([]);
-  const [{ history, index }, setTimeline] = useState(() => ({ history: [newWireframe()], index: 0 }));
+  const [{ history, index }, setTimeline] = useState(() => ({ history: [blankWireframe()], index: 0 }));
   const doc = history[index]!;
   const [live, setLive] = useState<Wireframe | null>(null);
   const view = live ?? doc;
   const [selected, setSelected] = useState<string[]>([]);
-  const [badges, setBadges] = useState(true);
+  const badges = settings.protoBadges;
+  const snapGrid = settings.protoSnap;
   const [zoom, setZoom] = useState(1);
-  const [snapGrid, setSnapGrid] = useState(true);
-  const [fineGrid, setFineGrid] = useState(true);
   const [marquee, setMarquee] = useState<CanvasRect | null>(null);
   const [snapGuides, setSnapGuides] = useState<SnapGuide[]>([]);
   const [distanceLines, setDistanceLines] = useState<DistanceLine[]>([]);
@@ -142,7 +149,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   const [menu, setMenu] = useState<ToolbarMenu | null>(null);
   const [savedNames, setSavedNames] = useState<string[]>([]);
   const [openedStem, setOpenedStem] = useState<string | null>(null);
-  const [saveName, setSaveName] = useState("Untitled");
+  const [saveName, setSaveName] = useState(() => t("protoUntitled"));
   const [nameDraft, setNameDraft] = useState(doc.name);
   const [edit, setEdit] = useState<InlineEdit | null>(null);
   const editRef = useRef<InlineEdit | null>(null);
@@ -330,7 +337,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   };
 
   const commitName = () => {
-    const name = nameDraft.trim() || "Untitled";
+    const name = nameDraft.trim() || t("protoUntitled");
     setNameDraft(name);
     if (name !== doc.name) commit({ ...doc, name });
   };
@@ -478,7 +485,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
         dy += peerSnap.dy;
         guides.push(...peerSnap.guides);
       }
-      const grid = snapGrid ? gridStep(fineGrid) : null;
+      const grid = snapGrid ? settings.protoGridStep : null;
       const snapped = snapDelta(dx, dy, grid);
       setSnapGuides(guides);
       if (bounds) {
@@ -508,7 +515,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     setMarquee(null);
     if (current?.kind === "move") {
       const p = boardPoint(event);
-      const grid = snapGrid ? gridStep(fineGrid) : null;
+      const grid = snapGrid ? settings.protoGridStep : null;
       const raw = snapDelta(p.x - current.ox, p.y - current.oy, grid);
       if (raw.dx === 0 && raw.dy === 0) {
         const el = pageElements(doc).find((item) => current.ids[0] === item.id);
@@ -850,14 +857,14 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       setZoom(2);
       return;
     }
-    if (mod && event.key === "'") {
-      event.preventDefault();
-      setSnapGrid((on) => !on);
-      return;
-    }
     if (mod && event.altKey && event.key === "'") {
       event.preventDefault();
-      setFineGrid((on) => !on);
+      patchStudioSettings({ protoGridStep: settings.protoGridStep === 5 ? 8 : 5 });
+      return;
+    }
+    if (mod && event.key === "'") {
+      event.preventDefault();
+      patchStudioSettings({ protoSnap: !snapGrid });
       return;
     }
     if (event.key === "Delete" || event.key === "Backspace") {
@@ -1029,10 +1036,10 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             setZoom={setZoom}
             fitZoom={fitZoom}
             badges={badges}
-            setBadges={setBadges}
+            setBadges={(fn) => patchStudioSettings({ protoBadges: fn(badges) })}
             busy={busy}
             sendToChat={sendToChat}
-            onNew={() => { commit(newWireframe()); setOpenedStem(null); setSelected([]); setEdit(null); setOpenTabIds([getActivePage(newWireframe()).id]); }}
+            onNew={() => { const next = blankWireframe(); commit(next); setOpenedStem(null); setSelected([]); setEdit(null); setOpenTabIds([getActivePage(next).id]); }}
             onOpen={() => { setOpenOpen(true); void loadList(); }}
             onSave={() => { setSaveName(openedStem ?? doc.name); setSaveOpen(true); }}
             toggleLeftPane={() => setLeftOpen((o) => !o)}
@@ -1089,8 +1096,8 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             edit={edit}
             editInputRef={editInputRef}
             selectionBand={selectionBand}
-            showSnapGrid={snapGrid}
-            gridSize={gridStep(fineGrid)}
+            showSnapGrid={settings.protoShowGrid}
+            gridSize={settings.protoGridStep}
             marquee={marquee}
             snapGuides={snapGuides}
             distanceLines={distanceLines}
@@ -1123,7 +1130,7 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             canvas={pageCanvas(doc)}
             pageNotes={activePage.notes ?? ""}
             noteMarkers={badges}
-            onNoteMarkers={setBadges}
+            onNoteMarkers={(on) => patchStudioSettings({ protoBadges: on })}
             onPageNotes={updatePageNotes}
             onCanvas={(patch) => commit(patchCanvas(doc, patch))}
             updateOne={updateOne}
