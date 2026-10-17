@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,18 @@ import { Pictogram } from "./pictograms";
 import { PrototypeOverlayCloseButton } from "./shell";
 import { TemplateTileButton } from "./template-tile";
 import { FORM_TEMPLATES, INTERFACE_TEMPLATES, filterTemplates } from "./templates";
+import {
+  LEFT_PANE_DIVIDER_SIZE,
+  adjustSplitByKeyboard,
+  readLeftPaneSplit,
+  resolveLeftPaneHeights,
+  toggleLibrariesCollapsed,
+  togglePagesCollapsed,
+  topRatioFromHeight,
+  writeLeftPaneSplit,
+  type LeftPaneSplitState,
+  type SplitDividerKey,
+} from "./pane-split";
 import type { PaletteGroup, WireframeElement, WireframePage } from "./model";
 
 export type PaletteLibraryView = "elements" | "templates" | "icons";
@@ -79,6 +91,61 @@ export function PrototypeLeftPane({
   const [elDraft, setElDraft] = useState("");
   const dragPage = useRef<number | null>(null);
   const dragEl = useRef<number | null>(null);
+  const paneRef = useRef<HTMLDivElement>(null);
+  const [paneHeight, setPaneHeight] = useState(480);
+  const [split, setSplit] = useState<LeftPaneSplitState>(() => readLeftPaneSplit());
+  const dragSplitRef = useRef<{ startY: number; startTop: number } | null>(null);
+
+  useEffect(() => {
+    writeLeftPaneSplit(split);
+  }, [split]);
+
+  useEffect(() => {
+    const node = paneRef.current;
+    if (!node) return;
+    const ro = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+      if (rect) setPaneHeight(rect.height);
+    });
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, []);
+
+  const layout = useMemo(() => resolveLeftPaneHeights(paneHeight, split), [paneHeight, split]);
+
+  const onDividerPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (split.pagesCollapsed || split.librariesCollapsed) return;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      dragSplitRef.current = { startY: event.clientY, startTop: layout.top };
+    },
+    [layout.top, split.librariesCollapsed, split.pagesCollapsed],
+  );
+
+  const onDividerPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = dragSplitRef.current;
+      if (!drag) return;
+      const nextTop = drag.startTop + (event.clientY - drag.startY);
+      setSplit((was) => ({ ...was, topRatio: topRatioFromHeight(paneHeight, nextTop, was) }));
+    },
+    [paneHeight],
+  );
+
+  const onDividerPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    dragSplitRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  }, []);
+
+  const onDividerKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      const key = event.key as SplitDividerKey;
+      if (key !== "ArrowUp" && key !== "ArrowDown" && key !== "Home" && key !== "End") return;
+      event.preventDefault();
+      setSplit((was) => adjustSplitByKeyboard(paneHeight, was, key));
+    },
+    [paneHeight],
+  );
 
   const outline = [...elements].reverse();
   const filteredFormTemplates = useMemo(
@@ -91,9 +158,18 @@ export function PrototypeLeftPane({
   );
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col bg-background">
-      <div className="flex min-h-0 flex-[2] flex-col border-b border-border">
-        <div className="flex items-center gap-1 border-b border-border p-2">
+    <div ref={paneRef} className="flex h-full min-h-0 w-full flex-col bg-background">
+      <section className="flex min-h-0 shrink-0 flex-col overflow-hidden" style={{ height: layout.top }}>
+        <div className="flex items-center gap-1 p-2">
+          <button
+            type="button"
+            className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-state-hover hover:text-foreground"
+            aria-label={t("protoPaneCollapsePages")}
+            aria-expanded={!split.pagesCollapsed}
+            onClick={() => setSplit((was) => togglePagesCollapsed(was))}
+          >
+            <Icon name="ChevronDown" className={cn("size-3.5", split.pagesCollapsed && "-rotate-90")} />
+          </button>
           <div className="flex min-w-0 flex-1 gap-1">
             {(["pages", "outline"] as LeftTopTab[]).map((id) => (
               <button key={id} type="button" className={cn("min-w-0 flex-1 rounded px-2 py-1 text-xs font-medium", topTab === id ? "bg-muted" : "text-muted-foreground")} onClick={() => setTopTab(id)}>
@@ -103,6 +179,7 @@ export function PrototypeLeftPane({
           </div>
           <PrototypeOverlayCloseButton />
         </div>
+        {split.pagesCollapsed ? null : (
         <div className="min-h-0 flex-1 overflow-auto p-2 text-sm">
           {topTab === "pages" ? (
             <ul className="space-y-0.5">
@@ -180,27 +257,58 @@ export function PrototypeLeftPane({
             </ul>
           )}
         </div>
-        {topTab === "pages" ? (
-          <div className="border-t border-border p-2">
+        )}
+        {!split.pagesCollapsed && topTab === "pages" ? (
+          <div className="p-2 pt-0">
             <button type="button" className="w-full rounded border border-border px-2 py-1 text-xs hover:bg-state-hover" onClick={onAddPage}>{t("protoAddPage")}</button>
           </div>
         ) : null}
+      </section>
+      <div
+        role="separator"
+        tabIndex={0}
+        aria-orientation="horizontal"
+        aria-label={t("protoPaneSplitDivider")}
+        aria-valuenow={layout.top}
+        aria-valuemin={80}
+        aria-valuemax={Math.max(80, paneHeight - LEFT_PANE_DIVIDER_SIZE - 80)}
+        className="group shrink-0 cursor-row-resize touch-none outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        style={{ height: LEFT_PANE_DIVIDER_SIZE }}
+        onPointerDown={onDividerPointerDown}
+        onPointerMove={onDividerPointerMove}
+        onPointerUp={onDividerPointerUp}
+        onPointerCancel={onDividerPointerUp}
+        onDoubleClick={() => setSplit((was) => togglePagesCollapsed(was))}
+        onKeyDown={onDividerKeyDown}
+      >
+        <div className="mx-2 h-px bg-border transition-colors group-hover:bg-muted-foreground/50 group-focus-visible:bg-muted-foreground/50" />
       </div>
-      <div className="flex min-h-0 flex-[3] flex-col">
-        <div className="border-b border-border px-2 py-1 text-xs font-medium text-muted-foreground">{t("protoLibraries")}</div>
-        <div className="border-b border-border p-2">
+      <section className="flex min-h-0 flex-col overflow-hidden" style={{ height: layout.bottom }}>
+        <div className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted-foreground">
+          <button
+            type="button"
+            className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-state-hover hover:text-foreground"
+            aria-label={t("protoPaneCollapseLibraries")}
+            aria-expanded={!split.librariesCollapsed}
+            onClick={() => setSplit((was) => toggleLibrariesCollapsed(was))}
+          >
+            <Icon name="ChevronDown" className={cn("size-3.5", split.librariesCollapsed && "-rotate-90")} />
+          </button>
+          <span className="min-w-0 flex-1">{t("protoLibraries")}</span>
+        </div>
+        {split.librariesCollapsed ? null : (
+        <div className="min-h-0 flex flex-1 flex-col p-2 pt-0">
           <div className="mb-2 flex gap-1 rounded-md border border-border p-0.5">
             <button type="button" className={cn("flex-1 rounded px-1 py-1 text-[11px] font-medium", paletteView === "elements" ? "bg-muted" : "text-muted-foreground")} onClick={() => setPaletteView("elements")}>{t("protoPalette")}</button>
             <button type="button" className={cn("flex-1 rounded px-1 py-1 text-[11px] font-medium", paletteView === "templates" ? "bg-muted" : "text-muted-foreground")} onClick={() => setPaletteView("templates")}>{t("protoPaletteTemplates")}</button>
             <button type="button" className={cn("flex-1 rounded px-1 py-1 text-[11px] font-medium", paletteView === "icons" ? "bg-muted" : "text-muted-foreground")} onClick={() => setPaletteView("icons")}>{t("protoPaletteIcons")}</button>
           </div>
-          {paletteView === "elements" ? <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("protoSearch")} className="h-8" /> : null}
-          {paletteView === "templates" ? <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("protoSearchTemplates")} className="h-8" /> : null}
-        </div>
+          {paletteView === "elements" ? <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("protoSearch")} className="mb-2 h-8" /> : null}
+          {paletteView === "templates" ? <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("protoSearchTemplates")} className="mb-2 h-8" /> : null}
         {paletteView === "icons" ? (
-          <IconsLibraryPanel onPick={onAddIcon} />
+          <IconsLibraryPanel className="min-h-0 flex-1" onPick={onAddIcon} />
         ) : paletteView === "templates" ? (
-          <div className="min-h-0 flex-1 overflow-auto p-2">
+          <div className="min-h-0 flex-1 overflow-auto">
             <div className="mb-3">
               <div className="mb-1 text-xs font-medium text-muted-foreground">{t("protoTemplateGroupForms")}</div>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1">
@@ -219,7 +327,7 @@ export function PrototypeLeftPane({
             </div>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-auto p-2">
+          <div className="min-h-0 flex-1 overflow-auto">
             {PALETTE_GROUPS.map((group) => {
               const items = filteredTiles.filter((tile) => tileGroup(tile) === group.id);
               if (!items.length) return null;
@@ -242,7 +350,9 @@ export function PrototypeLeftPane({
             })}
           </div>
         )}
-      </div>
+        </div>
+        )}
+      </section>
     </div>
   );
 }
