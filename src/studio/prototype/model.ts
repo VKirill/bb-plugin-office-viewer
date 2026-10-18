@@ -123,6 +123,16 @@ export type WireframeComponent = {
   elements: WireframeElement[];
 };
 
+export type WireframeComment = {
+  id: string;
+  pageId: string;
+  x: number;
+  y: number;
+  elementId?: string;
+  text: string;
+  resolved?: boolean;
+};
+
 export type Wireframe = {
   format: typeof WIREFRAME_FORMAT;
   version: typeof WIREFRAME_VERSION;
@@ -130,6 +140,7 @@ export type Wireframe = {
   pages: WireframePage[];
   activePageId: string;
   components?: WireframeComponent[];
+  comments?: WireframeComment[];
 };
 
 export type CatalogEntry = {
@@ -390,6 +401,18 @@ const pageSchema = z
   })
   .strict();
 
+const wireframeCommentSchema = z
+  .object({
+    id: z.string().min(1).max(128),
+    pageId: z.string().min(1).max(128),
+    x: z.number().finite(),
+    y: z.number().finite(),
+    elementId: z.string().min(1).max(128).optional(),
+    text: z.string().min(1).max(4000),
+    resolved: z.boolean().optional(),
+  })
+  .strict();
+
 const wireframeV2Schema = z
   .object({
     format: z.literal(WIREFRAME_FORMAT),
@@ -398,6 +421,7 @@ const wireframeV2Schema = z
     pages: z.array(pageSchema).min(1).max(200),
     activePageId: z.string().min(1).max(128),
     components: z.array(componentSchema).max(200).optional(),
+    comments: z.array(wireframeCommentSchema).max(500).optional(),
   })
   .strict()
   .refine((doc) => doc.pages.some((page) => page.id === doc.activePageId), { message: "activePageId must match a page" });

@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "task_id": "studio-spec-code-export",
+  "task_sha256": "137c06ed54be030be24951116c19530219fa411b13358b6fb82bb36963b79c4f",
+  "attempt": 1,
+  "provider_exit": 0,
+  "report": "complete",
+  "report_sha256": "adb3f187125b0a239f9bbdf9ff883a52de5c6d0e847507369ec4beb61015b84d",
+  "owns_check": "passed",
+  "verification": "passed",
+  "review": "not_required",
+  "accepted": true,
+  "accepted_at": "2026-10-18T00:00:38.869Z",
+  "model": "composer-2.5"
+}

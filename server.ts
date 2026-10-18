@@ -20,6 +20,12 @@ import {
   hashUtf8,
   prototypeRefPath,
 } from "./src/server/wireframe-agent.ts";
+import {
+  wireframeCodeFilePath,
+  wireframeCodeReadmePath,
+  wireframeSpecAssetPath,
+  wireframeSpecPath,
+} from "./src/server/wireframe-export.ts";
 import { freeStem, listedStem, pngPath, prototypesDir, sanitizeStem, wireframePath } from "./src/server/wireframes.ts";
 import { appendWireframeHistorySnapshot, readHistoryIndex } from "./src/server/wireframe-history-store.ts";
 import { historySnapshotPath, wireframeHistoryReasons } from "./src/server/wireframe-history.ts";
@@ -205,6 +211,26 @@ export const rpcContract = defineRpcContract({
       })
       .strict(),
     output: z.object({ base64: z.string(), contentType: z.string() }).strict(),
+  },
+  writePrototypeDeliverables: {
+    input: z
+      .object({
+        threadId: z.string().min(1).max(256),
+        stem: z.string().min(1).max(255),
+        specMarkdown: z.string().min(1).max(8 * 1024 * 1024).optional(),
+        specImages: z
+          .array(z.object({ relPath: z.string().min(1).max(512), base64: z.string().min(1).max(60 * 1024 * 1024) }).strict())
+          .max(50)
+          .optional(),
+        codeFiles: z
+          .array(z.object({ fileName: z.string().min(1).max(255), content: z.string().min(1).max(2 * 1024 * 1024) }).strict())
+          .max(50)
+          .optional(),
+        codeReadme: z.string().min(1).max(512 * 1024).optional(),
+        locale: z.enum(["en", "ru"]).optional(),
+      })
+      .strict(),
+    output: z.object({ specPath: z.string().nullable(), paths: z.array(z.string()) }).strict(),
   },
   /** Writes a drawing PNG and its sidecar JSON under the thread's Paint/ folder. */
   savePaint: {
@@ -531,6 +557,43 @@ export default function plugin(bb: BbPluginApi) {
         .write({ hostId: storage.hostId, path: absPath, content: base64, contentEncoding: "base64", createParents: true })
         .catch((error: unknown) => { throw describe(error, hostName, absPath, locale); });
       return { absPath };
+    },
+    writePrototypeDeliverables: async ({ threadId, stem, specMarkdown, specImages = [], codeFiles = [], codeReadme, locale = "en" }) => {
+      const stemSafe = sanitizeStem(stem, locale);
+      const storage = await sdk.threads.storageLocation({ threadId });
+      const dir = prototypesDir(storage.storageRootPath, locale);
+      const hostName = (await bb.sdk.hosts.get({ hostId: storage.hostId }).catch(() => null))?.name || storage.hostId;
+      const written: string[] = [];
+      let specPath: string | null = null;
+      if (specMarkdown) {
+        specPath = wireframeSpecPath(dir, stemSafe, locale);
+        await bb.sdk.files
+          .write({ hostId: storage.hostId, path: specPath, content: specMarkdown, contentEncoding: "utf8", createParents: true })
+          .catch((error: unknown) => { throw describe(error, hostName, specPath!, locale); });
+        written.push(specPath);
+      }
+      for (const image of specImages) {
+        const absPath = wireframeSpecAssetPath(dir, image.relPath, locale);
+        await bb.sdk.files
+          .write({ hostId: storage.hostId, path: absPath, content: image.base64, contentEncoding: "base64", createParents: true })
+          .catch((error: unknown) => { throw describe(error, hostName, absPath, locale); });
+        written.push(absPath);
+      }
+      if (codeReadme) {
+        const readmePath = wireframeCodeReadmePath(dir, stemSafe, locale);
+        await bb.sdk.files
+          .write({ hostId: storage.hostId, path: readmePath, content: codeReadme, contentEncoding: "utf8", createParents: true })
+          .catch((error: unknown) => { throw describe(error, hostName, readmePath, locale); });
+        written.push(readmePath);
+      }
+      for (const file of codeFiles) {
+        const absPath = wireframeCodeFilePath(dir, stemSafe, file.fileName, locale);
+        await bb.sdk.files
+          .write({ hostId: storage.hostId, path: absPath, content: file.content, contentEncoding: "utf8", createParents: true })
+          .catch((error: unknown) => { throw describe(error, hostName, absPath, locale); });
+        written.push(absPath);
+      }
+      return { specPath, paths: written };
     },
     readPrototypeAsset: async ({ threadId, relPath, locale = "en" }) => {
       const storage = await sdk.threads.storageLocation({ threadId });

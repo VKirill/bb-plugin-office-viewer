@@ -96,6 +96,10 @@ import { ProtoShortcutsSheet } from "./proto-shortcuts-sheet";
 import { PrototypePreviewPlayer } from "./preview-player";
 import { WireframeHistoryDialog } from "./wireframe-history-dialog";
 import { AgentGenerateDialog } from "./agent-generate-dialog";
+import { addComment, commentNumbersOnPage, commentsForPage, deleteComment, updateComment } from "./comments";
+import { CommentComposeDialog } from "./comment-compose-dialog";
+import { buildWireframeCodeExport } from "./code-export";
+import { buildImplementFromSpecPrompt, buildWireframeSpecMarkdown, specImageRelPath } from "./spec-export";
 import {
   replaceWireframeFromRemote,
   shouldApplyRemoteWireframe,
@@ -246,6 +250,9 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const previewBoardRef = useRef<HTMLDivElement>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [commentToolActive, setCommentToolActive] = useState(false);
+  const [commentComposeOpen, setCommentComposeOpen] = useState(false);
+  const [commentDraft, setCommentDraft] = useState<{ x: number; y: number; elementId?: string } | null>(null);
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const lastHistorySnapshotAt = useRef(0);
   const lastWrittenHashRef = useRef<string | null>(null);
@@ -668,6 +675,12 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
         drag.current = { kind: "connectorHandle", id: connectorHit, which };
         event.currentTarget.setPointerCapture(event.pointerId);
       }
+      return;
+    }
+    if (commentToolActive && !handle) {
+      const hit = elementAtPoint(pageElements(view), p.x, p.y);
+      setCommentDraft({ x: p.x, y: p.y, elementId: hit?.id });
+      setCommentComposeOpen(true);
       return;
     }
     if (pendingTool && isConnectorTool(pendingTool) && !handle) {
@@ -1164,6 +1177,106 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     }
   };
 
+  const exportStem = () => openedStem ?? doc.name;
+
+  const captureSpecAssets = async (stem: string) => {
+    const startPageId = doc.activePageId;
+    const images: { pageId: string; relPath: string }[] = [];
+    const specImages: { relPath: string; base64: string }[] = [];
+    const prevBadges = badges;
+    if (!prevBadges) patchStudioSettings({ protoBadges: true });
+    for (const page of docRef.current.pages) {
+      if (page.id !== docRef.current.activePageId) {
+        commit(setActivePageId(docRef.current, page.id));
+        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      }
+      const rel = specImageRelPath(stem, page);
+      const png = await capturePng();
+      specImages.push({ relPath: rel, base64: await blobToBase64(png) });
+      images.push({ pageId: page.id, relPath: rel });
+    }
+    if (docRef.current.activePageId !== startPageId) {
+      commit(setActivePageId(docRef.current, startPageId));
+    }
+    if (!prevBadges) patchStudioSettings({ protoBadges: false });
+    return { images, specImages };
+  };
+
+  const writeSpecDeliverables = async (stem: string, attachChat = false) => {
+    const { images, specImages } = await captureSpecAssets(stem);
+    const markdown = buildWireframeSpecMarkdown(docRef.current, stem, images);
+    const saved = await rpc.call("writePrototypeDeliverables", {
+      threadId,
+      stem,
+      specMarkdown: markdown,
+      specImages,
+      locale,
+    });
+    if (attachChat) {
+      const files = [new File([markdown], `${stem}.spec.md`, { type: "text/markdown" })];
+      const attach = (composer as typeof composer & { experimental_vkAttachFiles?: (files: File[]) => Promise<void> }).experimental_vkAttachFiles;
+      if (typeof attach === "function") {
+        await attach.call(composer, files);
+      }
+      const prompt = buildImplementFromSpecPrompt(saved.specPath ?? `${stem}.spec.md`);
+      composer.updateText((draft) => `${draft.trim() ? `${draft.trimEnd()}\n\n` : ""}${prompt}\n\n`);
+      composer.focus();
+    }
+    return saved;
+  };
+
+  const exportSpecification = async () => {
+    setMenu(null);
+    setBusy(true);
+    try {
+      const stem = exportStem();
+      if (!openedStem) await persist(stem, false);
+      await writeSpecDeliverables(stem, false);
+      toast.success(t("protoExportSpecDone"));
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const exportCode = async () => {
+    setMenu(null);
+    setBusy(true);
+    try {
+      const stem = exportStem();
+      if (!openedStem) await persist(stem, false);
+      const { readme, files } = buildWireframeCodeExport(docRef.current);
+      await rpc.call("writePrototypeDeliverables", {
+        threadId,
+        stem,
+        codeReadme: readme,
+        codeFiles: files.map((file) => ({ fileName: file.fileName, content: file.content })),
+        locale,
+      });
+      toast.success(t("protoExportCodeDone"));
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendBuildToChat = async () => {
+    setMenu(null);
+    setBusy(true);
+    try {
+      const stem = exportStem();
+      if (!openedStem) await persist(stem, false);
+      await writeSpecDeliverables(stem, true);
+      toast.success(t("protoSendBuildDone"));
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const sendToChat = async (kind: SendKind) => {
     setMenu(null);
     setBusy(true);
@@ -1534,6 +1647,13 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     }
     if (!mod && key === "v") {
       setPendingTool(null);
+      setCommentToolActive(false);
+      return;
+    }
+    if (!mod && key === "c") {
+      event.preventDefault();
+      setCommentToolActive((on) => !on);
+      setPendingTool(null);
       return;
     }
     if (!mod && key.length === 1 && CANVAS_TOOL_KEYS[key]) {
@@ -1545,6 +1665,19 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
 
   
   const activePage = getActivePage(view);
+  const pageCommentNumbers = useMemo(() => commentNumbersOnPage(doc, activePage.id), [doc, activePage.id]);
+  const pageComments = useMemo(() => commentsForPage(doc, activePage.id), [doc, activePage.id]);
+  const commentPins = useMemo(
+    () =>
+      pageComments.map((comment) => ({
+        id: comment.id,
+        x: comment.x,
+        y: comment.y,
+        number: pageCommentNumbers.get(comment.id) ?? 0,
+        resolved: comment.resolved,
+      })),
+    [pageComments, pageCommentNumbers],
+  );
   const openTabs = doc.pages.filter((p) => openTabIds.includes(p.id));
   const pageEls = pageElements(view);
   const boardItems = useMemo(() => {
@@ -1812,6 +1945,14 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             onPreview={() => setPreviewOpen(true)}
             onHistory={() => { setMenu(null); setHistoryOpen(true); }}
             onGenerate={() => setGenerateOpen(true)}
+            commentToolActive={commentToolActive}
+            onToggleCommentTool={() => {
+              setCommentToolActive((on) => !on);
+              setPendingTool(null);
+            }}
+            onExportSpec={() => void exportSpecification()}
+            onExportCode={() => void exportCode()}
+            onSendBuild={() => void sendBuildToChat()}
           />
         }
         styleBar={<PrototypeStyleBar inspect={inspect} canvas={pageCanvas(doc)} onCanvas={(patch) => commit(patchCanvas(doc, patch))} onUpdate={updateOne} />}
@@ -1914,6 +2055,12 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             skipBlur={skipBlur}
             onPaneClick={() => setMenu(null)}
             resolveAsset={resolveAsset}
+            commentPins={commentPins}
+            onCommentPinClick={(id) => {
+              setSelected([]);
+              setInspectorTab("notes");
+              void id;
+            }}
           />
         }
         inspector={
@@ -1965,6 +2112,11 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
               if (!one) return;
               replaceElement({ ...one, interactions });
             }}
+            pageComments={pageComments}
+            commentNumbers={pageCommentNumbers}
+            onCommentText={(id, text) => commit(updateComment(doc, id, { text }))}
+            onCommentResolve={(id, resolved) => commit(updateComment(doc, id, { resolved }))}
+            onCommentDelete={(id) => commit(deleteComment(doc, id))}
           />
         }
         dialogs={
@@ -2020,6 +2172,24 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
                 )}
               </DialogContent>
             </Dialog>
+            <CommentComposeDialog
+              open={commentComposeOpen}
+              onOpenChange={setCommentComposeOpen}
+              onSubmit={(text) => {
+                if (!commentDraft) return;
+                commit(
+                  addComment(doc, {
+                    pageId: doc.activePageId,
+                    x: commentDraft.x,
+                    y: commentDraft.y,
+                    elementId: commentDraft.elementId,
+                    text,
+                  }),
+                );
+                setCommentDraft(null);
+                setInspectorTab("notes");
+              }}
+            />
             <AgentGenerateDialog
               threadId={threadId}
               open={generateOpen}
