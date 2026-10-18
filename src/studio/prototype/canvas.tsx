@@ -63,6 +63,8 @@ export function PrototypeCanvas({
   skipBlur,
   onPaneClick,
   resolveAsset,
+  commentPins = [],
+  onCommentPinClick,
 }: {
   canvasPaneRef: RefObject<HTMLDivElement | null>;
   boardRef: RefObject<HTMLDivElement | null>;
@@ -113,6 +115,8 @@ export function PrototypeCanvas({
   skipBlur: React.MutableRefObject<boolean>;
   onPaneClick: () => void;
   resolveAsset?: (src: string) => string | undefined;
+  commentPins?: { id: string; x: number; y: number; number: number; resolved?: boolean }[];
+  onCommentPinClick?: (id: string) => void;
 }) {
   const t = useT();
   const placed =
@@ -258,6 +262,25 @@ export function PrototypeCanvas({
                   />
                 ) : null}
                 {scopeOverlay}
+                {commentPins.map((pin) => (
+                  <button
+                    key={pin.id}
+                    type="button"
+                    data-proto-skip
+                    className={cn(
+                      "absolute z-30 flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-background text-[10px] font-semibold shadow",
+                      pin.resolved ? "bg-muted text-muted-foreground" : "bg-amber-500 text-amber-950",
+                    )}
+                    style={{ left: pin.x, top: pin.y }}
+                    title={t("protoCommentPin")}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onCommentPinClick?.(pin.id);
+                    }}
+                  >
+                    {pin.number}
+                  </button>
+                ))}
                 {placed.map(({ element: el, absX, absY }) => {
                   const active = selected.includes(el.id);
                   const mark = notes.get(el.id);

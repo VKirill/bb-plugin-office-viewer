@@ -24,7 +24,7 @@ import { RepeaterDataGrid } from "./repeater-data-grid";
 import { SNAP, snap, type PropValue, type WireframeCanvas, type WireframeElement } from "./model";
 import { listInstanceOverrides } from "./components";
 import { normalizeRepeaterData, repeaterColumns } from "./containers";
-import type { WireframeComponent, WireframePage } from "./model";
+import type { WireframeComment, WireframeComponent, WireframePage } from "./model";
 import { InspectorInteractionsPanel } from "./inspector-interactions";
 import type { Interaction } from "./interactions";
 
@@ -56,6 +56,11 @@ export function PrototypeInspector({
   onInstanceClearOverride,
   pages = [],
   onInteractionsChange,
+  pageComments = [],
+  commentNumbers,
+  onCommentText,
+  onCommentResolve,
+  onCommentDelete,
 }: {
   tab: InspectorTab;
   setTab: (tab: InspectorTab) => void;
@@ -82,6 +87,11 @@ export function PrototypeInspector({
   onInstanceClearOverride?: (masterElementId: string, propKey: string) => void;
   pages?: readonly WireframePage[];
   onInteractionsChange?: (interactions: Interaction[]) => void;
+  pageComments?: readonly WireframeComment[];
+  commentNumbers?: Map<string, number>;
+  onCommentText?: (id: string, text: string) => void;
+  onCommentResolve?: (id: string, resolved: boolean) => void;
+  onCommentDelete?: (id: string) => void;
 }) {
   const t = useT();
   const [styleTarget, setStyleTarget] = useState<StyleTarget>("base");
@@ -154,6 +164,36 @@ export function PrototypeInspector({
             ) : (
               <p className="mt-2 text-xs text-muted-foreground">{t("protoPageNotesHint")}</p>
             )}
+            {pageComments.length ? (
+              <div className="mt-4 space-y-2">
+                <span className="text-xs font-medium text-muted-foreground">{t("protoCommentsTitle")}</span>
+                <ul className="space-y-2">
+                  {pageComments.map((comment) => {
+                    const number = commentNumbers?.get(comment.id) ?? 0;
+                    return (
+                      <li key={comment.id} className={cn("rounded border border-border p-2", comment.resolved && "opacity-60")}>
+                        <div className="mb-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <span>{t("protoCommentNumber", { n: number })}</span>
+                          <div className="flex gap-1">
+                            <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => onCommentResolve?.(comment.id, !comment.resolved)}>
+                              {comment.resolved ? t("protoCommentReopen") : t("protoCommentResolve")}
+                            </Button>
+                            <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => onCommentDelete?.(comment.id)}>
+                              {t("protoDelete")}
+                            </Button>
+                          </div>
+                        </div>
+                        <Textarea
+                          rows={2}
+                          value={comment.text}
+                          onChange={(event) => onCommentText?.(comment.id, event.target.value)}
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
           </label>
         ) : null}
 

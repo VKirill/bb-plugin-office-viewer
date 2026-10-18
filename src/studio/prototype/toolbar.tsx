@@ -50,6 +50,11 @@ export function PrototypeToolbar({
   onPreview,
   onHistory,
   onGenerate,
+  commentToolActive = false,
+  onToggleCommentTool,
+  onExportSpec,
+  onExportCode,
+  onSendBuild,
 }: {
   barRef: React.RefObject<HTMLDivElement | null>;
   menu: ToolbarMenu | null;
@@ -86,6 +91,11 @@ export function PrototypeToolbar({
   onPreview?: () => void;
   onHistory?: () => void;
   onGenerate?: () => void;
+  commentToolActive?: boolean;
+  onToggleCommentTool?: () => void;
+  onExportSpec?: () => void;
+  onExportCode?: () => void;
+  onSendBuild?: () => void;
 }) {
   const t = useT();
   return (
@@ -102,6 +112,8 @@ export function PrototypeToolbar({
               <MenuItem onClick={onOpen}>{t("protoOpen")}</MenuItem>
               <MenuItem disabled={busy} onClick={onSave}>{t("save")}</MenuItem>
               {onHistory ? <MenuItem disabled={busy} onClick={onHistory}>{t("protoHistoryTitle")}</MenuItem> : null}
+              {onExportSpec ? <MenuItem disabled={busy} onClick={onExportSpec}>{t("protoExportSpec")}</MenuItem> : null}
+              {onExportCode ? <MenuItem disabled={busy} onClick={onExportCode}>{t("protoExportCode")}</MenuItem> : null}
             </div>
           ) : null}
         </div>
@@ -129,6 +141,11 @@ export function PrototypeToolbar({
         {onToggleConnectorTool ? (
           <ToolBtn tip={t("protoToolConnector")} pressed={connectorToolActive} onClick={onToggleConnectorTool}>
             <Icon name="GitBranch" className="size-4" />
+          </ToolBtn>
+        ) : null}
+        {onToggleCommentTool ? (
+          <ToolBtn tip={t("protoToolComment")} pressed={commentToolActive} onClick={onToggleCommentTool}>
+            <Icon name="MessageSquare" className="size-4" />
           </ToolBtn>
         ) : null}
         {onPreview ? (
@@ -236,6 +253,7 @@ export function PrototypeToolbar({
               <MenuItem onClick={() => sendToChat("both")}>{t("protoSendBoth")}</MenuItem>
               <MenuItem onClick={() => sendToChat("png")}>{t("protoSendPng")}</MenuItem>
               <MenuItem onClick={() => sendToChat("json")}>{t("protoSendJson")}</MenuItem>
+              {onSendBuild ? <MenuItem disabled={busy} onClick={onSendBuild}>{t("protoSendBuild")}</MenuItem> : null}
             </div>
           ) : null}
         </div>
