@@ -21,7 +21,8 @@ import {
 import { iconDisplayLabel } from "./icons";
 import { ElementFace } from "./elements";
 import { InspectorAutoLayoutPanel } from "./inspector-auto-layout";
-import { SNAP, snap, type PropValue, type WireframeCanvas, type WireframeElement } from "./model";
+import { findColorToken, findTextStyle } from "./styles";
+import { SNAP, snap, type PropValue, type WireframeCanvas, type WireframeElement, type WireframeStyleLibrary } from "./model";
 
 const STYLE_EFFECT_LABEL: Record<(typeof STYLE_EFFECTS)[number], I18nKey> = {
   hover: "protoStyleHover",
@@ -64,6 +65,8 @@ export function InspectorStylePanel({
   applyDistribute,
   documentColours,
   onReplaceElement,
+  styleLibrary,
+  onUnlinkStyles,
 }: {
   inspect: WireframeElement | null;
   selection: WireframeElement[];
@@ -80,6 +83,8 @@ export function InspectorStylePanel({
   applyAlign: (edge: AlignEdge) => void;
   applyDistribute: (axis: DistributeAxis) => void;
   onReplaceElement: (el: WireframeElement) => void;
+  styleLibrary?: WireframeStyleLibrary;
+  onUnlinkStyles?: () => void;
 }) {
   const t = useT();
   const [lockAspect, setLockAspect] = useState(() => inspect?.props.lockAspect === true);
@@ -204,6 +209,17 @@ export function InspectorStylePanel({
           {t("protoGeometryFit")}
         </Button>
       </CollapseSection>
+
+      {inspect && styleLibrary && (inspect.linkedColorTokenId || inspect.linkedTextStyleId) ? (
+        <div className="mb-2 rounded border border-border p-2 text-xs">
+          <div className="text-muted-foreground">{t("protoStyleLinked")}</div>
+          {inspect.linkedColorTokenId ? <div>{findColorToken(styleLibrary, inspect.linkedColorTokenId)?.name}</div> : null}
+          {inspect.linkedTextStyleId ? <div>{findTextStyle(styleLibrary, inspect.linkedTextStyleId)?.name}</div> : null}
+          {onUnlinkStyles ? (
+            <Button type="button" size="sm" variant="outline" className="mt-2 h-7" onClick={onUnlinkStyles}>{t("protoStyleUnlink")}</Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <InspectorAutoLayoutPanel
         inspect={inspect}

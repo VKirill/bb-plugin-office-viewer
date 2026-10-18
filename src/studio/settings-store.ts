@@ -9,6 +9,8 @@ const PRESETS: CanvasPresetId[] = ["desktop", "desktopWide", "tablet", "tabletLa
 
 export type GridStep = (typeof GRID_STEPS)[number];
 
+export type ProtoFidelity = "sketch" | "mockup";
+
 export type StudioSettings = {
   language: LanguagePref;
   protoPreset: CanvasPresetId;
@@ -16,6 +18,9 @@ export type StudioSettings = {
   protoShowGrid: boolean;
   protoSnap: boolean;
   protoBadges: boolean;
+  protoFidelity: ProtoFidelity;
+  protoMinimap: boolean;
+  protoTourDone: boolean;
   paintColor: string;
   paintSize: number;
 };
@@ -27,6 +32,9 @@ const DEFAULTS: StudioSettings = {
   protoShowGrid: true,
   protoSnap: true,
   protoBadges: true,
+  protoFidelity: "mockup",
+  protoMinimap: true,
+  protoTourDone: false,
   paintColor: "#ef4444",
   paintSize: 4,
 };
@@ -47,6 +55,9 @@ function load(): StudioSettings {
       protoShowGrid: typeof parsed.protoShowGrid === "boolean" ? parsed.protoShowGrid : DEFAULTS.protoShowGrid,
       protoSnap: typeof parsed.protoSnap === "boolean" ? parsed.protoSnap : DEFAULTS.protoSnap,
       protoBadges: typeof parsed.protoBadges === "boolean" ? parsed.protoBadges : DEFAULTS.protoBadges,
+      protoFidelity: parsed.protoFidelity === "sketch" || parsed.protoFidelity === "mockup" ? parsed.protoFidelity : DEFAULTS.protoFidelity,
+      protoMinimap: typeof parsed.protoMinimap === "boolean" ? parsed.protoMinimap : DEFAULTS.protoMinimap,
+      protoTourDone: typeof parsed.protoTourDone === "boolean" ? parsed.protoTourDone : DEFAULTS.protoTourDone,
       paintColor: typeof parsed.paintColor === "string" && parsed.paintColor.length > 0 ? parsed.paintColor : DEFAULTS.paintColor,
       paintSize: typeof parsed.paintSize === "number" && (PAINT_SIZES as readonly number[]).includes(parsed.paintSize) ? parsed.paintSize : DEFAULTS.paintSize,
     };

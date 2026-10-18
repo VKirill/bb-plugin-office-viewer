@@ -1,5 +1,6 @@
 import { boardElements, childrenOf } from "./containers.ts";
 import { isAutoLayoutStack, resolvePageView, stackFlexStyle, type PageDeviceView } from "./layout.ts";
+import { fidelityExportClassName, type ProtoFidelity } from "./styles.ts";
 import type { ElementType, PropValue, Wireframe, WireframeElement, WireframePage } from "./model.ts";
 
 export type CodeExportFile = { fileName: string; content: string };
@@ -138,15 +139,20 @@ function renderPageElements(page: WireframePage): string {
     .join("\n");
 }
 
-export function buildPageComponent(page: WireframePage): CodeExportFile {
+export function buildPageComponent(page: WireframePage, fidelity: ProtoFidelity = "mockup"): CodeExportFile {
   const componentName = slugComponentName(page.name);
   const body = renderPageElements(page);
-  const content = `/** Generated starting point — adjust layout and styles. */\nexport function ${componentName}() {\n  return (\n    <div\n      className="relative bg-background"\n      style={{ width: ${page.canvas.width}, height: ${page.canvas.height}, background: "${page.canvas.background}" }}\n    >\n${body}\n    </div>\n  );\n}\n`;
+  const fidelityClass = fidelityExportClassName(fidelity);
+  const content = `/** Generated starting point — adjust layout and styles. */\nexport function ${componentName}() {\n  return (\n    <div\n      className="relative bg-background${fidelityClass ? ` ${fidelityClass}` : ""}"\n      style={{ width: ${page.canvas.width}, height: ${page.canvas.height}, background: "${page.canvas.background}" }}\n    >\n${body}\n    </div>\n  );\n}\n`;
   return { fileName: `${componentName}.tsx`, content };
 }
 
-export function buildWireframeCodeExport(doc: Wireframe, deviceView: PageDeviceView = "desktop"): { readme: string; files: CodeExportFile[] } {
-  const files = doc.pages.map((page) => buildPageComponent(resolvePageView(page, deviceView)));
+export function buildWireframeCodeExport(
+  doc: Wireframe,
+  deviceView: PageDeviceView = "desktop",
+  fidelity: ProtoFidelity = "mockup",
+): { readme: string; files: CodeExportFile[] } {
+  const files = doc.pages.map((page) => buildPageComponent(resolvePageView(page, deviceView), fidelity));
   const readme = [
     `# ${doc.name} — generated React components`,
     "",

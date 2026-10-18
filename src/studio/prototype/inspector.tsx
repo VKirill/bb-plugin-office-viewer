@@ -61,6 +61,8 @@ export function PrototypeInspector({
   onCommentText,
   onCommentResolve,
   onCommentDelete,
+  styleLibrary,
+  onUnlinkStyles,
 }: {
   tab: InspectorTab;
   setTab: (tab: InspectorTab) => void;
@@ -92,6 +94,8 @@ export function PrototypeInspector({
   onCommentText?: (id: string, text: string) => void;
   onCommentResolve?: (id: string, resolved: boolean) => void;
   onCommentDelete?: (id: string) => void;
+  styleLibrary?: import("./model").WireframeStyleLibrary;
+  onUnlinkStyles?: () => void;
 }) {
   const t = useT();
   const [styleTarget, setStyleTarget] = useState<StyleTarget>("base");
@@ -214,6 +218,8 @@ export function PrototypeInspector({
             applyAlign={applyAlign}
             applyDistribute={applyDistribute}
             onReplaceElement={onReplaceElement}
+            styleLibrary={styleLibrary}
+            onUnlinkStyles={onUnlinkStyles}
           />
         ) : null}
 

@@ -114,6 +114,17 @@ import {
   writeStackLayout,
 } from "./layout";
 import { childrenOf, readParent } from "./containers";
+import { PrototypeCommandPalette } from "./command-palette";
+import { PrototypeStylesPane } from "./styles-pane";
+import { PrototypeTour } from "./prototype-tour";
+import { UndoStepsPanel } from "./undo-steps-panel";
+import {
+  applyColorTokenLink,
+  applyTextStyleLink,
+  getStyleLibrary,
+  unlinkElementStyles,
+  type CommandPaletteItem,
+} from "./styles";
 import {
   replaceWireframeFromRemote,
   shouldApplyRemoteWireframe,
@@ -251,7 +262,11 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const drag = useRef<Drag | null>(null);
   const spaceHeld = useRef(false);
   const clipboard = useRef<WireframeElement[]>([]);
-  const [{ history, index }, setTimeline] = useState(() => ({ history: [restored?.doc ?? blankWireframe()], index: 0 }));
+  const [{ history, index, labels }, setTimeline] = useState(() => ({
+    history: [restored?.doc ?? blankWireframe()],
+    labels: ["Initial"],
+    index: 0,
+  }));
   const doc = history[index]!;
   const [live, setLive] = useState<Wireframe | null>(null);
   const view = live ?? doc;
@@ -278,6 +293,10 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const previewBoardRef = useRef<HTMLDivElement>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [undoStepsOpen, setUndoStepsOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [minimapViewport, setMinimapViewport] = useState({ left: 0, top: 0, width: 1280, height: 800 });
   const [generateOpen, setGenerateOpen] = useState(false);
   const [commentToolActive, setCommentToolActive] = useState(false);
   const [commentComposeOpen, setCommentComposeOpen] = useState(false);
@@ -360,13 +379,35 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     return () => document.removeEventListener("pointerdown", onPointer);
   }, [menu]);
 
-  const commit = useCallback((next: Wireframe) => {
+  const commit = useCallback((next: Wireframe, label = "Edit") => {
     setLive(null);
     setTimeline((s) => {
-      const kept = s.history.slice(Math.max(0, s.index + 1 - MAX_HISTORY), s.index + 1);
-      return { history: [...kept, cloneWireframe(next)], index: kept.length };
+      const keptHist = s.history.slice(Math.max(0, s.index + 1 - MAX_HISTORY), s.index + 1);
+      const keptLabels = s.labels.slice(Math.max(0, s.index + 1 - MAX_HISTORY), s.index + 1);
+      return { history: [...keptHist, cloneWireframe(next)], labels: [...keptLabels, label], index: keptHist.length };
     });
   }, []);
+
+  useEffect(() => {
+    if (!settings.protoTourDone) setTourOpen(true);
+  }, [settings.protoTourDone]);
+
+  useEffect(() => {
+    const pane = canvasPaneRef.current;
+    if (!pane) return;
+    const sync = () => {
+      const canvas = pageCanvas(docRef.current, pageDeviceView);
+      setMinimapViewport({
+        left: pane.scrollLeft / zoom,
+        top: pane.scrollTop / zoom,
+        width: pane.clientWidth / zoom,
+        height: pane.clientHeight / zoom,
+      });
+    };
+    sync();
+    pane.addEventListener("scroll", sync);
+    return () => pane.removeEventListener("scroll", sync);
+  }, [zoom, pageDeviceView, doc.activePageId]);
 
   const markWrittenJson = useCallback(async (json: string) => {
     lastWrittenHashRef.current = await wireframeContentSha256(json);
@@ -1320,7 +1361,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     try {
       const stem = exportStem();
       if (!openedStem) await persist(stem, false);
-      const { readme, files } = buildWireframeCodeExport(docRef.current, pageDeviceView);
+      const { readme, files } = buildWireframeCodeExport(docRef.current, pageDeviceView, settings.protoFidelity);
       await rpc.call("writePrototypeDeliverables", {
         threadId,
         stem,
@@ -1555,6 +1596,11 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     if (edit || (event.target as HTMLElement).closest("input, textarea, [role=dialog]")) return;
     const mod = event.metaKey || event.ctrlKey;
     const key = event.key.toLowerCase();
+    if (mod && key === "k") {
+      event.preventDefault();
+      setCommandPaletteOpen(true);
+      return;
+    }
     if (mod && key === "z") {
       event.preventDefault();
       if (event.shiftKey) redo();
@@ -1974,6 +2020,40 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
   const selectionLocked = selected.length > 0 && selected.every((id) => pageElements(doc, pageDeviceView).find((el) => el.id === id)?.locked);
   const selectionHidden = selected.length > 0 && selected.every((id) => pageElements(doc, pageDeviceView).find((el) => el.id === id)?.hidden);
 
+  const commandItems = useMemo((): CommandPaletteItem[] => {
+    const items: CommandPaletteItem[] = [
+      { id: "action:preview", group: "action", label: t("protoPreviewTip"), shortcut: "." },
+      { id: "action:undo", group: "action", label: t("protoUndoTip"), shortcut: "Mod+Z" },
+      { id: "action:save", group: "action", label: t("save"), shortcut: "Mod+S" },
+      { id: "action:tour", group: "action", label: t("protoTourOpen") },
+    ];
+    for (const page of doc.pages) {
+      items.push({ id: `page:${page.id}`, group: "page", label: page.name });
+    }
+    for (const el of pageElements(view, pageDeviceView)) {
+      items.push({ id: `element:${el.id}`, group: "element", label: el.label, detail: el.type });
+    }
+    for (const component of doc.components ?? []) {
+      items.push({ id: `component:${component.id}`, group: "component", label: component.name });
+    }
+    return items;
+  }, [doc, pageDeviceView, t, view]);
+
+  const runCommand = (item: CommandPaletteItem) => {
+    if (item.id === "action:preview") setPreviewOpen(true);
+    else if (item.id === "action:undo") undo();
+    else if (item.id === "action:save") {
+      setSaveName(openedStem ?? doc.name);
+      setSaveOpen(true);
+    } else if (item.id === "action:tour") setTourOpen(true);
+    else if (item.id.startsWith("page:")) switchPage(item.id.slice(5));
+    else if (item.id.startsWith("element:")) setSelected([item.id.slice(8)]);
+    else if (item.id.startsWith("component:")) {
+      setEditScope({ kind: "component", componentId: item.id.slice(10) });
+      setSelected([]);
+    }
+  };
+
   const menuBuildContext: MenuBuildContext = useMemo(
     () => ({
       selectedElementIds: selected,
@@ -2049,6 +2129,9 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             onExportSpec={() => void exportSpecification()}
             onExportCode={() => void exportCode()}
             onSendBuild={() => void sendBuildToChat()}
+            protoFidelity={settings.protoFidelity}
+            onFidelityChange={(value) => patchStudioSettings({ protoFidelity: value })}
+            onUndoSteps={() => setUndoStepsOpen(true)}
           />
         }
         styleBar={<PrototypeStyleBar inspect={inspect} canvas={pageCanvas(doc, pageDeviceView)} onCanvas={(patch) => commit(patchCanvas(doc, patch))} onUpdate={updateOne} />}
@@ -2095,6 +2178,39 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
               setSelected([]);
             }}
             onComponentContextMenu={(componentId, event) => openContextMenu(event.clientX, event.clientY, { kind: "componentTile", componentId })}
+            stylesPanel={
+              <PrototypeStylesPane
+                doc={doc}
+                selection={selectedEls}
+                onDocChange={(next) => commit(next, t("protoStyleEdit"))}
+                onApplyColorToken={(tokenId) => {
+                  if (!one) return;
+                  replaceElement(applyColorTokenLink(one, tokenId));
+                }}
+                onApplyTextStyle={(styleId) => {
+                  if (!one) return;
+                  replaceElement(applyTextStyleLink(one, styleId));
+                }}
+                onImportMarkdown={async () => {
+                  const remote = await rpc.call("readDesignMd", { threadId, locale });
+                  if (remote.markdown) return remote.markdown;
+                  return await new Promise<string | null>((resolve) => {
+                    const input = document.createElement("input");
+                    input.type = "file";
+                    input.accept = ".md,text/markdown";
+                    input.onchange = () => {
+                      const file = input.files?.[0];
+                      if (!file) {
+                        resolve(null);
+                        return;
+                      }
+                      void file.text().then(resolve);
+                    };
+                    input.click();
+                  });
+                }}
+              />
+            }
           />
         }
         canvas={
@@ -2133,6 +2249,17 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             scopeOverlay={scopeOverlay}
             deviceView={pageDeviceView}
             onDeviceViewChange={setPageDeviceView}
+            fidelity={settings.protoFidelity}
+            styleLibrary={getStyleLibrary(doc)}
+            minimapVisible={settings.protoMinimap}
+            minimapViewport={minimapViewport}
+            onMinimapJump={(x, y) => {
+              const pane = canvasPaneRef.current;
+              if (!pane) return;
+              pane.scrollLeft = Math.max(0, x * zoom - pane.clientWidth / 2);
+              pane.scrollTop = Math.max(0, y * zoom - pane.clientHeight / 2);
+            }}
+            onOpenTour={() => setTourOpen(true)}
             onOpenShortcuts={() => setShortcutsOpen(true)}
             onPanePointerDown={onPanePointerDown}
             onPanePointerMove={onPanePointerMove}
@@ -2215,6 +2342,11 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             onCommentText={(id, text) => commit(updateComment(doc, id, { text }))}
             onCommentResolve={(id, resolved) => commit(updateComment(doc, id, { resolved }))}
             onCommentDelete={(id) => commit(deleteComment(doc, id))}
+            styleLibrary={getStyleLibrary(doc)}
+            onUnlinkStyles={() => {
+              if (!one) return;
+              replaceElement(unlinkElementStyles(one));
+            }}
           />
         }
         dialogs={
@@ -2332,6 +2464,19 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
         context={menuBuildContext}
         onAction={onContextAction}
         onClose={() => setContextMenu(null)}
+      />
+      <PrototypeCommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} items={commandItems} onRun={runCommand} />
+      <UndoStepsPanel
+        open={undoStepsOpen}
+        onOpenChange={setUndoStepsOpen}
+        labels={labels}
+        activeIndex={index}
+        onJump={(target) => setTimeline((s) => ({ ...s, index: target }))}
+      />
+      <PrototypeTour
+        open={tourOpen}
+        onOpenChange={setTourOpen}
+        onDone={() => patchStudioSettings({ protoTourDone: true })}
       />
       {quickInsertOpen ? (
         <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/20 pt-24" onClick={() => { setQuickInsertOpen(false); setQuickQuery(""); }}>
