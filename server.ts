@@ -27,6 +27,13 @@ import {
   wireframeSpecPath,
 } from "./src/server/wireframe-export.ts";
 import { freeStem, listedStem, pngPath, prototypesDir, sanitizeStem, wireframePath } from "./src/server/wireframes.ts";
+import {
+  parsePublishIndex,
+  publishDataPath,
+  publishIndexPath,
+  publishPlayerPath,
+} from "./src/server/wireframe-publish.ts";
+import { buildStaticPlayerHtml, prototypePreviewHttpPath } from "./src/studio/prototype/publish.ts";
 import { appendWireframeHistorySnapshot, readHistoryIndex } from "./src/server/wireframe-history-store.ts";
 import { historySnapshotPath, wireframeHistoryReasons } from "./src/server/wireframe-history.ts";
 import { freePaintStem, listedPaintStem, paintDir, paintJsonPath, paintPngPath, sanitizePaintStem } from "./src/server/paint.ts";
@@ -216,6 +223,38 @@ export const rpcContract = defineRpcContract({
     input: z.object({ threadId: z.string().min(1).max(256), locale: z.enum(["en", "ru"]).optional() }).strict(),
     output: z.object({ markdown: z.string().nullable() }).strict(),
   },
+  publishWireframePreview: {
+    input: z
+      .object({
+        threadId: z.string().min(1).max(256),
+        name: z.string().min(1).max(255),
+        json: z.string().min(2).max(8 * 1024 * 1024),
+        locale: z.enum(["en", "ru"]).optional(),
+      })
+      .strict(),
+    output: z
+      .object({
+        stem: z.string(),
+        published: z.literal(true),
+        updatedAt: z.number(),
+        previewPath: z.string(),
+      })
+      .strict(),
+  },
+  unpublishWireframePreview: {
+    input: z.object({ threadId: z.string().min(1).max(256), name: z.string().min(1).max(255), locale: z.enum(["en", "ru"]).optional() }).strict(),
+    output: z.object({ published: z.literal(false) }).strict(),
+  },
+  getWireframePublishStatus: {
+    input: z.object({ threadId: z.string().min(1).max(256), name: z.string().min(1).max(255), locale: z.enum(["en", "ru"]).optional() }).strict(),
+    output: z
+      .object({
+        published: z.boolean(),
+        updatedAt: z.number().nullable(),
+        previewPath: z.string().nullable(),
+      })
+      .strict(),
+  },
   writePrototypeDeliverables: {
     input: z
       .object({
@@ -374,6 +413,50 @@ export default function plugin(bb: BbPluginApi) {
         "access-control-allow-origin": "*",
       },
     });
+  });
+
+  const serveWireframePreviewHtml = async (threadId: string, stem: string) => {
+    if (!threadId || !stem) return new Response("Not found", { status: 404 });
+    const storage = await sdk.threads.storageLocation({ threadId }).catch(() => null);
+    if (!storage) return new Response("Not found", { status: 404 });
+    const dir = prototypesDir(storage.storageRootPath, "en");
+    const indexAbs = publishIndexPath(dir, stem, "en");
+    const indexFile = await bb.sdk.files.read({ hostId: storage.hostId, path: indexAbs }).catch(() => null);
+    if (!indexFile || !("content" in indexFile)) return new Response("Not found", { status: 404 });
+    const indexRaw = indexFile.contentEncoding === "base64" ? Buffer.from(indexFile.content, "base64").toString("utf8") : indexFile.content;
+    const index = parsePublishIndex(indexRaw, stem);
+    if (!index.published || index.threadId !== threadId) return new Response("Not published", { status: 404 });
+    const playerAbs = publishPlayerPath(dir, stem, "en");
+    const playerFile = await bb.sdk.files.read({ hostId: storage.hostId, path: playerAbs }).catch(() => null);
+    if (!playerFile || !("content" in playerFile)) return new Response("Not found", { status: 404 });
+    const html = playerFile.contentEncoding === "base64" ? Buffer.from(playerFile.content, "base64").toString("utf8") : playerFile.content;
+    return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, max-age=60" } });
+  };
+
+  bb.http.route("GET", "/prototype/preview/:threadId/:stem", async (context) => {
+    const threadId = decodeURIComponent(context.req.param("threadId") ?? "");
+    const stem = decodeURIComponent(context.req.param("stem") ?? "");
+    return serveWireframePreviewHtml(threadId, stem);
+  });
+
+  bb.http.route("GET", "/prototype/preview/:threadId/:stem/index.html", async (context) => {
+    const threadId = decodeURIComponent(context.req.param("threadId") ?? "");
+    const stem = decodeURIComponent(context.req.param("stem") ?? "");
+    return serveWireframePreviewHtml(threadId, stem);
+  });
+
+  bb.http.route("GET", "/prototype/preview/:threadId/:stem/data.json", async (context) => {
+    const threadId = decodeURIComponent(context.req.param("threadId") ?? "");
+    const stem = decodeURIComponent(context.req.param("stem") ?? "");
+    if (!threadId || !stem) return new Response("Not found", { status: 404 });
+    const storage = await sdk.threads.storageLocation({ threadId }).catch(() => null);
+    if (!storage) return new Response("Not found", { status: 404 });
+    const dir = prototypesDir(storage.storageRootPath, "en");
+    const dataAbs = publishDataPath(dir, stem, "en");
+    const dataFile = await bb.sdk.files.read({ hostId: storage.hostId, path: dataAbs }).catch(() => null);
+    if (!dataFile || !("content" in dataFile)) return new Response("Not found", { status: 404 });
+    const json = dataFile.contentEncoding === "base64" ? Buffer.from(dataFile.content, "base64").toString("utf8") : dataFile.content;
+    return new Response(json, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "private, max-age=60" } });
   });
 
   bb.rpc.register(rpcContract, {
@@ -632,6 +715,53 @@ export default function plugin(bb: BbPluginApi) {
       } catch {
         return { markdown: null };
       }
+    },
+    publishWireframePreview: async ({ threadId, name, json, locale = "en" }) => {
+      const doc = parseWireframe(json);
+      const stem = sanitizeStem(name, locale);
+      const storage = await sdk.threads.storageLocation({ threadId });
+      const dir = prototypesDir(storage.storageRootPath, locale);
+      const hostName = (await bb.sdk.hosts.get({ hostId: storage.hostId }).catch(() => null))?.name || storage.hostId;
+      const updatedAt = Date.now();
+      const indexAbs = publishIndexPath(dir, stem, locale);
+      const playerAbs = publishPlayerPath(dir, stem, locale);
+      const dataAbs = publishDataPath(dir, stem, locale);
+      const index = JSON.stringify({ stem, threadId, published: true, updatedAt }, null, 2);
+      const html = buildStaticPlayerHtml({ ...doc, name: stem });
+      await bb.sdk.files
+        .write({ hostId: storage.hostId, path: indexAbs, content: index, contentEncoding: "utf8", createParents: true })
+        .catch((error: unknown) => { throw describe(error, hostName, indexAbs, locale); });
+      await bb.sdk.files
+        .write({ hostId: storage.hostId, path: playerAbs, content: html, contentEncoding: "utf8", createParents: true })
+        .catch((error: unknown) => { throw describe(error, hostName, playerAbs, locale); });
+      await bb.sdk.files
+        .write({ hostId: storage.hostId, path: dataAbs, content: json, contentEncoding: "utf8", createParents: true })
+        .catch((error: unknown) => { throw describe(error, hostName, dataAbs, locale); });
+      return { stem, published: true as const, updatedAt, previewPath: prototypePreviewHttpPath(threadId, stem) };
+    },
+    unpublishWireframePreview: async ({ threadId, name, locale = "en" }) => {
+      const stem = sanitizeStem(name, locale);
+      const storage = await sdk.threads.storageLocation({ threadId });
+      const dir = prototypesDir(storage.storageRootPath, locale);
+      const hostName = (await bb.sdk.hosts.get({ hostId: storage.hostId }).catch(() => null))?.name || storage.hostId;
+      const indexAbs = publishIndexPath(dir, stem, locale);
+      const index = JSON.stringify({ stem, threadId, published: false, updatedAt: Date.now() }, null, 2);
+      await bb.sdk.files
+        .write({ hostId: storage.hostId, path: indexAbs, content: index, contentEncoding: "utf8", createParents: true })
+        .catch((error: unknown) => { throw describe(error, hostName, indexAbs, locale); });
+      return { published: false as const };
+    },
+    getWireframePublishStatus: async ({ threadId, name, locale = "en" }) => {
+      const stem = sanitizeStem(name, locale);
+      const storage = await sdk.threads.storageLocation({ threadId });
+      const dir = prototypesDir(storage.storageRootPath, locale);
+      const indexAbs = publishIndexPath(dir, stem, locale);
+      const file = await bb.sdk.files.read({ hostId: storage.hostId, path: indexAbs }).catch(() => null);
+      if (!file || !("content" in file)) return { published: false, updatedAt: null, previewPath: null };
+      const raw = file.contentEncoding === "base64" ? Buffer.from(file.content, "base64").toString("utf8") : file.content;
+      const index = parsePublishIndex(raw, stem);
+      if (!index.published || index.threadId !== threadId) return { published: false, updatedAt: null, previewPath: null };
+      return { published: true, updatedAt: index.updatedAt, previewPath: prototypePreviewHttpPath(threadId, stem) };
     },
     listWireframeHistory: async ({ threadId, name, locale = "en" }) => {
       const stem = sanitizeStem(name, locale);

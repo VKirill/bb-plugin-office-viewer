@@ -55,6 +55,7 @@ export function PrototypeToolbar({
   onToggleCommentTool,
   onExportSpec,
   onExportCode,
+  onPublishExport,
   onSendBuild,
   protoFidelity = "mockup",
   onFidelityChange,
@@ -99,6 +100,7 @@ export function PrototypeToolbar({
   onToggleCommentTool?: () => void;
   onExportSpec?: () => void;
   onExportCode?: () => void;
+  onPublishExport?: () => void;
   onSendBuild?: () => void;
   protoFidelity?: "sketch" | "mockup";
   onFidelityChange?: (value: "sketch" | "mockup") => void;
@@ -122,6 +124,7 @@ export function PrototypeToolbar({
               {onUndoSteps ? <MenuItem onClick={onUndoSteps}>{t("protoUndoHistoryTitle")}</MenuItem> : null}
               {onExportSpec ? <MenuItem disabled={busy} onClick={onExportSpec}>{t("protoExportSpec")}</MenuItem> : null}
               {onExportCode ? <MenuItem disabled={busy} onClick={onExportCode}>{t("protoExportCode")}</MenuItem> : null}
+              {onPublishExport ? <MenuItem disabled={busy} onClick={onPublishExport}>{t("protoPublishMenu")}</MenuItem> : null}
             </div>
           ) : null}
         </div>
