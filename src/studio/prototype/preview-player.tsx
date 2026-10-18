@@ -15,16 +15,19 @@ import {
   type InteractionEvent,
   type PreviewState,
 } from "./interactions";
+import { resolvePageView, type PageDeviceView } from "./layout";
 import type { Wireframe, WireframeElement } from "./model";
 import { noteNumbers } from "./builder-geometry";
 
 export function PrototypePreviewPlayer({
   doc,
+  deviceView = "desktop",
   onClose,
   onSendScreenshot,
   boardRef: externalBoardRef,
 }: {
   doc: Wireframe;
+  deviceView?: PageDeviceView;
   onClose: () => void;
   onSendScreenshot?: () => void | Promise<void>;
   boardRef?: RefObject<HTMLDivElement | null>;
@@ -38,7 +41,8 @@ export function PrototypePreviewPlayer({
   const boardRef = externalBoardRef ?? internalBoardRef;
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const page = doc.pages.find((item) => item.id === state.pageId) ?? doc.pages[0]!;
+  const rawPage = doc.pages.find((item) => item.id === state.pageId) ?? doc.pages[0]!;
+  const page = useMemo(() => resolvePageView(rawPage, deviceView), [rawPage, deviceView]);
   const elements = useMemo(() => materializePage(page, state), [page, state]);
   const notes = useMemo(() => (showNotes ? noteNumbers(elements) : new Map<string, number>()), [elements, showNotes]);
 

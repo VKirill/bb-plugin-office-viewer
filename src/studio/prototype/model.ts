@@ -86,6 +86,25 @@ export type ElementStyle = {
   effects?: Partial<Record<"hover" | "pressed" | "selected" | "disabled" | "focus", ElementStylePatch>>;
 };
 
+export type ElementConstraints = {
+  horizontal: "left" | "right" | "leftRight" | "center" | "scale";
+  vertical: "top" | "bottom" | "topBottom" | "center" | "scale";
+};
+
+export type ElementViewOverride = {
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  hidden?: boolean;
+  props?: Record<string, PropValue>;
+};
+
+export type PageViewData = {
+  canvas?: Partial<WireframeCanvas>;
+  elements?: Record<string, ElementViewOverride>;
+};
+
 export type WireframeElement = {
   id: string;
   type: ElementType;
@@ -103,6 +122,7 @@ export type WireframeElement = {
   parentState?: string;
   style?: ElementStyle;
   interactions?: Interaction[];
+  constraints?: ElementConstraints;
 };
 
 export type WireframeCanvas = { width: number; height: number; background: string };
@@ -113,6 +133,7 @@ export type WireframePage = {
   canvas: WireframeCanvas;
   elements: WireframeElement[];
   notes?: string;
+  views?: Partial<Record<"tablet" | "phone", PageViewData>>;
 };
 
 export type WireframeComponent = {
@@ -316,6 +337,24 @@ const elementStyleSchema = z
 
 const propValueSchema = z.union([z.string(), z.number().finite(), z.boolean(), z.array(z.string()), z.array(z.array(z.string()))]);
 
+const constraintsSchema = z
+  .object({
+    horizontal: z.enum(["left", "right", "leftRight", "center", "scale"]),
+    vertical: z.enum(["top", "bottom", "topBottom", "center", "scale"]),
+  })
+  .strict();
+
+const elementViewOverrideSchema = z
+  .object({
+    x: z.number().finite().optional(),
+    y: z.number().finite().optional(),
+    w: z.number().positive().max(8192).optional(),
+    h: z.number().positive().max(8192).optional(),
+    hidden: z.boolean().optional(),
+    props: z.record(z.string(), propValueSchema).optional(),
+  })
+  .strict();
+
 const elementSchema = z
   .object({
     id: z.string().min(1).max(128),
@@ -333,6 +372,7 @@ const elementSchema = z
     parentId: z.string().min(1).max(128).optional(),
     parentState: z.string().min(1).max(200).optional(),
     style: elementStyleSchema.optional(),
+    constraints: constraintsSchema.optional(),
     interactions: z
       .array(
         z
@@ -381,6 +421,13 @@ const canvasSchema = z
   })
   .strict();
 
+const pageViewSchema = z
+  .object({
+    canvas: canvasSchema.partial().optional(),
+    elements: z.record(z.string(), elementViewOverrideSchema).optional(),
+  })
+  .strict();
+
 const componentSchema = z
   .object({
     id: z.string().min(1).max(128),
@@ -398,6 +445,13 @@ const pageSchema = z
     canvas: canvasSchema,
     elements: z.array(elementSchema).max(2000),
     notes: z.string().max(8000).optional(),
+    views: z
+      .object({
+        tablet: pageViewSchema.optional(),
+        phone: pageViewSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

@@ -213,6 +213,7 @@ export function PrototypeInspector({
             onCanvas={onCanvas}
             applyAlign={applyAlign}
             applyDistribute={applyDistribute}
+            onReplaceElement={onReplaceElement}
           />
         ) : null}
 

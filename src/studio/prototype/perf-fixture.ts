@@ -55,9 +55,10 @@ export function benchSnapOnPerfPage(elementCount = PERF_FIXTURE_ELEMENT_COUNT, i
   };
 
   const runIndexed = () => {
+    const index = new ElementSpatialIndex(peers);
     const start = performance.now();
     for (let i = 0; i < iterations; i += 1) {
-      snapPeersIndexed(rect, peers, exclude, threshold);
+      snapRectToPeers(rect, peers, exclude, threshold, index);
     }
     return performance.now() - start;
   };

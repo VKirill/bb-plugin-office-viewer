@@ -1,6 +1,7 @@
 import { boardElements, type EditScope } from "./containers.ts";
 import { commentNumbersOnPage, commentsForPage, type WireframeComment } from "./comments.ts";
 import type { InteractionAction } from "./interactions.ts";
+import { resolvePageView, type PageDeviceView } from "./layout.ts";
 import type { PropValue, Wireframe, WireframeElement, WireframePage } from "./model.ts";
 
 export type SpecPageImage = {
@@ -99,7 +100,12 @@ function formatCommentLine(comment: WireframeComment, number: number): string {
   return `${number}. @ ${comment.x}×${comment.y}${anchor}${status}: ${comment.text}`;
 }
 
-export function buildWireframeSpecMarkdown(doc: Wireframe, stem: string, images: SpecPageImage[]): string {
+export function buildWireframeSpecMarkdown(
+  doc: Wireframe,
+  stem: string,
+  images: SpecPageImage[],
+  deviceView: PageDeviceView = "desktop",
+): string {
   const imageByPage = new Map(images.map((item) => [item.pageId, item.relPath]));
   const pageNameById = new Map(doc.pages.map((page) => [page.id, page.name]));
   const lines: string[] = [
@@ -110,9 +116,13 @@ export function buildWireframeSpecMarkdown(doc: Wireframe, stem: string, images:
   ];
 
   for (const page of doc.pages) {
+    const resolved = resolvePageView(page, deviceView);
     const numbers = commentNumbersOnPage(doc, page.id);
     lines.push(`## ${page.name}`, "");
-    lines.push(`Canvas: ${page.canvas.width}×${page.canvas.height}, background ${page.canvas.background}.`, "");
+    if (deviceView !== "desktop") {
+      lines.push(`Device view: ${deviceView}.`, "");
+    }
+    lines.push(`Canvas: ${resolved.canvas.width}×${resolved.canvas.height}, background ${resolved.canvas.background}.`, "");
     const rel = imageByPage.get(page.id);
     if (rel) {
       lines.push(`![${page.name}](${rel})`, "");
@@ -128,9 +138,9 @@ export function buildWireframeSpecMarkdown(doc: Wireframe, stem: string, images:
       }
       lines.push("");
     }
-    lines.push("### Elements", "", ...describeElementTree(page, { kind: "page" }), "");
+    lines.push("### Elements", "", ...describeElementTree(resolved, { kind: "page" }), "");
     const ixLines: string[] = [];
-    for (const el of page.elements) ixLines.push(...describeInteractions(el, pageNameById));
+    for (const el of resolved.elements) ixLines.push(...describeInteractions(el, pageNameById));
     if (ixLines.length) {
       lines.push("### Interactions", "", ...ixLines, "");
     }
