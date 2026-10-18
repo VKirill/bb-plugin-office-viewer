@@ -1,6 +1,6 @@
 ---
 title: Office Viewer — project facts
-updated: 2026-10-17
+updated: 2026-10-18
 sources:
   - package.json
   - app.tsx
@@ -9,6 +9,11 @@ sources:
   - docs/architecture.md
   - docs/gotchas.md
   - docs/features/html-layout.md
+  - src/studio/studio-panel.tsx
+  - src/studio/tools.tsx
+  - src/studio/prototype/builder.tsx
+  - src/studio/slides/editor.tsx
+  - src/studio/paint/paint.tsx
 ---
 
 # Office Viewer — project facts
@@ -21,21 +26,23 @@ sources:
 
 ## Entry points
 
-- Frontend slot registration: `app.tsx`; opener implementations under `src/` (`app.tsx:14-52`). [Feature pages](docs/features/spreadsheets.md)
-- Backend RPC, GET routes and file writes: `server.ts:125-261`. [API](docs/api.md)
+- Six file opener registrations and plugin panels: `app.tsx:19-75`; opener implementations under `src/`. [Architecture](docs/architecture.md)
+- Backend RPC, GET routes and file writes: `server.ts:356-933`. [API](docs/api.md)
 - File source resolution: `src/server/locate.ts:91-133`.
 
 ## Critical invariants
 
 - Resolve files using opener source context; workspace paths are constrained to root (`src/server/locate.ts:49-56`; `src/server/locate.ts:91-133`). [Gotchas](docs/gotchas.md)
-- Spreadsheet save is conditional on the opened SHA-256 (`server.ts:210-231`). [Spreadsheet editing](docs/features/spreadsheets.md)
+- Spreadsheet save concurrency: [Spreadsheet editing](docs/features/spreadsheets.md) (`server.ts:548-569`).
+- Studio prototype, slide and paint documents are separate thread-scoped files persisted through RPC to BB thread storage (`src/studio/prototype/builder.tsx:1270-1303`; `src/studio/slides/editor.tsx:96-125`; `src/studio/paint/paint.tsx:98-118`). [Studio](docs/features/studio.md)
 - Opened formats and editable formats differ; read-only modes live in each feature page. [Feature reference](docs/features/office-documents.md)
 
 ## Conventions
 
 - TypeScript ES modules; React JSX; `@/*` aliases map to project root (`tsconfig.json:1-23`).
-- Each UI opener calls the typed BB RPC client; backend contract schemas live in `server.ts:18-79`.
+- File openers and Studio tools call the typed BB RPC contract in `server.ts:69-321`.
 - Feature behavior and limits: [Spreadsheets](docs/features/spreadsheets.md), [Office documents](docs/features/office-documents.md), [PDF](docs/features/pdf.md), [HTML layout](docs/features/html-layout.md), [Media](docs/features/media.md).
+- Studio tool behavior: [Studio](docs/features/studio.md).
 
 ## Common gotchas
 

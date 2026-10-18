@@ -2,9 +2,9 @@
 title: Office Viewer gotchas
 type: gotchas
 created: 2026-10-13
-updated: 2026-10-17
+updated: 2026-10-18
 status: active
-confidence: low
+confidence: medium
 tags: [gotchas, limitations, file-handling]
 sources:
   - src/server/locate.ts
@@ -34,9 +34,9 @@ TL;DR: The sharp edges come from file ownership context, format-specific edit pa
 
 ### Spreadsheet save can conflict with a concurrent edit
 
-**Problem:** The server checks the opened SHA-256 before patching and also passes it into the write (`server.ts:210-231`).
+**Problem:** A save conflict means the opened spreadsheet changed before the save completed (`server.ts:548-569`). The compare and conditional write are described in [Spreadsheet editing](features/spreadsheets.md).
 **Risk:** If another writer changes the file, the plugin returns `conflict` rather than replacing the newer version.
-**Workaround:** The spreadsheet UI offers a reload path that discards local edits and an overwrite path that reapplies edits to the latest content (`src/spreadsheet/opener.tsx:103-162`; `server.ts:240-264`).
+**Workaround:** Use the spreadsheet UI's reload or apply-to-latest conflict action (`src/spreadsheet/opener.tsx:103-162`; `server.ts:548-569`).
 
 ## High
 
@@ -48,7 +48,7 @@ TL;DR: The sharp edges come from file ownership context, format-specific edit pa
 
 ### Oversized files are gated by feature-specific paths
 
-**Problem:** Size handling is implemented in several viewer paths rather than one shared gate (`server.ts:149-153`; `src/media/media.tsx:35-36`; `src/slides/slides.tsx:130-135`).
+**Problem:** Size handling is implemented in several viewer paths rather than one shared gate (`server.ts:480-503`; `src/media/media.tsx:35-36`; `src/slides/slides.tsx:130-135`).
 **Risk:** One global file-size rule does not describe all viewers.
 **Workaround:** Consult [Media tools](features/media.md), [Office documents](features/office-documents.md) and [API](api.md) for the owner of each limit.
 
@@ -62,9 +62,9 @@ TL;DR: The sharp edges come from file ownership context, format-specific edit pa
 
 ### Experimental chat image editor requires an optional slot
 
-**Problem:** The app registers the slot only when `experimental_vkImageEditor` exists (`app.tsx:45-51`).
+**Problem:** The app registers the chat image editor only when BB exposes `experimental_vkImageEditor` (`app.tsx:69-75`).
 **Risk:** BB image-preview editing is unavailable without that optional function.
-**Workaround:** Open the image through the regular file opener to use its editor; the Browser image-preview slot only provides an editor when BB exposes that optional slot (`app.tsx:45-51`; `src/media/media.tsx:161-168`).
+**Workaround:** Open the image through the regular file opener to use its editor; the chat attachment editor requires the optional slot (`app.tsx:69-75`; `src/media/media.tsx:161-168`).
 
 ### Presentation parsing has explicit legacy behavior
 

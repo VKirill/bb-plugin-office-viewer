@@ -2,7 +2,7 @@
 title: Word and PowerPoint documents
 type: component
 created: 2026-10-13
-updated: 2026-10-17
+updated: 2026-10-18
 status: active
 confidence: medium
 tags: [word, powerpoint, documents]
@@ -15,6 +15,7 @@ sources:
   - server.ts
   - app.tsx
   - src/slides/pptx-text.ts
+  - src/slides/xml.ts
 ---
 
 # Word and PowerPoint documents
@@ -28,7 +29,7 @@ The Word opener presents Word documents as pages or extracted legacy text; the s
 ## How it works
 
 1. BB registers separate Word and slide openers for their extension lists (`app.tsx:27-37`).
-2. For `.docx`, `.docm` and `.dotx`, the Word opener gets a preview URL, fetches file bytes and passes them to `docx-preview`; `.doc` and `.dot` call `docText` and render extracted sections (`src/word/document.tsx:21-22`; `src/word/document.tsx:148-170`; `server.ts:142-165`).
+2. For `.docx`, `.docm` and `.dotx`, the Word opener gets a preview URL, fetches file bytes and passes them to `docx-preview`; `.doc` and `.dot` call `docText` and render extracted sections (`src/word/document.tsx:21-22`; `src/word/document.tsx:148-170`; `server.ts:480-503`).
 3. Word search finds case-insensitive text runs across formatted text nodes and highlights them; selected text is formatted with file context and inserted into the composer (`src/word/document.tsx:28-79`; `src/shared/quote.ts:3-10`).
 4. The slide opener gets a preview, checks the payload size, parses the PPTX ZIP/XML into a deck and renders the selected slide; thumbnails, navigation, notes and present mode are managed by the opener (`src/slides/slides.tsx:83-160`; `src/slides/pptx.ts:401-460`; `src/slides/slide-view.tsx:140-159`).
 5. A quote action converts the current slide's text to Markdown with file and slide context before inserting it into the composer (`src/slides/pptx.ts:481-498`; `src/slides/slides.tsx:83-149`).
@@ -36,7 +37,7 @@ The Word opener presents Word documents as pages or extracted legacy text; the s
 | Mode | Inputs and output | Failure behavior |
 |---|---|---|
 | Word Open XML (`.docx`, `.docm`, `.dotx`) | Browser fetch + `docx-preview` page layout; search, zoom, selection, download and quoting (`src/word/document.tsx:21-22`; `src/word/document.tsx:160-170`). | Fetch or render errors set the opener error state (`src/word/document.tsx:148-170`). |
-| Legacy Word (`.doc`, `.dot`) | Server `word-extractor` returns body, headers, footnotes and endnotes; UI shows plain text (`server.ts:142-165`; `src/word/document.tsx:148-158`). | Extraction errors are wrapped in localized messages; inputs over 30 MiB are rejected (`server.ts:149-153`). |
+| Legacy Word (`.doc`, `.dot`) | Server `word-extractor` returns body, headers, footnotes and endnotes; UI shows plain text (`server.ts:480-503`; `src/word/document.tsx:148-158`). | The server rejects files over `MAX_BYTES` (30 MiB) and wraps extraction failures in localized messages (`server.ts:46`; `server.ts:480-503`). |
 | PowerPoint Open XML (`.pptx`, `.ppsx`, `.potx`) | Browser parses slide XML into shapes, text, images and tables (`src/slides/slides.tsx:19-22`; `src/slides/pptx.ts:401-460`). | Invalid presentation and fetch errors enter the error state; input over 30 MiB is rejected (`src/slides/slides.tsx:120-149`). |
 | Legacy PowerPoint (`.ppt`, `.pps`, `.pot`) | Viewer displays a download-only message (`src/slides/slides.tsx:20-22`; `src/slides/slides.tsx:120-149`). | No binary parser is called. |
 
@@ -44,7 +45,7 @@ The Word opener presents Word documents as pages or extracted legacy text; the s
 
 - The Word opener exposes download and quote actions alongside rendering or extracted text; the slide opener loads and renders a deck and exposes its slide quote action (`src/word/document.tsx:148-173`; `src/slides/slides.tsx:120-149`). Neither opener passes document edits to a write RPC (`src/word/document.tsx:148-173`; `src/slides/slides.tsx:120-149`).
 - Word quotes include selected text and source context through `formatBlockquote` (`src/shared/quote.ts:3-10`). `slideMarkdown` emits the title in bold, then outline text with nested bullet indentation and Markdown tables; slide numbering is added by the caller (`src/slides/pptx.ts:481-498`; `src/slides/slides.tsx:290-315`).
-- Legacy Word extraction preserves Unicode punctuation by passing `filterUnicode: false` (`server.ts:154-165`).
+- `docText` passes `filterUnicode: false` to body, headers, footnotes and endnotes extraction (`server.ts:492-503`).
 - PowerPoint parsing is for Open XML extensions only; legacy binary files are not parsed (`src/slides/slides.tsx:19-22`).
 
 ## Public API
@@ -56,8 +57,9 @@ The Word opener presents Word documents as pages or extracted legacy text; the s
 | `SlidesOpener` | `src/slides/slides.tsx:83-160` | PowerPoint navigation and presentation UI. |
 | `parsePptx`, `slideMarkdown` | `src/slides/pptx.ts:401-498` | Parse a presentation and extract slide quote text. |
 | `buildBody` | `src/slides/pptx-text.ts:147-215` | Resolve inherited paragraph and run formatting, bullets, and text from a slide text body. |
+| `parseXml` | `src/slides/xml.ts:17-35` | Parse XML elements into a tree while preserving qualified names and decoding entities. |
 | `SlideView`, `ScaledSlide` | `src/slides/slide-view.tsx:140-159` | Draw a slide at native or scaled width. |
-| RPC `docText` | `server.ts:45-50`; `server.ts:142-165` | Extract text from legacy Word files. |
+| RPC `docText` | `server.ts:75-80`; `server.ts:480-503` | Extract text from legacy Word files. |
 
 ## Package shape
 
@@ -74,7 +76,7 @@ Word rendering uses `docx-preview`, legacy extraction uses `word-extractor`; sli
 ## Gotchas
 
 - Unsupported presentation objects are represented by parser/viewer fallbacks; this renderer does not reproduce all PowerPoint effects (`src/slides/pptx.ts:401-460`; `src/slides/slide-view.tsx:65-124`).
-- Legacy `.doc` text extraction is not page layout and does not preserve document formatting (`server.ts:142-165`; `src/word/document.tsx:148-158`).
+- Legacy `.doc` text extraction is not page layout and does not preserve document formatting (`server.ts:480-503`; `src/word/document.tsx:148-158`).
 
 <!-- lane-pilot:backlinks -->
 ## Referenced by
