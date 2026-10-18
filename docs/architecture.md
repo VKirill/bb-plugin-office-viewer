@@ -2,9 +2,9 @@
 title: Office Viewer architecture
 type: architecture
 created: 2026-10-13
-updated: 2026-10-17
+updated: 2026-10-18
 status: active
-confidence: low
+confidence: medium
 tags: [office-viewer, architecture, bb-plugin]
 sources:
   - app.tsx
@@ -19,11 +19,16 @@ sources:
   - src/spreadsheet/xlsx-patch.ts
   - src/html/html.tsx
   - src/html/capture.ts
+  - src/studio/studio-panel.tsx
+  - src/studio/tools.tsx
+  - src/studio/prototype/builder.tsx
+  - src/studio/slides/editor.tsx
+  - src/studio/paint/paint.tsx
 ---
 
 # Office Viewer architecture
 
-TL;DR: BB hosts a React plugin app and a plugin server; registered file openers call server RPC to resolve/read/write files on the machine that owns them (`app.tsx:14-52`; `server.ts:125-126`; `server.ts:154-178`).
+TL;DR: BB hosts the React plugin app and plugin server; file openers and thread Studio tools call server RPC for file and thread-storage operations (`app.tsx:19-61`; `server.ts:462-479`).
 
 ## System Context
 
@@ -55,7 +60,7 @@ C4Container
   Rel(server, files, "Reads, previews, writes")
 ```
 
-The UI registers five file opener slots and an optional experimental image-editor slot (`app.tsx:14-52`). The server registers GET routes for PDF.js and screenshot assets plus one typed RPC contract (`server.ts:129-153`; `server.ts:154-178`).
+The UI registers six file opener slots, two thread-panel actions, a settings section, and experimental thread-header, browser-toolbar, and chat-image-editor slots when those host functions exist (`app.tsx:19-75`). The server registers PDF.js and screenshot assets, prototype schema/icon/preview routes, and a typed RPC contract for file operations and Studio persistence (`server.ts:356-460`; `server.ts:462-570`).
 
 ## Building Blocks
 
@@ -63,7 +68,8 @@ The UI registers five file opener slots and an optional experimental image-edito
 - Image, video and audio openers: [Media tools](features/media.md) (`src/media/media.tsx:52-111`).
 - Word and PowerPoint viewers: [Office documents](features/office-documents.md) (`src/word/document.tsx:82-141`; `src/slides/slides.tsx:83-149`).
 - PDF viewer: [PDF](features/pdf.md) (`src/pdf/pdf.tsx:239-298`).
-- Server location policy: `src/server/locate.ts:91-133`; RPC handlers: `server.ts:132-234`.
+- Thread tools for wireframe prototypes, slide decks, and paint canvases: [Studio](features/studio.md) (`src/studio/studio-panel.tsx:12-14`; `src/studio/tools.tsx:7-27`).
+- Server location policy: `src/server/locate.ts:91-133`; file and Studio RPC handlers: `server.ts:480-933`.
 
 ## Key Flows
 
@@ -83,7 +89,7 @@ sequenceDiagram
   UI->>Host: fetch file bytes
 ```
 
-App slot registration passes the opener `path` and `source`, and the server's `open` handler locates the file and requests a preview (`app.tsx:14-44`; `server.ts:167-177`).
+App slot registration passes the opener `path` and `source`, and the server's `open` handler locates the file and requests a preview (`app.tsx:20-25`; `server.ts:505-516`).
 
 ### Save spreadsheet edits
 
@@ -102,18 +108,18 @@ sequenceDiagram
   Host-->>UI: written or conflict
 ```
 
-The client translates touched cells to edits; server save checks the source hash before patching and passes the expected hash to the file write (`src/spreadsheet/engine.ts:198-239`; `server.ts:210-234`).
+Spreadsheet client edits and save behavior are documented in [Spreadsheet editing](features/spreadsheets.md) (`src/spreadsheet/engine.ts:198-239`; `server.ts:548-569`).
 
 ## Invariants
 
 - Workspace-relative paths are lexically confined to their resolved root by `within`; host sources require absolute paths (`src/server/locate.ts:49-56`; `src/server/locate.ts:117-133`).
 - The file host is selected from the opener's thread, environment, project or explicit host context; location failures are surfaced instead of silently choosing another computer (`src/server/locate.ts:91-133`).
-- Spreadsheet saves compare the read file's SHA-256 with `expectedSha256`; a mismatch returns `conflict` without writing (`server.ts:210-218`).
-- Spreadsheet edit schemas cap edits at 50,000 and constrain row/column coordinates to spreadsheet bounds (`server.ts:30-37`; `server.ts:66-77`).
+- Spreadsheet save concurrency behavior: [Spreadsheet editing](features/spreadsheets.md) (`server.ts:548-567`).
+- Spreadsheet edit schemas cap edits at 50,000 and constrain row/column coordinates to spreadsheet bounds (`server.ts:60-67`; `server.ts:106-118`).
 
 ## Cross-cutting concerns
 
-Authentication is delegated to BB's plugin RPC and HTTP host; `server.ts` contains no user identity check in the registered handlers (`server.ts:114-132`). File access is through `bb.sdk.files`, `bb.sdk.hosts`, threads, environments and projects (`src/server/locate.ts:22-36`; `server.ts:142-210`). Errors from file reads/previews/writes are converted to path/host-aware messages for missing or unavailable machines (`server.ts:102-112`).
+The plugin server registers HTTP asset routes and the RPC contract through the BB Plugin SDK (`server.ts:356-479`). File access is through `bb.sdk.files`, `bb.sdk.hosts`, threads, environments and projects (`src/server/locate.ts:22-36`; `server.ts:480-569`). Selected file read/preview/write errors are converted to path/host-aware messages (`server.ts:344-354`).
 
 <!-- lane-pilot:backlinks -->
 ## Referenced by

@@ -2,7 +2,7 @@
 title: Office Viewer deployment
 type: deployment
 created: 2026-10-13
-updated: 2026-10-17
+updated: 2026-10-18
 status: active
 confidence: medium
 tags: [deployment, install, development]
@@ -25,7 +25,7 @@ TL;DR: Install Node dependencies, run the BB plugin build, and install the resul
 - Node.js with npm for the package scripts and TypeScript (`package.json`; `tsconfig.json:1-23`).
 - BB CLI (`bb`) for plugin build, installation and reload; scripts and install command are documented in `package.json` and `README.md`.
 
-No environment variables are read by the plugin code. The server derives a typed SDK handle from `bb.sdk` and uses `bb.http` for route registration (`server.ts:125-140`; `src/server/locate.ts:22-36`).
+No environment variables are read by the plugin code. The server derives a typed SDK handle from `bb.sdk` and uses `bb.http` for route registration (`server.ts:356-382`; `src/server/locate.ts:22-36`).
 
 ## Deploy procedure
 
