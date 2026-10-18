@@ -14,11 +14,11 @@
 
 ## Last verify
 - command: Lane Pilot acceptance for `lprun_38203a8bf69c43f294a012b07bded797`.
-- result: green (accepted Paint, i18n and Axure-style prototype refinements; release 0.8.14; spreadsheet links remain underlined after the 0.8.7 revert)
+- result: green (accepted Paint, i18n and Axure-style prototype refinements; releases through 0.8.15; spreadsheet links remain underlined after the 0.8.7 revert)
 - when: 2026-10-18
 
 ## Pointers
 - Open todos: no todo index exists (`.agents/todos/INDEX.md`).
-- Active plans: [Office Studio](plans/2026-10-17-office-studio.md) (Studio live check remains); [chat link chips in BB core](plans/2026-10-17-chat-link-chips-core.md) (planned); [Studio prototyper roadmap](plans/2026-10-18-studio-roadmap.md) (proposed).
+- Plans: [Office Studio](plans/2026-10-17-office-studio.md) (in progress; Studio live check remains); [chat link chips in BB core](plans/2026-10-17-chat-link-chips-core.md) (planned); [Studio prototyper roadmap](plans/2026-10-18-studio-roadmap.md) (proposed).
 - No `.agents/plans/ROADMAP.md` exists.
 - [Changelog](CHANGELOG.md) — project memory updates.
