@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.15 — 2026-10-18
+
+### Added
+
+- Agent loop: a wireframe schema for agents next to the chat's prototypes; the open builder picks up the agent's edits live (undoable); «Сгенерировать» asks the agent for a screen from a description or a screenshot (shown as a tracing layer).
+- Pinned comments on the canvas; Spec export (Markdown with annotated screenshots, element tree, interactions, notes) and React + Tailwind code export; «В чат: сверстай это».
+- Auto layout stacks (direction, gap, padding, alignment, hug/fill), constraints and per-device page views.
+- Text and colour styles with import from DESIGN.md; Sketch / Mockup fidelity switch; ⌘K command palette; layers search; minimap; history panel; first-run tour.
+- Publish a preview link served by BB; PDF, SVG and PNG exports; Excalidraw and SVG import.
+- Version history with restore; faster canvas on large prototypes.
+
 ## 0.8.14 — 2026-10-18
 
 ### Added
