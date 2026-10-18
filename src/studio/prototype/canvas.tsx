@@ -11,6 +11,7 @@ import { elementHasInteractions } from "./interactions";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { useT } from "../../shared/i18n";
+import { isAutoLayoutStack, stackLayoutHandleMarkers, type PageDeviceView } from "./layout";
 import { type WireframeCanvas, type WireframeComponent, type WireframeElement, type WireframePage } from "./model";
 
 export function PrototypeCanvas({
@@ -47,6 +48,8 @@ export function PrototypeCanvas({
   boardItems,
   scopeOverlay = null,
   onOpenShortcuts = () => {},
+  deviceView = "desktop",
+  onDeviceViewChange,
   onPanePointerDown,
   onPanePointerMove,
   onPanePointerUp,
@@ -99,6 +102,8 @@ export function PrototypeCanvas({
   boardItems?: BoardElement[];
   scopeOverlay?: ReactNode;
   onOpenShortcuts?: () => void;
+  deviceView?: PageDeviceView;
+  onDeviceViewChange?: (view: PageDeviceView) => void;
   onPanePointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPanePointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPanePointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
@@ -132,7 +137,8 @@ export function PrototypeCanvas({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex shrink-0 gap-0.5 overflow-x-auto border-b border-border bg-background px-2 py-1">
+      <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-background px-2 py-1">
+        <div className="flex shrink-0 gap-0.5">
         {openTabs.map((page) => (
           <button
             key={page.id}
@@ -157,6 +163,24 @@ export function PrototypeCanvas({
             ) : null}
           </button>
         ))}
+        </div>
+        {onDeviceViewChange ? (
+          <div className="ml-auto flex shrink-0 gap-0.5 rounded-md border border-border p-0.5">
+            {(["desktop", "tablet", "phone"] as PageDeviceView[]).map((view) => (
+              <button
+                key={view}
+                type="button"
+                className={cn(
+                  "rounded px-2 py-0.5 text-[10px] font-medium",
+                  deviceView === view ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-state-hover",
+                )}
+                onClick={() => onDeviceViewChange(view)}
+              >
+                {view === "desktop" ? t("protoDeviceDesktop") : view === "tablet" ? t("protoDeviceTablet") : t("protoDevicePhone")}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
       <div
         ref={canvasPaneRef}
@@ -345,6 +369,18 @@ export function PrototypeCanvas({
                   hoverElementId={connectorHoverId}
                   draftLine={connectorDraft}
                 />
+                {one && isAutoLayoutStack(one) ? (
+                  <div data-proto-skip className="pointer-events-none absolute inset-0 z-20">
+                    {stackLayoutHandleMarkers(one, elements).map((marker) => (
+                      <span
+                        key={marker.key}
+                        data-stack-handle={marker.stackHandle}
+                        className="pointer-events-auto absolute size-2.5 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-pink-600 bg-pink-200 shadow-sm"
+                        style={{ left: marker.x, top: marker.y }}
+                      />
+                    ))}
+                  </div>
+                ) : null}
                 {one && isConnector(one) ? (
                   <div data-proto-skip className="pointer-events-none absolute inset-0 z-20">
                     {(() => {

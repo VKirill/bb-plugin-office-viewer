@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "task_id": "studio-auto-layout",
+  "task_sha256": "f6c81ef800b87e6a332c7f4d59309098e683d5cbd4e15ae88ba51eb7bcd20be3",
+  "attempt": 1,
+  "provider_exit": 0,
+  "report": "complete",
+  "report_sha256": "8db2c7f00434a28c25f33d99db1d3c6862e3f7d519861a849e63e01ee8694dcb",
+  "owns_check": "passed",
+  "verification": "passed",
+  "review": "not_required",
+  "accepted": true,
+  "accepted_at": "2026-10-18T00:07:18.311Z",
+  "model": "composer-2.5"
+}

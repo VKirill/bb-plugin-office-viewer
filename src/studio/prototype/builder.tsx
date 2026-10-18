@@ -13,6 +13,7 @@ import { useChatAutosave } from "../use-chat-autosave";
 import {
   CATALOG_BY_TYPE,
   SNAP,
+  snap,
   canvasPresetDimensions,
   cloneWireframe,
   defaultElement,
@@ -100,6 +101,19 @@ import { addComment, commentNumbersOnPage, commentsForPage, deleteComment, updat
 import { CommentComposeDialog } from "./comment-compose-dialog";
 import { buildWireframeCodeExport } from "./code-export";
 import { buildImplementFromSpecPrompt, buildWireframeSpecMarkdown, specImageRelPath } from "./spec-export";
+import {
+  applyConstraintsToChildren,
+  isAutoLayoutStack,
+  mergePageElementsForView,
+  readStackLayout,
+  relayoutPageStacks,
+  resolvePageView,
+  reorderStackChild,
+  type PageDeviceView,
+  wrapSelectionInStack,
+  writeStackLayout,
+} from "./layout";
+import { childrenOf, readParent } from "./containers";
 import {
   replaceWireframeFromRemote,
   shouldApplyRemoteWireframe,
@@ -195,7 +209,16 @@ type Drag =
       fromX: number;
       fromY: number;
     }
-  | { kind: "connectorHandle"; id: string; which: "start" | "end" | "bend" };
+  | { kind: "connectorHandle"; id: string; which: "start" | "end" | "bend" }
+  | {
+      kind: "stackLayout";
+      stackId: string;
+      mode: "gap" | "padding";
+      arg: string;
+      ox: number;
+      oy: number;
+      start: ReturnType<typeof readStackLayout>;
+    };
 type SendKind = "both" | "png" | "json";
 
 function blankWireframe() {
@@ -203,9 +226,15 @@ function blankWireframe() {
   return newWireframe(undefined, { ...canvasPresetDimensions(settings.protoPreset), background: "#ffffff" });
 }
 
-function pageElements(doc: Wireframe) { return getActivePage(doc).elements; }
-function pageCanvas(doc: Wireframe) { return getActivePage(doc).canvas; }
-function patchElements(doc: Wireframe, elements: WireframeElement[]) { return updateActivePage(doc, (p) => ({ ...p, elements })); }
+function pageElements(doc: Wireframe, deviceView: import("./layout").PageDeviceView) {
+  return resolvePageView(getActivePage(doc), deviceView).elements;
+}
+function pageCanvas(doc: Wireframe, deviceView: import("./layout").PageDeviceView) {
+  return resolvePageView(getActivePage(doc), deviceView).canvas;
+}
+function patchElements(doc: Wireframe, elements: WireframeElement[], deviceView: import("./layout").PageDeviceView) {
+  return updateActivePage(doc, (p) => mergePageElementsForView(p, deviceView, elements));
+}
 function patchCanvas(doc: Wireframe, patch: Partial<Wireframe["pages"][0]["canvas"]>) { return updateActivePage(doc, (p) => ({ ...p, canvas: { ...p.canvas, ...patch } })); }
 
 export function PrototypeBuilder({ threadId }: { threadId: string }) {
@@ -253,6 +282,7 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const [commentToolActive, setCommentToolActive] = useState(false);
   const [commentComposeOpen, setCommentComposeOpen] = useState(false);
   const [commentDraft, setCommentDraft] = useState<{ x: number; y: number; elementId?: string } | null>(null);
+  const [pageDeviceView, setPageDeviceView] = useState<PageDeviceView>("desktop");
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const lastHistorySnapshotAt = useRef(0);
   const lastWrittenHashRef = useRef<string | null>(null);
@@ -393,10 +423,11 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   }, [commit, locale, openedStem, rpc, t]);
 
   const withBoardElements = (elements: WireframeElement[]) => {
+    const laid = editScope.kind === "page" ? relayoutPageStacks(elements) : elements;
     if (editScope.kind === "component") {
-      return syncInstanceDimensions(updateComponentElements(doc, editScope.componentId, elements));
+      return syncInstanceDimensions(updateComponentElements(doc, editScope.componentId, laid));
     }
-    return patchElements(doc, elements);
+    return patchElements(doc, laid, pageDeviceView);
   };
 
   const replace = (elements: WireframeElement[]) => commit(withBoardElements(elements));
@@ -405,7 +436,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     if (editScope.kind === "component") {
       return findComponent(source, editScope.componentId)?.elements ?? [];
     }
-    return pageElements(source);
+    return pageElements(source, pageDeviceView);
   };
 
   const addTile = (tile: PaletteTile, x?: number, y?: number) => {
@@ -415,27 +446,27 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     }
     const spec = CATALOG_BY_TYPE[tile.type];
     const el = placeOnCanvas(
-      elementFromTile(tile, x ?? (pageCanvas(doc).width - spec.w) / 2, y ?? (pageCanvas(doc).height - spec.h) / 2, pageElements(doc)),
-      pageCanvas(doc),
+      elementFromTile(tile, x ?? (pageCanvas(doc, pageDeviceView).width - spec.w) / 2, y ?? (pageCanvas(doc, pageDeviceView).height - spec.h) / 2, pageElements(doc, pageDeviceView)),
+      pageCanvas(doc, pageDeviceView),
     );
-    replace([...pageElements(doc), el]);
+    replace([...pageElements(doc, pageDeviceView), el]);
     setSelected([el.id]);
   };
 
   const insertOnBoard = (draft: WireframeElement, absX: number, absY: number) => {
     const scoped = editScope.kind === "page" ? draft : attachToScope(draft, editScope, absX, absY, boardElementsFor(doc));
-    const el = placeOnCanvas(scoped, pageCanvas(doc));
+    const el = placeOnCanvas(scoped, pageCanvas(doc, pageDeviceView));
     replace([...boardElementsFor(doc), el]);
     setSelected([el.id]);
   };
 
   const addQuickTool = (tool: QuickTool, x: number, y: number) => {
-    const base = defaultElement(tool.type, x, y, pageElements(doc));
+    const base = defaultElement(tool.type, x, y, pageElements(doc, pageDeviceView));
     insertOnBoard({ ...base, props: { ...base.props, ...(tool.props ?? {}) } }, x, y);
   };
 
   const placeDrawnElement = (tool: QuickTool, box: ElementBox) => {
-    const base = defaultElement(tool.type, box.x, box.y, pageElements(doc));
+    const base = defaultElement(tool.type, box.x, box.y, pageElements(doc, pageDeviceView));
     insertOnBoard({ ...base, props: { ...base.props, ...(tool.props ?? {}) }, w: box.w, h: box.h }, box.x, box.y);
   };
 
@@ -460,13 +491,13 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   };
 
   const addTemplate = (templateId: string, x?: number, y?: number) => {
-    const canvas = pageCanvas(doc);
+    const canvas = pageCanvas(doc, pageDeviceView);
     const centerX = x ?? canvas.width / 2;
     const centerY = y ?? canvas.height / 2;
-    const built = insertTemplateElements(templateId, centerX, centerY, pageElements(doc));
+    const built = insertTemplateElements(templateId, centerX, centerY, pageElements(doc, pageDeviceView));
     if (!built?.length) return;
     const placed = built.map((el) => placeOnCanvas(el, canvas));
-    replace([...pageElements(doc), ...placed]);
+    replace([...pageElements(doc, pageDeviceView), ...placed]);
     setSelected(placed.map((el) => el.id));
   };
 
@@ -474,26 +505,26 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     const size = 24;
     const el = placeOnCanvas(
       {
-        ...defaultElement("Icon", x ?? (pageCanvas(doc).width - size) / 2, y ?? (pageCanvas(doc).height - size) / 2, pageElements(doc)),
+        ...defaultElement("Icon", x ?? (pageCanvas(doc, pageDeviceView).width - size) / 2, y ?? (pageCanvas(doc, pageDeviceView).height - size) / 2, pageElements(doc, pageDeviceView)),
         props: { name: iconName, size, color: "foreground" },
         label: iconDisplayLabel(iconName),
         w: size,
         h: size,
       },
-      pageCanvas(doc),
+      pageCanvas(doc, pageDeviceView),
     );
-    replace([...pageElements(doc), el]);
+    replace([...pageElements(doc, pageDeviceView), el]);
     setSelected([el.id]);
   };
 
   const selectedEls = boardElementsFor(view).filter((el) => selected.includes(el.id));
   const one = selectedEls.length === 1 ? selectedEls[0] : null;
   const inspect = one && edit?.id === one.id ? applyInlineDraft(one, edit) : one;
-  const notes = useMemo(() => noteNumbers(pageElements(view)), [pageElements(view)]);
+  const notes = useMemo(() => noteNumbers(pageElements(view, pageDeviceView)), [pageElements(view, pageDeviceView)]);
 
   const updateOne = (patch: Partial<WireframeElement>) => {
     if (!one) return;
-    const elements = pageElements(doc);
+    const elements = pageElements(doc, pageDeviceView);
     replace(
       elements.map((el) => {
         if (el.id !== one.id) return el;
@@ -504,17 +535,18 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   };
 
   const updateMany = (mapper: (el: WireframeElement) => WireframeElement) => {
-    replace(pageElements(doc).map((el) => mapper(el)));
+    replace(pageElements(doc, pageDeviceView).map((el) => mapper(el)));
   };
 
   const replaceElement = (next: WireframeElement) => {
-    replace(pageElements(doc).map((el) => (el.id === next.id ? next : el)));
+    const elements = relayoutPageStacks(pageElements(doc, pageDeviceView).map((el) => (el.id === next.id ? next : el)));
+    replace(elements);
   };
 
   const setProp = (key: string, value: PropValue) => {
     if (!one) return;
     if (one.type === "Radio" && key === "checked") {
-      replace(setRadioChecked(pageElements(doc), one.id, value === true));
+      replace(setRadioChecked(pageElements(doc, pageDeviceView), one.id, value === true));
       return;
     }
     updateOne({ props: { ...one.props, [key]: value } });
@@ -524,17 +556,17 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     if (!selected.length) return;
     void recordRiskySnapshot();
     const removed = new Set(selected);
-    const remaining = orphanChildren(pageElements(doc).filter((el) => !removed.has(el.id)), removed);
+    const remaining = orphanChildren(pageElements(doc, pageDeviceView).filter((el) => !removed.has(el.id)), removed);
     replace(detachConnectorsOnDelete(remaining, removed));
     setSelected([]);
   };
 
   const duplicateSelected = () => {
     if (!selected.length) return;
-    const copies = pageElements(doc)
+    const copies = pageElements(doc, pageDeviceView)
       .filter((el) => selected.includes(el.id))
-      .map((el) => placeOnCanvas({ ...structuredClone(el), id: newElementId(), x: el.x + SNAP * 2, y: el.y + SNAP * 2 }, pageCanvas(doc)));
-    replace([...pageElements(doc), ...copies]);
+      .map((el) => placeOnCanvas({ ...structuredClone(el), id: newElementId(), x: el.x + SNAP * 2, y: el.y + SNAP * 2 }, pageCanvas(doc, pageDeviceView)));
+    replace([...pageElements(doc, pageDeviceView), ...copies]);
     setSelected(copies.map((el) => el.id));
   };
 
@@ -549,34 +581,34 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
 
   const groupSelected = () => {
     if (selected.length < 2) return;
-    replace(groupIds(pageElements(doc), selected));
+    replace(groupIds(pageElements(doc, pageDeviceView), selected));
   };
 
   const ungroupSelected = () => {
-    replace(ungroupIds(pageElements(doc), selected));
+    replace(ungroupIds(pageElements(doc, pageDeviceView), selected));
   };
 
   const toggleLockSelected = () => {
     if (!selected.length) return;
     const pick = new Set(selected);
-    const locking = pageElements(doc).some((el) => pick.has(el.id) && !el.locked);
-    replace(pageElements(doc).map((el) => (pick.has(el.id) ? { ...el, locked: locking } : el)));
+    const locking = pageElements(doc, pageDeviceView).some((el) => pick.has(el.id) && !el.locked);
+    replace(pageElements(doc, pageDeviceView).map((el) => (pick.has(el.id) ? { ...el, locked: locking } : el)));
   };
 
   const setHiddenSelected = (hidden?: boolean) => {
     if (!selected.length) return;
     const pick = new Set(selected);
-    const nextHidden = hidden ?? !pageElements(doc).some((el) => pick.has(el.id) && el.hidden);
-    replace(pageElements(doc).map((el) => (pick.has(el.id) ? { ...el, hidden: nextHidden } : el)));
+    const nextHidden = hidden ?? !pageElements(doc, pageDeviceView).some((el) => pick.has(el.id) && el.hidden);
+    replace(pageElements(doc, pageDeviceView).map((el) => (pick.has(el.id) ? { ...el, hidden: nextHidden } : el)));
   };
 
   const paste = () => {
     if (!clipboard.current.length) return;
     const copies = clipboard.current.map((el) =>
-      placeOnCanvas({ ...structuredClone(el), id: newElementId(), x: el.x + SNAP * 2, y: el.y + SNAP * 2 }, pageCanvas(doc)),
+      placeOnCanvas({ ...structuredClone(el), id: newElementId(), x: el.x + SNAP * 2, y: el.y + SNAP * 2 }, pageCanvas(doc, pageDeviceView)),
     );
     clipboard.current = copies;
-    replace([...pageElements(doc), ...copies]);
+    replace([...pageElements(doc, pageDeviceView), ...copies]);
     setSelected(copies.map((el) => el.id));
   };
 
@@ -588,23 +620,23 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
 
   const applyAlign = (edge: AlignEdge) => {
     if (!selected.length) return;
-    replace(alignElements(pageElements(doc), selected, edge, pageCanvas(doc)));
+    replace(alignElements(pageElements(doc, pageDeviceView), selected, edge, pageCanvas(doc, pageDeviceView)));
   };
 
   const applyDistribute = (axis: DistributeAxis) => {
     if (selected.length < 3) return;
-    replace(distributeElements(pageElements(doc), selected, axis));
+    replace(distributeElements(pageElements(doc, pageDeviceView), selected, axis));
   };
 
   const fitZoom = () => {
     const pane = canvasPaneRef.current;
     if (!pane) return;
-    setZoom(zoomToFit(pageCanvas(doc).width, pageCanvas(doc).height, pane.clientWidth, pane.clientHeight));
+    setZoom(zoomToFit(pageCanvas(doc, pageDeviceView).width, pageCanvas(doc, pageDeviceView).height, pane.clientWidth, pane.clientHeight));
   };
 
   const zoomSelection = () => {
     const pane = canvasPaneRef.current;
-    const bounds = selectionRect(pageElements(doc), selected);
+    const bounds = selectionRect(pageElements(doc, pageDeviceView), selected);
     if (!pane || !bounds) return;
     setZoom(zoomToBounds(bounds, pane.clientWidth, pane.clientHeight));
   };
@@ -613,7 +645,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
 
   const nudgeLayer = (delta: 1 | -1) => {
     if (!selected.length) return;
-    replace(nudgeZOrder(pageElements(doc), selected, delta));
+    replace(nudgeZOrder(pageElements(doc, pageDeviceView), selected, delta));
   };
 
   const openContextMenu = (x: number, y: number, target: MenuTarget) => {
@@ -667,6 +699,21 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     const handle = (event.target as HTMLElement).dataset.handle as Handle | undefined;
     const id = (event.target as HTMLElement).closest("[data-el]")?.getAttribute("data-el");
     const p = boardPoint(event);
+    const stackHandle = (event.target as HTMLElement).dataset.stackHandle;
+    if (stackHandle && one && isAutoLayoutStack(one)) {
+      const [mode, arg] = stackHandle.split(":") as ["gap" | "padding", string];
+      drag.current = {
+        kind: "stackLayout",
+        stackId: one.id,
+        mode,
+        arg,
+        ox: p.x,
+        oy: p.y,
+        start: readStackLayout(one),
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+      return;
+    }
     const connectorHit = (event.target as HTMLElement).closest("[data-connector-hit]")?.getAttribute("data-connector-hit");
     if (connectorHit) {
       if (!selected.includes(connectorHit)) setSelected([connectorHit]);
@@ -678,7 +725,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       return;
     }
     if (commentToolActive && !handle) {
-      const hit = elementAtPoint(pageElements(view), p.x, p.y);
+      const hit = elementAtPoint(pageElements(view, pageDeviceView), p.x, p.y);
       setCommentDraft({ x: p.x, y: p.y, elementId: hit?.id });
       setCommentComposeOpen(true);
       return;
@@ -686,7 +733,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     if (pendingTool && isConnectorTool(pendingTool) && !handle) {
       const anchorEl = (event.target as HTMLElement).dataset.anchorEl;
       const anchorName = (event.target as HTMLElement).dataset.anchor as ConnectorAnchor | undefined;
-      const els = pageElements(view);
+      const els = pageElements(view, pageDeviceView);
       let fromElementId: string | undefined;
       let fromAnchor: ConnectorAnchor | undefined;
       let fromX = p.x;
@@ -743,17 +790,17 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       return;
     }
     if (id) {
-      const target = pageElements(view).find((item) => item.id === id);
+      const target = pageElements(view, pageDeviceView).find((item) => item.id === id);
       if (target?.locked) return;
       const picked = clickSelection(selected, id, event.metaKey || event.ctrlKey, event.shiftKey);
-      let ids = expandToGroups(pageElements(view), picked);
+      let ids = expandToGroups(pageElements(view, pageDeviceView), picked);
       setSelected(ids);
-      let elements = pageElements(doc);
+      let elements = pageElements(doc, pageDeviceView);
       if (event.altKey) {
         const copies = elements
           .filter((el) => ids.includes(el.id))
           .map((el) =>
-            placeOnCanvas({ ...structuredClone(el), id: newElementId(), x: el.x, y: el.y }, pageCanvas(doc)),
+            placeOnCanvas({ ...structuredClone(el), id: newElementId(), x: el.x, y: el.y }, pageCanvas(doc, pageDeviceView)),
           );
         elements = [...elements, ...copies];
         ids = copies.map((el) => el.id);
@@ -761,7 +808,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
         setSelected(ids);
       }
       const orig: Record<string, { x: number; y: number }> = {};
-      const source = live ? pageElements(live) : elements;
+      const source = live ? pageElements(live, pageDeviceView) : elements;
       for (const el of source) if (ids.includes(el.id)) orig[el.id] = { x: el.x, y: el.y };
       const snapPeers = boardElementsFor(doc);
       const snapIndex = snapPeers.length >= SNAP_SPATIAL_MIN_PEERS ? new ElementSpatialIndex(snapPeers) : null;
@@ -781,21 +828,21 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     syncPointerModifiers(event);
     if (!current) {
       if (pendingTool && isConnectorTool(pendingTool)) {
-        setConnectorHoverId(shapeAtPoint(pageElements(view), p.x, p.y)?.id ?? null);
+        setConnectorHoverId(shapeAtPoint(pageElements(view, pageDeviceView), p.x, p.y)?.id ?? null);
       } else setConnectorHoverId(null);
       if (event.altKey) {
-        const hit = elementAtPoint(pageElements(view), p.x, p.y);
-        setDistanceLines(hit ? distanceLinesFor(hit, pageElements(view)) : []);
+        const hit = elementAtPoint(pageElements(view, pageDeviceView), p.x, p.y);
+        setDistanceLines(hit ? distanceLinesFor(hit, pageElements(view, pageDeviceView)) : []);
       } else setDistanceLines([]);
       return;
     }
     if (current.kind === "connectorDraw") {
       setConnectorDraft({ from: { x: current.fromX, y: current.fromY }, to: { x: p.x, y: p.y } });
-      setConnectorHoverId(shapeAtPoint(pageElements(view), p.x, p.y)?.id ?? null);
+      setConnectorHoverId(shapeAtPoint(pageElements(view, pageDeviceView), p.x, p.y)?.id ?? null);
       return;
     }
     if (current.kind === "connectorHandle") {
-      const base = live ? pageElements(live) : pageElements(doc);
+      const base = live ? pageElements(live, pageDeviceView) : pageElements(doc, pageDeviceView);
       setLive(
         patchElements(
           doc,
@@ -818,6 +865,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
             const next = { ...el, props: { ...el.props, ...connectorPropsToRecord(patch) } };
             return refreshConnector(next, base);
           }),
+          pageDeviceView,
         ),
       );
       return;
@@ -879,14 +927,40 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       setLive(withBoardElements(refreshConnectorsForElements(moved, new Set(current.ids))));
       return;
     }
+    if (current.kind === "stackLayout") {
+      const stack = pageElements(doc, pageDeviceView).find((el) => el.id === current.stackId);
+      if (!stack || !isAutoLayoutStack(stack)) return;
+      const layout = { ...current.start };
+      const dx = p.x - current.ox;
+      const dy = p.y - current.oy;
+      const vertical = layout.direction === "vertical";
+      if (current.mode === "gap") {
+        layout.gap = snap(Math.max(0, layout.gap + (vertical ? dy : dx)));
+      } else {
+        const edge = current.arg as "top" | "right" | "bottom" | "left";
+        const idx = { top: 0, right: 1, bottom: 2, left: 3 }[edge];
+        const delta = edge === "top" || edge === "bottom" ? dy : dx;
+        const sign = edge === "top" || edge === "left" ? 1 : -1;
+        const nextPad = [...layout.padding] as [number, number, number, number];
+        nextPad[idx] = snap(Math.max(0, nextPad[idx] + delta * sign));
+        layout.padding = nextPad;
+      }
+      const nextStack = writeStackLayout(stack, layout);
+      setLive(patchElements(doc, relayoutPageStacks(pageElements(doc, pageDeviceView).map((el) => (el.id === stack.id ? nextStack : el))), pageDeviceView));
+      return;
+    }
     if (current.kind === "resize") {
       const mods = { shift: event.shiftKey, alt: event.altKey };
-      setLive(
-        patchElements(
-          doc,
-          pageElements(doc).map((el) => (el.id === current.id ? resized(current.orig, current.handle, p.x, p.y, mods) : el)),
-        ),
-      );
+      const orig = current.orig;
+      const resizedEl = resized(orig, current.handle, p.x, p.y, mods);
+      let next = pageElements(doc, pageDeviceView).map((el) => (el.id === current.id ? resizedEl : el));
+      const before = { w: orig.w, h: orig.h };
+      const after = { w: resizedEl.w, h: resizedEl.h };
+      if (before.w !== after.w || before.h !== after.h) {
+        next = applyConstraintsToChildren(next, current.id, before, after);
+        next = relayoutPageStacks(next);
+      }
+      setLive(patchElements(doc, next, pageDeviceView));
     }
   };
 
@@ -900,7 +974,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       setConnectorDraft(null);
       setConnectorHoverId(null);
       const p = boardPoint(event);
-      const els = pageElements(doc);
+      const els = pageElements(doc, pageDeviceView);
       const targetShape = shapeAtPoint(els, p.x, p.y);
       const toAnchor = targetShape ? anchorAtPoint(targetShape, p.x, p.y) ?? undefined : undefined;
       const connector = createConnectorElement(
@@ -944,8 +1018,8 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       const p = boardPoint(event);
       const rect = normalizeRect(current.ox, current.oy, p.x, p.y);
       setMarquee(null);
-      const hits = marqueeHitTest(pageElements(view), rect, current.contain ? "contain" : "intersect");
-      setSelected(expandToGroups(pageElements(view), hits));
+      const hits = marqueeHitTest(pageElements(view, pageDeviceView), rect, current.contain ? "contain" : "intersect");
+      setSelected(expandToGroups(pageElements(view, pageDeviceView), hits));
       return;
     }
     setMarquee(null);
@@ -954,10 +1028,10 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       const grid = snapGrid ? settings.protoGridStep : null;
       const raw = snapDelta(p.x - current.ox, p.y - current.oy, grid);
       if (raw.dx === 0 && raw.dy === 0) {
-        const el = pageElements(doc).find((item) => current.ids[0] === item.id);
+        const el = pageElements(doc, pageDeviceView).find((item) => current.ids[0] === item.id);
         if (el && event.detail === 1 && (el.type === "Radio" || el.type === "Checkbox") && p.x - el.x < 28) {
           setLive(null);
-          replace(el.type === "Radio" ? checkRadio(pageElements(doc), el.id) : toggleCheckbox(pageElements(doc), el.id));
+          replace(el.type === "Radio" ? checkRadio(pageElements(doc, pageDeviceView), el.id) : toggleCheckbox(pageElements(doc, pageDeviceView), el.id));
           return;
         }
         setLive(null);
@@ -974,7 +1048,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   const onBoardContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();
     const id = (event.target as HTMLElement).closest("[data-el]")?.getAttribute("data-el");
-    if (id && !selected.includes(id)) setSelected(expandToGroups(pageElements(view), [id]));
+    if (id && !selected.includes(id)) setSelected(expandToGroups(pageElements(view, pageDeviceView), [id]));
     const target: MenuTarget = id ? { kind: "canvasElement", elementId: id } : { kind: "canvasEmpty" };
     openContextMenu(event.clientX, event.clientY, target);
   };
@@ -982,7 +1056,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   const onContextAction = (action: MenuActionId, target: MenuTarget) => {
     const zOp = zOrderOpFromAction(action);
     if (zOp) {
-      replace(applyZOrder(pageElements(doc), selected, zOp));
+      replace(applyZOrder(pageElements(doc, pageDeviceView), selected, zOp));
       return;
     }
     if (action === "cut") cutSelected();
@@ -999,7 +1073,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       if (target.kind === "page" || target.kind === "pageTab") setRenamePageId(target.pageId);
       else if (target.kind === "outlineLayer" || target.kind === "canvasElement") {
         const id = target.kind === "outlineLayer" ? target.elementId : target.elementId;
-        if (!selected.includes(id)) setSelected(expandToGroups(pageElements(view), [id]));
+        if (!selected.includes(id)) setSelected(expandToGroups(pageElements(view, pageDeviceView), [id]));
         setRenameElementId(id);
         setLeftTab("outline");
       }
@@ -1022,7 +1096,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     } else if (action === "components" && target.kind === "canvasEmpty") {
       setPaletteView("components");
     } else if (action === "createComponent") {
-      const applied = applyComponentFromSelection(doc, pageElements(doc), selected);
+      const applied = applyComponentFromSelection(doc, pageElements(doc, pageDeviceView), selected);
       if (applied) {
         commit(updateActivePage(applied.doc, (page) => ({ ...page, elements: applied.elements })));
         setSelected([applied.elements[applied.elements.length - 1]!.id]);
@@ -1034,8 +1108,8 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
         return;
       }
       const id = target.kind === "canvasElement" || target.kind === "outlineLayer" ? target.elementId : one?.id;
-      const el = id ? pageElements(view).find((item) => item.id === id) : one;
-      const scope = el ? enterScopeForElement(el, pageElements(view)) : null;
+      const el = id ? pageElements(view, pageDeviceView).find((item) => item.id === id) : one;
+      const scope = el ? enterScopeForElement(el, pageElements(view, pageDeviceView)) : null;
       if (scope?.kind === "component") {
         setEditScope(scope);
         setSelected([]);
@@ -1044,7 +1118,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       const component = findComponent(doc, instanceComponentId(one));
       if (!component) return;
       const expanded = detachInstanceElements(one, component);
-      replace([...pageElements(doc).filter((el) => el.id !== one.id), ...expanded]);
+      replace([...pageElements(doc, pageDeviceView).filter((el) => el.id !== one.id), ...expanded]);
       setSelected(expanded.map((el) => el.id));
     } else if (action === "deleteComponent" && target.kind === "componentTile") {
       setDeleteComponentId(target.componentId);
@@ -1070,7 +1144,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     if (raw.startsWith(COMPONENT_DRAG_PREFIX)) {
       const componentId = raw.slice(COMPONENT_DRAG_PREFIX.length);
       if (!componentId) return;
-      const inst = createInstanceFromComponent(doc, componentId, p.x, p.y, pageElements(doc));
+      const inst = createInstanceFromComponent(doc, componentId, p.x, p.y, pageElements(doc, pageDeviceView));
       if (inst) insertOnBoard(inst, p.x, p.y);
       return;
     }
@@ -1204,7 +1278,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
 
   const writeSpecDeliverables = async (stem: string, attachChat = false) => {
     const { images, specImages } = await captureSpecAssets(stem);
-    const markdown = buildWireframeSpecMarkdown(docRef.current, stem, images);
+    const markdown = buildWireframeSpecMarkdown(docRef.current, stem, images, pageDeviceView);
     const saved = await rpc.call("writePrototypeDeliverables", {
       threadId,
       stem,
@@ -1246,7 +1320,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     try {
       const stem = exportStem();
       if (!openedStem) await persist(stem, false);
-      const { readme, files } = buildWireframeCodeExport(docRef.current);
+      const { readme, files } = buildWireframeCodeExport(docRef.current, pageDeviceView);
       await rpc.call("writePrototypeDeliverables", {
         threadId,
         stem,
@@ -1401,12 +1475,12 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   const commitEdit = () => {
     const current = editRef.current;
     if (!current) return;
-    const el = pageElements(doc).find((item) => item.id === current.id);
+    const el = pageElements(doc, pageDeviceView).find((item) => item.id === current.id);
     if (!el || draftUnchanged(el, current)) {
       closeEdit(null);
       return;
     }
-    replace(applyEdit(current, pageElements(doc)));
+    replace(applyEdit(current, pageElements(doc, pageDeviceView)));
     closeEdit(null);
   };
 
@@ -1421,13 +1495,13 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     }
     if (event.key === "Enter") {
       event.preventDefault();
-      const el = pageElements(doc).find((item) => item.id === current.id);
+      const el = pageElements(doc, pageDeviceView).find((item) => item.id === current.id);
       if (!el) {
         closeEdit(null);
         return;
       }
       if (el.type === "Radio" || el.type === "Checkbox") {
-        const result = addChoiceSibling(applyEdit(current, pageElements(doc)), el.id, current.draft);
+        const result = addChoiceSibling(applyEdit(current, pageElements(doc, pageDeviceView)), el.id, current.draft);
         replace(result.elements);
         closeEdit(result.edit);
         setSelected([result.edit.id]);
@@ -1435,7 +1509,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       }
       if (current.target.kind === "item") {
         const result = enterOnListItem(applyInlineDraft(el, current), current.target.key, current.target.index, current.draft);
-        replace(pageElements(doc).map((item) => (item.id === el.id ? result.element : item)));
+        replace(pageElements(doc, pageDeviceView).map((item) => (item.id === el.id ? result.element : item)));
         closeEdit({ id: el.id, target: { kind: "item", key: current.target.key, index: result.nextIndex }, draft: "" });
         return;
       }
@@ -1444,10 +1518,10 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     }
     if (event.key === "Backspace" && current.target.kind === "item" && current.draft === "") {
       event.preventDefault();
-      const el = pageElements(doc).find((item) => item.id === current.id);
+      const el = pageElements(doc, pageDeviceView).find((item) => item.id === current.id);
       if (!el) return;
       const result = removeEmptyListItem(el, current.target.key, current.target.index);
-      replace(pageElements(doc).map((item) => (item.id === el.id ? result.element : item)));
+      replace(pageElements(doc, pageDeviceView).map((item) => (item.id === el.id ? result.element : item)));
       if (result.nextIndex === null) closeEdit(null);
       else closeEdit({ id: el.id, target: { kind: "item", key: current.target.key, index: result.nextIndex }, draft: readDraft(result.element, { kind: "item", key: current.target.key, index: result.nextIndex }) });
     }
@@ -1455,9 +1529,9 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
 
   const onBoardDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
     const id = (event.target as HTMLElement).closest("[data-el]")?.getAttribute("data-el");
-    const el = pageElements(view).find((item) => item.id === id);
+    const el = pageElements(view, pageDeviceView).find((item) => item.id === id);
     if (!el) return;
-    const scope = enterScopeForElement(el, pageElements(view));
+    const scope = enterScopeForElement(el, pageElements(view, pageDeviceView));
     if (scope) {
       event.preventDefault();
       setEditScope(scope);
@@ -1529,9 +1603,16 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       else setHiddenSelected(true);
       return;
     }
+    if (!mod && event.shiftKey && key === "a" && selected.length > 0 && editScope.kind === "page") {
+      event.preventDefault();
+      const { elements, stackId } = wrapSelectionInStack(pageElements(doc, pageDeviceView), selected);
+      replace(elements);
+      setSelected([stackId]);
+      return;
+    }
     if (mod && key === "a") {
       event.preventDefault();
-      setSelected(pageElements(doc).map((el) => el.id));
+      setSelected(pageElements(doc, pageDeviceView).map((el) => el.id));
       return;
     }
     if (mod && key === "s") {
@@ -1596,12 +1677,12 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
       const step = nudgeStep(event.shiftKey);
       const { dx, dy } = arrowNudge(event.key, step);
       if (mod && one) {
-        replace(pageElements(doc).map((el) => (el.id === one.id ? resizeByArrow(el, event.key, step) : el)));
+        replace(pageElements(doc, pageDeviceView).map((el) => (el.id === one.id ? resizeByArrow(el, event.key, step) : el)));
         return;
       }
       replace(
         refreshConnectorsForElements(
-          pageElements(doc).map((el) => (selected.includes(el.id) ? { ...el, x: el.x + dx, y: el.y + dy } : el)),
+          pageElements(doc, pageDeviceView).map((el) => (selected.includes(el.id) ? { ...el, x: el.x + dx, y: el.y + dy } : el)),
           new Set(selected),
         ),
       );
@@ -1679,7 +1760,7 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     [pageComments, pageCommentNumbers],
   );
   const openTabs = doc.pages.filter((p) => openTabIds.includes(p.id));
-  const pageEls = pageElements(view);
+  const pageEls = pageElements(view, pageDeviceView);
   const boardItems = useMemo(() => {
     if (editScope.kind === "component") {
       const component = findComponent(view, editScope.componentId);
@@ -1797,15 +1878,30 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
   };
 
   const reorderElements = (from: number, to: number) => {
-    const els = [...pageElements(doc)];
-    const [item] = els.splice(from, 1);
-    els.splice(to, 0, item!);
-    replace(els);
+    const els = pageElements(doc, pageDeviceView);
+    const moved = els[from];
+    const target = els[to];
+    if (moved && target) {
+      const parent = readParent(moved);
+      const stack = parent ? els.find((el) => el.id === parent.id) : undefined;
+      if (stack && isAutoLayoutStack(stack)) {
+        const siblings = childrenOf(els, stack.id);
+        const toIndex = siblings.findIndex((el) => el.id === target.id);
+        if (toIndex >= 0) {
+          replace(reorderStackChild(els, stack.id, moved.id, toIndex));
+          return;
+        }
+      }
+    }
+    const next = [...els];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item!);
+    replace(next);
   };
 
-  const toggleHidden = (id: string) => replace(pageElements(doc).map((el) => (el.id === id ? { ...el, hidden: !el.hidden } : el)));
-  const toggleLocked = (id: string) => replace(pageElements(doc).map((el) => (el.id === id ? { ...el, locked: !el.locked } : el)));
-  const renameElement = (id: string, label: string) => replace(pageElements(doc).map((el) => (el.id === id ? { ...el, label } : el)));
+  const toggleHidden = (id: string) => replace(pageElements(doc, pageDeviceView).map((el) => (el.id === id ? { ...el, hidden: !el.hidden } : el)));
+  const toggleLocked = (id: string) => replace(pageElements(doc, pageDeviceView).map((el) => (el.id === id ? { ...el, locked: !el.locked } : el)));
+  const renameElement = (id: string, label: string) => replace(pageElements(doc, pageDeviceView).map((el) => (el.id === id ? { ...el, label } : el)));
 
   const updatePageNotes = (notes: string) => commit(updateActivePage(doc, (p) => ({ ...p, notes: notes || undefined })));
 
@@ -1874,9 +1970,9 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
   const filteredComponentList = useMemo(() => filterComponents(query, docComponents), [query, docComponents]);
   const quickTiles = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, quickQuery, t(tile.labelKey, tile.labelParams ?? {}))).slice(0, 12);
   const canGroup = selected.length > 1;
-  const canUngroup = selected.some((id) => pageElements(doc).find((el) => el.id === id)?.groupId);
-  const selectionLocked = selected.length > 0 && selected.every((id) => pageElements(doc).find((el) => el.id === id)?.locked);
-  const selectionHidden = selected.length > 0 && selected.every((id) => pageElements(doc).find((el) => el.id === id)?.hidden);
+  const canUngroup = selected.some((id) => pageElements(doc, pageDeviceView).find((el) => el.id === id)?.groupId);
+  const selectionLocked = selected.length > 0 && selected.every((id) => pageElements(doc, pageDeviceView).find((el) => el.id === id)?.locked);
+  const selectionHidden = selected.length > 0 && selected.every((id) => pageElements(doc, pageDeviceView).find((el) => el.id === id)?.hidden);
 
   const menuBuildContext: MenuBuildContext = useMemo(
     () => ({
@@ -1890,7 +1986,7 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
       pageCount: doc.pages.length,
       canDeletePage: doc.pages.length > 1,
       componentsFeatureEnabled: true,
-      canCreateComponent: collectSelectionForComponent(pageElements(doc), selected).length > 0,
+      canCreateComponent: collectSelectionForComponent(pageElements(doc, pageDeviceView), selected).length > 0,
       canEditComponent: one?.type === "Instance",
       canDetachInstance: one?.type === "Instance",
     }),
@@ -1955,7 +2051,7 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             onSendBuild={() => void sendBuildToChat()}
           />
         }
-        styleBar={<PrototypeStyleBar inspect={inspect} canvas={pageCanvas(doc)} onCanvas={(patch) => commit(patchCanvas(doc, patch))} onUpdate={updateOne} />}
+        styleBar={<PrototypeStyleBar inspect={inspect} canvas={pageCanvas(doc, pageDeviceView)} onCanvas={(patch) => commit(patchCanvas(doc, patch))} onUpdate={updateOne} />}
         leftPane={
           <PrototypeLeftPane
             topTab={leftTab}
@@ -1968,7 +2064,7 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             onDeletePage={deletePage}
             onRenamePage={renamePage}
             onReorderPages={reorderPages}
-            elements={pageElements(doc)}
+            elements={pageElements(doc, pageDeviceView)}
             selected={selected}
             onSelectElements={(ids) => setSelected(ids)}
             onOpenContextMenu={openContextMenu}
@@ -2009,8 +2105,8 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             activePageId={doc.activePageId}
             onSelectPage={switchPage}
             onCloseTab={(id) => setOpenTabIds((tabs) => tabs.filter((t) => t !== id))}
-            canvas={pageCanvas(view)}
-            elements={pageElements(view)}
+            canvas={pageCanvas(view, pageDeviceView)}
+            elements={pageElements(view, pageDeviceView)}
             components={doc.components ?? []}
             zoom={zoom}
             badges={badges}
@@ -2035,6 +2131,8 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             connectorDraft={connectorDraft}
             boardItems={boardItems}
             scopeOverlay={scopeOverlay}
+            deviceView={pageDeviceView}
+            onDeviceViewChange={setPageDeviceView}
             onOpenShortcuts={() => setShortcutsOpen(true)}
             onPanePointerDown={onPanePointerDown}
             onPanePointerMove={onPanePointerMove}
@@ -2069,8 +2167,8 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             setTab={setInspectorTab}
             inspect={inspect}
             selection={selectedEls}
-            elements={pageElements(doc)}
-            canvas={pageCanvas(doc)}
+            elements={pageElements(doc, pageDeviceView)}
+            canvas={pageCanvas(doc, pageDeviceView)}
             pageNotes={activePage.notes ?? ""}
             noteMarkers={badges}
             onNoteMarkers={(on) => patchStudioSettings({ protoBadges: on })}
@@ -2083,14 +2181,14 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             onRadioGroup={(groupId) => {
               if (!one) return;
               if (groupId === "__create__") {
-                replace(createRadioGroup(pageElements(doc), [one.id]));
+                replace(createRadioGroup(pageElements(doc, pageDeviceView), [one.id]));
                 return;
               }
-              replace(assignRadioGroup(pageElements(doc), one.id, groupId));
+              replace(assignRadioGroup(pageElements(doc, pageDeviceView), one.id, groupId));
             }}
             onRadioChecked={(checked) => {
               if (!one) return;
-              replace(setRadioChecked(pageElements(doc), one.id, checked));
+              replace(setRadioChecked(pageElements(doc, pageDeviceView), one.id, checked));
             }}
             applyAlign={applyAlign}
             applyDistribute={applyDistribute}
@@ -2219,6 +2317,7 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
       {previewOpen ? (
         <PrototypePreviewPlayer
           doc={view}
+          deviceView={pageDeviceView}
           boardRef={previewBoardRef}
           onClose={() => setPreviewOpen(false)}
           onSendScreenshot={sendPreviewToChat}

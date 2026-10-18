@@ -20,6 +20,7 @@ import {
 } from "./inspector-model";
 import { iconDisplayLabel } from "./icons";
 import { ElementFace } from "./elements";
+import { InspectorAutoLayoutPanel } from "./inspector-auto-layout";
 import { SNAP, snap, type PropValue, type WireframeCanvas, type WireframeElement } from "./model";
 
 const STYLE_EFFECT_LABEL: Record<(typeof STYLE_EFFECTS)[number], I18nKey> = {
@@ -62,6 +63,7 @@ export function InspectorStylePanel({
   applyAlign,
   applyDistribute,
   documentColours,
+  onReplaceElement,
 }: {
   inspect: WireframeElement | null;
   selection: WireframeElement[];
@@ -77,6 +79,7 @@ export function InspectorStylePanel({
   onCanvas: (patch: Partial<WireframeCanvas>) => void;
   applyAlign: (edge: AlignEdge) => void;
   applyDistribute: (axis: DistributeAxis) => void;
+  onReplaceElement: (el: WireframeElement) => void;
 }) {
   const t = useT();
   const [lockAspect, setLockAspect] = useState(() => inspect?.props.lockAspect === true);
@@ -202,8 +205,62 @@ export function InspectorStylePanel({
         </Button>
       </CollapseSection>
 
+      <InspectorAutoLayoutPanel
+        inspect={inspect}
+        selection={selection}
+        onUpdate={(el) => onReplaceElement(el)}
+        onUpdateChild={(el) => onReplaceElement(el)}
+      />
+
       <CollapseSection title={t("protoStyleSectionConstraints")} open={openSections.constraints} onToggle={() => toggleSection("constraints")}>
-        <p className="text-muted-foreground">{t("protoConstraintsHint")}</p>
+        {inspect ? (
+          <div className="grid grid-cols-2 gap-2">
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">{t("protoConstraintHorizontal")}</span>
+              <select
+                className="h-8 rounded-md border border-input bg-transparent px-2"
+                value={inspect.constraints?.horizontal ?? "left"}
+                onChange={(event) =>
+                  updateOne({
+                    constraints: {
+                      horizontal: event.target.value as NonNullable<typeof inspect.constraints>["horizontal"],
+                      vertical: inspect.constraints?.vertical ?? "top",
+                    },
+                  })
+                }
+              >
+                <option value="left">{t("protoConstraintLeft")}</option>
+                <option value="right">{t("protoConstraintRight")}</option>
+                <option value="leftRight">{t("protoConstraintLeftRight")}</option>
+                <option value="center">{t("protoAlignCenter")}</option>
+                <option value="scale">{t("protoConstraintScale")}</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">{t("protoConstraintVertical")}</span>
+              <select
+                className="h-8 rounded-md border border-input bg-transparent px-2"
+                value={inspect.constraints?.vertical ?? "top"}
+                onChange={(event) =>
+                  updateOne({
+                    constraints: {
+                      horizontal: inspect.constraints?.horizontal ?? "left",
+                      vertical: event.target.value as NonNullable<typeof inspect.constraints>["vertical"],
+                    },
+                  })
+                }
+              >
+                <option value="top">{t("protoConstraintTop")}</option>
+                <option value="bottom">{t("protoConstraintBottom")}</option>
+                <option value="topBottom">{t("protoConstraintTopBottom")}</option>
+                <option value="center">{t("protoAlignCenter")}</option>
+                <option value="scale">{t("protoConstraintScale")}</option>
+              </select>
+            </label>
+          </div>
+        ) : (
+          <p className="text-muted-foreground">{t("protoConstraintsHint")}</p>
+        )}
       </CollapseSection>
 
       <CollapseSection title={t("protoStyleSectionWidget")} open={openSections.widget} onToggle={() => toggleSection("widget")}>

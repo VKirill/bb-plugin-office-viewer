@@ -1,4 +1,5 @@
-import { boardElements } from "./containers.ts";
+import { boardElements, childrenOf } from "./containers.ts";
+import { isAutoLayoutStack, resolvePageView, stackFlexStyle, type PageDeviceView } from "./layout.ts";
 import type { ElementType, PropValue, Wireframe, WireframeElement, WireframePage } from "./model.ts";
 
 export type CodeExportFile = { fileName: string; content: string };
@@ -56,6 +57,7 @@ function semanticTag(el: WireframeElement): { tag: string; selfClosing?: boolean
 }
 
 function tailwindFor(el: WireframeElement): string {
+  if (isAutoLayoutStack(el)) return "relative flex overflow-hidden";
   const base = "absolute overflow-hidden";
   switch (el.type) {
     case "Button":
@@ -102,11 +104,26 @@ function elementInner(el: WireframeElement): string {
   return escapeTsx(text);
 }
 
-function renderElement(el: WireframeElement, absX: number, absY: number, indent: string): string {
+function styleObjectLiteral(style: Record<string, string | number>, absX: number, absY: number, el: WireframeElement): string {
+  const parts = [`left: ${absX}`, `top: ${absY}`, `width: ${el.w}`, `height: ${el.h}`];
+  for (const [key, value] of Object.entries(style)) {
+    const cssKey = key.replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`);
+    parts.push(`${cssKey}: ${typeof value === "number" ? value : `"${value}"`}`);
+  }
+  return `{ ${parts.join(", ")} }`;
+}
+
+function renderElement(el: WireframeElement, elements: readonly WireframeElement[], absX: number, absY: number, indent: string): string {
   const { tag, selfClosing } = semanticTag(el);
   const className = tailwindFor(el);
   const attrs = elementAttributes(el);
-  const styleExpr = `{ left: ${absX}, top: ${absY}, width: ${el.w}, height: ${el.h} }`;
+  const flex = isAutoLayoutStack(el) ? stackFlexStyle(el) : {};
+  const styleExpr = styleObjectLiteral(flex, absX, absY, el);
+  if (isAutoLayoutStack(el)) {
+    const kids = childrenOf(elements, el.id);
+    const inner = kids.map((child) => renderElement(child, elements, child.x, child.y, `${indent}  `)).join("\n");
+    return `${indent}<div className="${className}" style={${styleExpr}}>\n${inner}\n${indent}</div>`;
+  }
   if (selfClosing) {
     return `${indent}<${tag} className="${className}" style={${styleExpr}}${attrs} />`;
   }
@@ -116,7 +133,9 @@ function renderElement(el: WireframeElement, absX: number, absY: number, indent:
 
 function renderPageElements(page: WireframePage): string {
   const placed = boardElements(page.elements, { kind: "page" });
-  return placed.map(({ element, absX, absY }) => renderElement(element, absX, absY, "      ")).join("\n");
+  return placed
+    .map(({ element, absX, absY }) => renderElement(element, page.elements, absX, absY, "      "))
+    .join("\n");
 }
 
 export function buildPageComponent(page: WireframePage): CodeExportFile {
@@ -126,8 +145,8 @@ export function buildPageComponent(page: WireframePage): CodeExportFile {
   return { fileName: `${componentName}.tsx`, content };
 }
 
-export function buildWireframeCodeExport(doc: Wireframe): { readme: string; files: CodeExportFile[] } {
-  const files = doc.pages.map((page) => buildPageComponent(page));
+export function buildWireframeCodeExport(doc: Wireframe, deviceView: PageDeviceView = "desktop"): { readme: string; files: CodeExportFile[] } {
+  const files = doc.pages.map((page) => buildPageComponent(resolvePageView(page, deviceView)));
   const readme = [
     `# ${doc.name} — generated React components`,
     "",
