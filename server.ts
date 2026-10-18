@@ -212,6 +212,10 @@ export const rpcContract = defineRpcContract({
       .strict(),
     output: z.object({ base64: z.string(), contentType: z.string() }).strict(),
   },
+  readDesignMd: {
+    input: z.object({ threadId: z.string().min(1).max(256), locale: z.enum(["en", "ru"]).optional() }).strict(),
+    output: z.object({ markdown: z.string().nullable() }).strict(),
+  },
   writePrototypeDeliverables: {
     input: z
       .object({
@@ -617,6 +621,17 @@ export default function plugin(bb: BbPluginApi) {
               : "application/octet-stream";
       const base64 = file.contentEncoding === "base64" ? file.content : Buffer.from(file.content, "utf8").toString("base64");
       return { base64, contentType };
+    },
+    readDesignMd: async ({ threadId, locale = "en" }) => {
+      try {
+        const where = await locate(sdk, { kind: "workspace", threadId, environmentId: null, projectId: null }, "DESIGN.md", locale);
+        const file = await bb.sdk.files.read({ hostId: where.hostId, path: where.absPath });
+        if (!("content" in file)) return { markdown: null };
+        const markdown = file.contentEncoding === "base64" ? Buffer.from(file.content, "base64").toString("utf8") : file.content;
+        return { markdown };
+      } catch {
+        return { markdown: null };
+      }
     },
     listWireframeHistory: async ({ threadId, name, locale = "en" }) => {
       const stem = sanitizeStem(name, locale);

@@ -10,7 +10,8 @@ import { useT } from "../../shared/i18n";
 import { elementFaceStyleOverrides, resolveStylePatch, readTable } from "./inspector-model";
 import type { CSSProperties } from "react";
 import { instanceChildrenForRender } from "./components";
-import type { PropValue, WireframeComponent, WireframeElement } from "./model";
+import { sketchElementStyleOverrides, type ProtoFidelity } from "./styles";
+import type { PropValue, WireframeComponent, WireframeElement, WireframeStyleLibrary } from "./model";
 import { NestedContent } from "./nested-content";
 import { isFlowShape, shapePath } from "./shapes";
 
@@ -42,8 +43,8 @@ function variantOf(value: PropValue | undefined): ButtonVariant {
 
 const inert = "pointer-events-none h-full w-full";
 
-function faceStyle(el: WireframeElement, extra?: CSSProperties): CSSProperties {
-  return { ...elementFaceStyleOverrides(el), ...extra };
+function faceStyle(el: WireframeElement, library?: WireframeStyleLibrary, fidelity: ProtoFidelity = "mockup", extra?: CSSProperties): CSSProperties {
+  return { ...elementFaceStyleOverrides(el, "base", library), ...sketchElementStyleOverrides(fidelity), ...extra };
 }
 
 function boxFill(fill: string, custom?: string): string {
@@ -74,11 +75,15 @@ export function ElementFace({
   allElements = [],
   components = [],
   resolveAsset,
+  styleLibrary,
+  fidelity = "mockup",
 }: {
   el: WireframeElement;
   allElements?: readonly WireframeElement[];
   components?: readonly WireframeComponent[];
   resolveAsset?: (src: string) => string | undefined;
+  styleLibrary?: WireframeStyleLibrary;
+  fidelity?: ProtoFidelity;
 }) {
   const t = useT();
   const p = el.props;
@@ -96,11 +101,11 @@ export function ElementFace({
         </div>
       );
     case "Text":
-      return <div className={cn(inert, "px-1 text-sm")} style={faceStyle(el)}>{text(p, "text", "Text")}</div>;
+      return <div className={cn(inert, "px-1 text-sm")} style={faceStyle(el, styleLibrary, fidelity)}>{text(p, "text", "Text")}</div>;
     case "Heading": {
       const level = Math.min(3, Math.max(1, Math.round(num(p, "level", 1))));
       const size = level === 1 ? "text-2xl" : level === 2 ? "text-xl" : "text-lg";
-      return <div className={cn(inert, size, "px-1 font-semibold")} style={faceStyle(el)}>{text(p, "text", "Heading")}</div>;
+      return <div className={cn(inert, size, "px-1 font-semibold")} style={faceStyle(el, styleLibrary, fidelity)}>{text(p, "text", "Heading")}</div>;
     }
     case "Button":
       return (
@@ -170,6 +175,14 @@ export function ElementFace({
     case "Image": {
       const src = text(p, "src", "");
       const assetUrl = src ? resolveAsset?.(src) : undefined;
+      if (fidelity === "sketch") {
+        return (
+          <div className={cn(inert, "relative flex items-center justify-center bg-muted text-xs text-muted-foreground")} style={faceStyle(el, styleLibrary, fidelity)}>
+            <div className="absolute inset-2 border border-dashed border-muted-foreground/60" />
+            <div className="absolute inset-2 rotate-45 border-t border-muted-foreground/60" />
+          </div>
+        );
+      }
       if (assetUrl) {
         return <img src={assetUrl} alt={text(p, "alt", "Image")} className={cn(inert, "h-full w-full object-contain")} draggable={false} />;
       }
@@ -258,7 +271,7 @@ export function ElementFace({
       return <div className={cn(inert, "flex items-center")}><div className="h-px w-full bg-border" /></div>;
     case "Container":
       return (
-        <div className={cn(inert, "relative border border-dashed border-border bg-muted/20")} style={faceStyle(el)}>
+        <div className={cn(inert, "relative border border-dashed border-border bg-muted/20")} style={faceStyle(el, styleLibrary, fidelity)}>
           <NestedContent host={el} elements={allElements.length ? allElements : [el]} />
         </div>
       );
@@ -266,11 +279,11 @@ export function ElementFace({
       const radius = num(p, "radius", 0);
       const fill = text(p, "fill", "none");
       const custom = text(p, "fillColor", "");
-      const patch = resolveStylePatch(el, "base");
+      const patch = resolveStylePatch(el, "base", styleLibrary);
       return (
         <div
           className={cn(inert, "flex items-center justify-center border border-foreground/70 px-2 text-center text-xs")}
-          style={faceStyle(el, {
+          style={faceStyle(el, styleLibrary, fidelity, {
             borderRadius: typeof patch.radius === "number" ? patch.radius : radius,
             background: patch.fill ?? boxFill(fill, custom),
           })}
@@ -283,8 +296,8 @@ export function ElementFace({
       return (
         <div
           className={cn(inert, "flex items-center justify-center rounded-full border border-foreground/70 px-2 text-center text-xs")}
-          style={faceStyle(el, {
-            background: resolveStylePatch(el, "base").fill ?? boxFill(text(p, "fill", "light")),
+          style={faceStyle(el, styleLibrary, fidelity, {
+            background: resolveStylePatch(el, "base", styleLibrary).fill ?? boxFill(text(p, "fill", "light")),
           })}
         >
           {text(p, "text", "")}
@@ -303,9 +316,9 @@ export function ElementFace({
         </div>
       );
     case "Label":
-      return <div className={cn(inert, "px-1 text-xs text-muted-foreground")} style={faceStyle(el)}>{text(p, "text", "Label")}</div>;
+      return <div className={cn(inert, "px-1 text-xs text-muted-foreground")} style={faceStyle(el, styleLibrary, fidelity)}>{text(p, "text", "Label")}</div>;
     case "Paragraph":
-      return <div className={cn(inert, "whitespace-pre-wrap px-1 text-sm leading-snug")} style={faceStyle(el)}>{text(p, "text", "Paragraph")}</div>;
+      return <div className={cn(inert, "whitespace-pre-wrap px-1 text-sm leading-snug")} style={faceStyle(el, styleLibrary, fidelity)}>{text(p, "text", "Paragraph")}</div>;
     case "Line": {
       const vertical = text(p, "orientation", "horizontal") === "vertical";
       const stroke = text(p, "stroke", "#333333");
@@ -531,7 +544,7 @@ export function ElementFace({
       const stroke = patch.stroke ?? text(p, "stroke", "#333333");
       const strokeWidth = typeof patch.strokeWidth === "number" ? patch.strokeWidth : 1.5;
       return (
-        <div className={cn(inert, "relative flex items-center justify-center")} style={faceStyle(el)}>
+        <div className={cn(inert, "relative flex items-center justify-center")} style={faceStyle(el, styleLibrary, fidelity)}>
           <svg className="absolute inset-0 size-full" viewBox={`0 0 ${el.w} ${el.h}`} preserveAspectRatio="none">
             <path d={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} vectorEffect="non-scaling-stroke" />
           </svg>

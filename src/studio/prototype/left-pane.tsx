@@ -8,6 +8,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from "react";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
@@ -36,11 +37,12 @@ import { clickSelection, expandToGroups } from "./canvas-math";
 import { flattenOutline, outlineTree } from "./containers";
 import type { MenuTarget } from "./menus";
 import { COMPONENT_DRAG_PREFIX } from "./components";
-import type { PaletteGroup, WireframeComponent, WireframeElement, WireframePage } from "./model";
+import { filterOutlineElements } from "./styles";
+import type { ElementType, PaletteGroup, WireframeComponent, WireframeElement, WireframePage } from "./model";
 
 export type PaletteLibraryView = "elements" | "templates" | "icons" | "components";
 
-export type LeftTopTab = "pages" | "outline";
+export type LeftTopTab = "pages" | "outline" | "styles";
 
 export function PrototypeLeftPane({
   topTab,
@@ -78,6 +80,7 @@ export function PrototypeLeftPane({
   filteredComponents,
   onEditComponent,
   onComponentContextMenu,
+  stylesPanel,
 }: {
   topTab: LeftTopTab;
   setTopTab: (tab: LeftTopTab) => void;
@@ -114,12 +117,15 @@ export function PrototypeLeftPane({
   filteredComponents: readonly WireframeComponent[];
   onEditComponent: (componentId: string) => void;
   onComponentContextMenu: (componentId: string, event: ReactMouseEvent) => void;
+  stylesPanel?: ReactNode;
 }) {
   const t = useT();
   const [pageEdit, setPageEdit] = useState<string | null>(null);
   const [pageDraft, setPageDraft] = useState("");
   const [elEdit, setElEdit] = useState<string | null>(null);
   const [elDraft, setElDraft] = useState("");
+  const [outlineQuery, setOutlineQuery] = useState("");
+  const [outlineType, setOutlineType] = useState<ElementType | "all">("all");
   const dragPage = useRef<number | null>(null);
   const dragEl = useRef<number | null>(null);
   const paneRef = useRef<HTMLDivElement>(null);
@@ -205,6 +211,10 @@ export function PrototypeLeftPane({
   );
 
   const outline = useMemo(() => flattenOutline(outlineTree(elements)).reverse(), [elements]);
+  const outlineVisible = useMemo(() => {
+    const allowed = new Set(filterOutlineElements(elements, outlineQuery, outlineType).map((el) => el.id));
+    return outline.filter((row) => allowed.has(row.element.id));
+  }, [elements, outline, outlineQuery, outlineType]);
   const filteredFormTemplates = useMemo(
     () => filterTemplates(FORM_TEMPLATES, query, (template) => t(template.labelKey)),
     [query],
@@ -235,9 +245,9 @@ export function PrototypeLeftPane({
             <Icon name="ChevronDown" className={cn("size-3.5", split.pagesCollapsed && "-rotate-90")} />
           </button>
           <div className="flex min-w-0 flex-1 gap-1">
-            {(["pages", "outline"] as LeftTopTab[]).map((id) => (
+            {(["pages", "outline", "styles"] as LeftTopTab[]).map((id) => (
               <button key={id} type="button" className={cn("min-w-0 flex-1 rounded px-2 py-1 text-xs font-medium", topTab === id ? "bg-muted" : "text-muted-foreground")} onClick={() => setTopTab(id)}>
-                {t(id === "pages" ? "protoTabPages" : "protoTabOutline")}
+                {t(id === "pages" ? "protoTabPages" : id === "outline" ? "protoTabOutline" : "protoTabStyles")}
               </button>
             ))}
           </div>
@@ -286,9 +296,21 @@ export function PrototypeLeftPane({
                 </li>
               ))}
             </ul>
+          ) : topTab === "styles" ? (
+            stylesPanel ?? <div className="text-muted-foreground">{t("protoTabStyles")}</div>
           ) : (
+            <>
+            <div className="mb-2 space-y-1">
+              <Input className="h-7 text-xs" value={outlineQuery} placeholder={t("protoOutlineSearch")} onChange={(e) => setOutlineQuery(e.target.value)} />
+              <select className="h-7 w-full rounded-md border border-input bg-transparent px-2 text-xs" value={outlineType} onChange={(e) => setOutlineType(e.target.value as ElementType | "all")}>
+                <option value="all">{t("protoOutlineFilterAll")}</option>
+                {Array.from(new Set(elements.map((el) => el.type))).sort().map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
             <ul className="space-y-0.5">
-              {outline.map((row, index) => {
+              {outlineVisible.map((row, index) => {
                 const el = row.element;
                 const realIndex = elements.findIndex((item) => item.id === el.id);
                 return (
@@ -335,6 +357,7 @@ export function PrototypeLeftPane({
                 );
               })}
             </ul>
+            </>
           )}
         </div>
         )}

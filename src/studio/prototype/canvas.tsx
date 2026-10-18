@@ -11,8 +11,10 @@ import { elementHasInteractions } from "./interactions";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { useT } from "../../shared/i18n";
+import { CanvasMinimap } from "./canvas-minimap";
 import { isAutoLayoutStack, stackLayoutHandleMarkers, type PageDeviceView } from "./layout";
-import { type WireframeCanvas, type WireframeComponent, type WireframeElement, type WireframePage } from "./model";
+import { fidelityBoardClassName, type ProtoFidelity } from "./styles";
+import { type WireframeCanvas, type WireframeComponent, type WireframeElement, type WireframePage, type WireframeStyleLibrary } from "./model";
 
 export function PrototypeCanvas({
   canvasPaneRef,
@@ -50,6 +52,12 @@ export function PrototypeCanvas({
   onOpenShortcuts = () => {},
   deviceView = "desktop",
   onDeviceViewChange,
+  fidelity = "mockup",
+  styleLibrary,
+  minimapVisible = false,
+  minimapViewport,
+  onMinimapJump,
+  onOpenTour,
   onPanePointerDown,
   onPanePointerMove,
   onPanePointerUp,
@@ -104,6 +112,12 @@ export function PrototypeCanvas({
   onOpenShortcuts?: () => void;
   deviceView?: PageDeviceView;
   onDeviceViewChange?: (view: PageDeviceView) => void;
+  fidelity?: ProtoFidelity;
+  styleLibrary?: WireframeStyleLibrary;
+  minimapVisible?: boolean;
+  minimapViewport?: { left: number; top: number; width: number; height: number };
+  onMinimapJump?: (centerX: number, centerY: number) => void;
+  onOpenTour?: () => void;
   onPanePointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPanePointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPanePointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
@@ -217,7 +231,7 @@ export function PrototypeCanvas({
                 ref={boardRef}
                 role="application"
                 aria-label={t("protoCanvas")}
-                className={cn("relative shrink-0 shadow-sm", insertMode && "cursor-crosshair")}
+                className={cn("relative shrink-0 shadow-sm", insertMode && "cursor-crosshair", fidelityBoardClassName(fidelity), fidelity === "sketch" && "[&_[data-el]]:grayscale")}
                 style={{ width: canvas.width, height: canvas.height, background: canvas.background, transform: `scale(${zoom})`, transformOrigin: "top left" }}
                 onPointerDown={onBoardPointerDown}
                 onPointerMove={onBoardPointerMove}
@@ -314,7 +328,7 @@ export function PrototypeCanvas({
                       key={el.id}
                       data-el={el.id}
                       className={cn("absolute overflow-visible outline outline-1 outline-transparent hover:outline-primary", active && "z-10 outline-2 outline-primary", locked && "opacity-80")}
-                      style={{ left: absX, top: absY, width: el.w, height: el.h, ...wireframeElementBoxStyle(el, "base") }}
+                      style={{ left: absX, top: absY, width: el.w, height: el.h, ...wireframeElementBoxStyle(el, "base", styleLibrary) }}
                     >
                       <div className="size-full overflow-hidden">
                         <ElementFace
@@ -322,6 +336,8 @@ export function PrototypeCanvas({
                           allElements={elements}
                           components={components}
                           resolveAsset={resolveAsset}
+                          styleLibrary={styleLibrary}
+                          fidelity={fidelity}
                         />
                       </div>
                       {badges ? (
@@ -414,15 +430,20 @@ export function PrototypeCanvas({
                   ) : (
                     <span />
                   )}
-                  <button
-                    type="button"
-                    data-proto-skip
-                    className="pointer-events-auto size-7 rounded-md border border-border bg-background text-xs font-medium text-muted-foreground shadow-sm hover:bg-state-hover"
-                    title={t("protoShortcutsHint")}
-                    onClick={onOpenShortcuts}
-                  >
-                    ?
-                  </button>
+                  <div className="flex items-end gap-2">
+                    {minimapVisible && minimapViewport && onMinimapJump ? (
+                      <CanvasMinimap canvas={canvas} elements={elements} viewport={minimapViewport} onJump={onMinimapJump} />
+                    ) : null}
+                    <button
+                      type="button"
+                      data-proto-skip
+                      className="pointer-events-auto size-7 rounded-md border border-border bg-background text-xs font-medium text-muted-foreground shadow-sm hover:bg-state-hover"
+                      title={t("protoTourOpen")}
+                      onClick={() => (onOpenTour ?? onOpenShortcuts)()}
+                    >
+                      ?
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

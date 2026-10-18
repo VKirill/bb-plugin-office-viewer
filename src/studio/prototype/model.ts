@@ -123,6 +123,8 @@ export type WireframeElement = {
   style?: ElementStyle;
   interactions?: Interaction[];
   constraints?: ElementConstraints;
+  linkedColorTokenId?: string;
+  linkedTextStyleId?: string;
 };
 
 export type WireframeCanvas = { width: number; height: number; background: string };
@@ -154,6 +156,27 @@ export type WireframeComment = {
   resolved?: boolean;
 };
 
+export type WireframeColorToken = {
+  id: string;
+  name: string;
+  value: string;
+};
+
+export type WireframeTextStyle = {
+  id: string;
+  name: string;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: string | number;
+  lineHeight: number;
+  color?: string;
+};
+
+export type WireframeStyleLibrary = {
+  colors: WireframeColorToken[];
+  text: WireframeTextStyle[];
+};
+
 export type Wireframe = {
   format: typeof WIREFRAME_FORMAT;
   version: typeof WIREFRAME_VERSION;
@@ -162,6 +185,7 @@ export type Wireframe = {
   activePageId: string;
   components?: WireframeComponent[];
   comments?: WireframeComment[];
+  styleLibrary?: WireframeStyleLibrary;
 };
 
 export type CatalogEntry = {
@@ -372,6 +396,8 @@ const elementSchema = z
     parentId: z.string().min(1).max(128).optional(),
     parentState: z.string().min(1).max(200).optional(),
     style: elementStyleSchema.optional(),
+    linkedColorTokenId: z.string().min(1).max(128).optional(),
+    linkedTextStyleId: z.string().min(1).max(128).optional(),
     constraints: constraintsSchema.optional(),
     interactions: z
       .array(
@@ -467,6 +493,33 @@ const wireframeCommentSchema = z
   })
   .strict();
 
+const colorTokenSchema = z
+  .object({
+    id: z.string().min(1).max(128),
+    name: z.string().min(1).max(120),
+    value: z.string().min(1).max(64),
+  })
+  .strict();
+
+const textStyleSchema = z
+  .object({
+    id: z.string().min(1).max(128),
+    name: z.string().min(1).max(120),
+    fontFamily: z.string().min(1).max(200),
+    fontSize: z.number().finite().min(6).max(200),
+    fontWeight: z.union([z.string(), z.number()]),
+    lineHeight: z.number().finite().min(0.5).max(4),
+    color: z.string().min(1).max(64).optional(),
+  })
+  .strict();
+
+const styleLibrarySchema = z
+  .object({
+    colors: z.array(colorTokenSchema).max(200),
+    text: z.array(textStyleSchema).max(200),
+  })
+  .strict();
+
 const wireframeV2Schema = z
   .object({
     format: z.literal(WIREFRAME_FORMAT),
@@ -476,6 +529,7 @@ const wireframeV2Schema = z
     activePageId: z.string().min(1).max(128),
     components: z.array(componentSchema).max(200).optional(),
     comments: z.array(wireframeCommentSchema).max(500).optional(),
+    styleLibrary: styleLibrarySchema.optional(),
   })
   .strict()
   .refine((doc) => doc.pages.some((page) => page.id === doc.activePageId), { message: "activePageId must match a page" });

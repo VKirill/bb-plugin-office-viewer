@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { IconTooltipButton } from "@/components/ui/icon-tooltip-button";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useT } from "../../shared/i18n";
 import { AutosaveLabel } from "../autosave-label";
@@ -55,6 +56,9 @@ export function PrototypeToolbar({
   onExportSpec,
   onExportCode,
   onSendBuild,
+  protoFidelity = "mockup",
+  onFidelityChange,
+  onUndoSteps,
 }: {
   barRef: React.RefObject<HTMLDivElement | null>;
   menu: ToolbarMenu | null;
@@ -96,6 +100,9 @@ export function PrototypeToolbar({
   onExportSpec?: () => void;
   onExportCode?: () => void;
   onSendBuild?: () => void;
+  protoFidelity?: "sketch" | "mockup";
+  onFidelityChange?: (value: "sketch" | "mockup") => void;
+  onUndoSteps?: () => void;
 }) {
   const t = useT();
   return (
@@ -112,6 +119,7 @@ export function PrototypeToolbar({
               <MenuItem onClick={onOpen}>{t("protoOpen")}</MenuItem>
               <MenuItem disabled={busy} onClick={onSave}>{t("save")}</MenuItem>
               {onHistory ? <MenuItem disabled={busy} onClick={onHistory}>{t("protoHistoryTitle")}</MenuItem> : null}
+              {onUndoSteps ? <MenuItem onClick={onUndoSteps}>{t("protoUndoHistoryTitle")}</MenuItem> : null}
               {onExportSpec ? <MenuItem disabled={busy} onClick={onExportSpec}>{t("protoExportSpec")}</MenuItem> : null}
               {onExportCode ? <MenuItem disabled={busy} onClick={onExportCode}>{t("protoExportCode")}</MenuItem> : null}
             </div>
@@ -152,6 +160,20 @@ export function PrototypeToolbar({
           <ToolBtn tip={t("protoPreviewTip")} onClick={onPreview}>
             <Icon name="Play" className="size-4" />
           </ToolBtn>
+        ) : null}
+        {onFidelityChange ? (
+          <div className="flex rounded-md border border-border p-0.5">
+            {(["sketch", "mockup"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                className={cn("rounded px-2 py-0.5 text-[10px] font-medium", protoFidelity === mode ? "bg-muted" : "text-muted-foreground hover:bg-state-hover")}
+                onClick={() => onFidelityChange(mode)}
+              >
+                {mode === "sketch" ? t("protoFidelitySketch") : t("protoFidelityMockup")}
+              </button>
+            ))}
+          </div>
         ) : null}
         <ToolBtn tip={t("protoUndoTip")} disabled={index === 0} onClick={undo}>
           <Icon name="ArrowTurnBackward" className="size-4" />

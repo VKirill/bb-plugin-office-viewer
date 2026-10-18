@@ -1,7 +1,8 @@
 // Inspector helpers: element.style, effects, lists, tables, radio groups.
 import type { I18nKey } from "../../shared/i18n.ts";
 import { checkRadio, type ItemKey } from "./editing.ts";
-import type { ElementStyle, ElementType, PropValue, WireframeElement } from "./model.ts";
+import type { ElementStyle, ElementType, PropValue, WireframeElement, WireframeStyleLibrary } from "./model.ts";
+import { linkedStylePatch } from "./styles.ts";
 
 export const STYLE_EFFECTS = ["hover", "pressed", "selected", "disabled", "focus"] as const;
 export type StyleEffect = (typeof STYLE_EFFECTS)[number];
@@ -75,11 +76,12 @@ export function readStyle(el: WireframeElement): WireframeStyle {
   return el.style ?? {};
 }
 
-export function resolveStylePatch(el: WireframeElement, target: StyleTarget): StylePatch {
+export function resolveStylePatch(el: WireframeElement, target: StyleTarget, library?: WireframeStyleLibrary): StylePatch {
   const style = readStyle(el);
   const base = style.base ?? {};
-  if (target === "base") return { ...base };
-  return { ...base, ...(style.effects?.[target] ?? {}) };
+  const merged = target === "base" ? { ...base } : { ...base, ...(style.effects?.[target] ?? {}) };
+  if (target !== "base" || !library) return merged;
+  return { ...linkedStylePatch(el, library), ...merged };
 }
 
 export function mergeStylePatch(el: WireframeElement, target: StyleTarget, patch: Partial<StylePatch>): WireframeElement {
@@ -137,8 +139,9 @@ export function stylePatchToInline(patch: StylePatch): Record<string, string | n
 export function wireframeElementBoxStyle(
   el: WireframeElement,
   target: StyleTarget = "base",
+  library?: WireframeStyleLibrary,
 ): Record<string, string | number> {
-  const inline = stylePatchToInline(resolveStylePatch(el, target));
+  const inline = stylePatchToInline(resolveStylePatch(el, target, library));
   const padding = typeof el.props.padding === "number" ? el.props.padding : undefined;
   if (padding !== undefined) {
     inline.padding = padding;
@@ -148,8 +151,12 @@ export function wireframeElementBoxStyle(
 }
 
 /** Inner face overrides from style (no opacity — applied on the element box). */
-export function elementFaceStyleOverrides(el: WireframeElement, target: StyleTarget = "base"): Record<string, string | number> {
-  const patch = resolveStylePatch(el, target);
+export function elementFaceStyleOverrides(
+  el: WireframeElement,
+  target: StyleTarget = "base",
+  library?: WireframeStyleLibrary,
+): Record<string, string | number> {
+  const patch = resolveStylePatch(el, target, library);
   const out: Record<string, string | number> = {};
   if (patch.fill) out.background = patch.fill;
   if (patch.color) out.color = patch.color;
