@@ -118,6 +118,21 @@ import { PrototypeCommandPalette } from "./command-palette";
 import { PrototypeStylesPane } from "./styles-pane";
 import { PrototypeTour } from "./prototype-tour";
 import { UndoStepsPanel } from "./undo-steps-panel";
+import { PrototypePublishDialog } from "./publish-dialog";
+import {
+  PLUGIN_HTTP_PREFIX,
+  buildPageSvg,
+  buildPdfFromJpegPages,
+  collectPdfNotes,
+  importFileText,
+  mergeImportOntoPage,
+  pdfExportFileName,
+  pngBlobToJpegBytes,
+  pngExportFileName,
+  svgExportFileName,
+  triggerDownload,
+  type PngExportScale,
+} from "./publish";
 import {
   applyColorTokenLink,
   applyTextStyleLink,
@@ -294,6 +309,9 @@ export function PrototypeBuilder({ threadId }: { threadId: string }) {
   const previewBoardRef = useRef<HTMLDivElement>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [undoStepsOpen, setUndoStepsOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishPublished, setPublishPublished] = useState(false);
+  const [previewPath, setPreviewPath] = useState<string | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
   const [minimapViewport, setMinimapViewport] = useState({ left: 0, top: 0, width: 1280, height: 800 });
@@ -1195,16 +1213,36 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
     addTile(tile, p.x - spec.w / 2, p.y - spec.h / 2);
   };
 
-  const capturePng = async () => {
+  const capturePng = async (pixelScale = 2) => {
     const node = boardRef.current;
     if (!node) throw new Error(t("protoCaptureFailed"));
     const lib = await loadScreenshotLibrary();
     return lib.domToBlob(node, {
-      scale: 2,
+      scale: pixelScale,
       type: "image/png",
       filter: (item) => !(item instanceof Element && item.hasAttribute("data-proto-skip")),
     });
   };
+
+  const refreshPublishStatus = useCallback(async () => {
+    if (!openedStem) {
+      setPublishPublished(false);
+      setPreviewPath(null);
+      return;
+    }
+    const status = await rpc.call("getWireframePublishStatus", { threadId, name: openedStem, locale });
+    setPublishPublished(status.published);
+    setPreviewPath(status.previewPath);
+  }, [locale, openedStem, rpc, threadId]);
+
+  useEffect(() => {
+    void refreshPublishStatus().catch(() => {
+      setPublishPublished(false);
+      setPreviewPath(null);
+    });
+  }, [refreshPublishStatus]);
+
+  const previewUrl = previewPath ? `${window.location.origin}${PLUGIN_HTTP_PREFIX}${previewPath}` : null;
 
   const recordRiskySnapshot = async () => {
     if (!openedStem) return;
@@ -1370,6 +1408,126 @@ const [paletteView, setPaletteView] = useState<PaletteLibraryView>("elements");
         locale,
       });
       toast.success(t("protoExportCodeDone"));
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const publishPreview = async () => {
+    setBusy(true);
+    try {
+      const stem = exportStem();
+      if (!openedStem) await persist(stem, false);
+      const result = await rpc.call("publishWireframePreview", {
+        threadId,
+        name: stem,
+        json: JSON.stringify(docRef.current),
+        locale,
+      });
+      setPublishPublished(true);
+      setPreviewPath(result.previewPath);
+      toast.success(t("protoPublishDone"));
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const unpublishPreview = async () => {
+    setBusy(true);
+    try {
+      const stem = exportStem();
+      await rpc.call("unpublishWireframePreview", { threadId, name: stem, locale });
+      setPublishPublished(false);
+      setPreviewPath(null);
+      toast.success(t("protoPublishUnpublished"));
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const exportPdfDownload = async (includeNotes: boolean) => {
+    setBusy(true);
+    const startPageId = doc.activePageId;
+    const startDevice = pageDeviceView;
+    try {
+      const stem = exportStem();
+      const pages: { widthPt: number; heightPt: number; jpeg: Uint8Array }[] = [];
+      for (const page of docRef.current.pages) {
+        if (page.id !== docRef.current.activePageId) {
+          commit(setActivePageId(docRef.current, page.id));
+          await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+        }
+        const canvas = pageCanvas(docRef.current, pageDeviceView);
+        const png = await capturePng(2);
+        const jpeg = await pngBlobToJpegBytes(png);
+        pages.push({ widthPt: canvas.width, heightPt: canvas.height, jpeg });
+      }
+      if (docRef.current.activePageId !== startPageId) commit(setActivePageId(docRef.current, startPageId));
+      const pdf = buildPdfFromJpegPages(pages, collectPdfNotes(docRef.current, includeNotes));
+      triggerDownload(pdf, pdfExportFileName(stem), "application/pdf");
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setPageDeviceView(startDevice);
+      setBusy(false);
+    }
+  };
+
+  const exportSvgDownload = async () => {
+    setBusy(true);
+    try {
+      const stem = exportStem();
+      const page = getActivePage(docRef.current);
+      const svg = buildPageSvg(docRef.current, page.id, pageDeviceView);
+      triggerDownload(new TextEncoder().encode(svg), svgExportFileName(stem, page), "image/svg+xml");
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const exportPngSet = async (devices: readonly string[], scales: readonly PngExportScale[]) => {
+    setBusy(true);
+    const startPageId = doc.activePageId;
+    const startDevice = pageDeviceView;
+    try {
+      const stem = exportStem();
+      for (const device of devices as PageDeviceView[]) {
+        setPageDeviceView(device);
+        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+        for (const page of docRef.current.pages) {
+          if (page.id !== docRef.current.activePageId) {
+            commit(setActivePageId(docRef.current, page.id));
+            await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+          }
+          for (const scale of scales) {
+            const png = await capturePng(2 * scale);
+            triggerDownload(png, pngExportFileName(stem, page, device, scale), "image/png");
+          }
+        }
+      }
+      if (docRef.current.activePageId !== startPageId) commit(setActivePageId(docRef.current, startPageId));
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setPageDeviceView(startDevice);
+      setBusy(false);
+    }
+  };
+
+  const importPublishFile = async (file: File) => {
+    setBusy(true);
+    try {
+      const placement = importFileText(file.name, await file.text());
+      commit(mergeImportOntoPage(docRef.current, placement));
+      toast.success(t("protoImportDone"));
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -2128,6 +2286,7 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
             }}
             onExportSpec={() => void exportSpecification()}
             onExportCode={() => void exportCode()}
+            onPublishExport={() => { setMenu(null); setPublishOpen(true); }}
             onSendBuild={() => void sendBuildToChat()}
             protoFidelity={settings.protoFidelity}
             onFidelityChange={(value) => patchStudioSettings({ protoFidelity: value })}
@@ -2477,6 +2636,28 @@ const filtered = PALETTE_TILES.filter((tile) => tileMatchesQuery(tile, query, t(
         open={tourOpen}
         onOpenChange={setTourOpen}
         onDone={() => patchStudioSettings({ protoTourDone: true })}
+      />
+      <PrototypePublishDialog
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        previewUrl={previewUrl}
+        published={publishPublished}
+        busy={busy}
+        onPublish={publishPreview}
+        onUnpublish={unpublishPreview}
+        onCopyLink={() => {
+          if (!previewUrl) return;
+          void navigator.clipboard.writeText(previewUrl);
+          toast.success(t("protoPublishCopy"));
+        }}
+        onOpenLink={() => {
+          if (!previewUrl) return;
+          window.open(previewUrl, "_blank", "noopener,noreferrer");
+        }}
+        onExportPdf={exportPdfDownload}
+        onExportSvg={exportSvgDownload}
+        onExportPng={exportPngSet}
+        onImportFile={importPublishFile}
       />
       {quickInsertOpen ? (
         <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/20 pt-24" onClick={() => { setQuickInsertOpen(false); setQuickQuery(""); }}>
