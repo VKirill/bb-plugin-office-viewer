@@ -378,7 +378,7 @@ export default function plugin(bb: BbPluginApi) {
     if (context.req.header("if-none-match") === `"${screenshotVersion}"`) return new Response(null, { status: 304 });
     screenshotBody ??= readFile(require.resolve("modern-screenshot/dist/index.js"));
     return new Response(new Uint8Array(await screenshotBody), {
-      headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache", etag: `"${screenshotVersion}"`, "access-control-allow-origin": "*" },
+      headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache", etag: `"${screenshotVersion}"` },
     });
   });
 
@@ -410,7 +410,6 @@ export default function plugin(bb: BbPluginApi) {
       headers: {
         "content-type": "application/json; charset=utf-8",
         "cache-control": "private, max-age=3600",
-        "access-control-allow-origin": "*",
       },
     });
   });
