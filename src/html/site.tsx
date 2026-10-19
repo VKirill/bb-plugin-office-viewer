@@ -9,7 +9,7 @@ import { ArrowLeft01Icon, Globe02Icon, SmartPhone01Icon } from "@hugeicons/core-
 import type { rpcContract } from "../../server";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { t } from "../shared/i18n";
+import { detectLocale, t } from "../shared/i18n";
 import { decodeHtml, normalizeAddress } from "./capture";
 import { DevicesViewer, type PageSource } from "./html";
 
@@ -34,7 +34,7 @@ export function SitePanel({ params }: PluginThreadPanelProps) {
       url
         ? {
             async load() {
-              const page = await rpc.call("webPage", { url });
+              const page = await rpc.call("webPage", { url, locale: detectLocale() });
               const finalUrl = new URL(page.finalUrl);
               return {
                 html: decodeHtml(bytesOf(page.base64), page.contentType),
@@ -46,7 +46,7 @@ export function SitePanel({ params }: PluginThreadPanelProps) {
               };
             },
             async fetchFile(fileUrl) {
-              const file = await rpc.call("webFile", { url: fileUrl });
+              const file = await rpc.call("webFile", { url: fileUrl, locale: detectLocale() });
               return new Blob([bytesOf(file.base64)], { type: file.contentType.split(";")[0] || "application/octet-stream" });
             },
           }

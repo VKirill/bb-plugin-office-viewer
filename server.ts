@@ -12,7 +12,7 @@ import { locate, LocateError, within, type Lang, type LocateSdk } from "./src/se
 import { applyCsvEdits, parseCsv, serializeCsv } from "./src/spreadsheet/csv.ts";
 import { editMode, extensionOf } from "./src/spreadsheet/sheet.ts";
 import { PatchError, patchXlsx, type CellEdit } from "./src/spreadsheet/xlsx-patch.ts";
-import { fetchPublic } from "./src/server/web.ts";
+import { fetchPublic, WebError } from "./src/server/web.ts";
 import { parseWireframe } from "./src/studio/prototype/model.ts";
 import { parsePaintDoc } from "./src/studio/paint/paint-model.ts";
 import {
@@ -95,12 +95,12 @@ export const rpcContract = defineRpcContract({
   },
   /** A web page for the site device viewer, fetched by the server: framing rules don't apply, internal addresses are refused. */
   webPage: {
-    input: z.object({ url: z.string().min(1).max(8192) }).strict(),
+    input: z.object({ url: z.string().min(1).max(8192), locale: z.enum(["en", "ru"]).default("en") }).strict(),
     output: z.object({ base64: z.string(), contentType: z.string(), finalUrl: z.string() }).strict(),
   },
   /** A file of that page's site (picture, font, stylesheet) for a screenshot. */
   webFile: {
-    input: z.object({ url: z.string().min(1).max(8192) }).strict(),
+    input: z.object({ url: z.string().min(1).max(8192), locale: z.enum(["en", "ru"]).default("en") }).strict(),
     output: z.object({ base64: z.string(), contentType: z.string() }).strict(),
   },
   save: {
@@ -378,7 +378,7 @@ export default function plugin(bb: BbPluginApi) {
     if (context.req.header("if-none-match") === `"${screenshotVersion}"`) return new Response(null, { status: 304 });
     screenshotBody ??= readFile(require.resolve("modern-screenshot/dist/index.js"));
     return new Response(new Uint8Array(await screenshotBody), {
-      headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache", etag: `"${screenshotVersion}"`, "access-control-allow-origin": "*" },
+      headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache", etag: `"${screenshotVersion}"` },
     });
   });
 
@@ -410,7 +410,6 @@ export default function plugin(bb: BbPluginApi) {
       headers: {
         "content-type": "application/json; charset=utf-8",
         "cache-control": "private, max-age=3600",
-        "access-control-allow-origin": "*",
       },
     });
   });
@@ -460,12 +459,12 @@ export default function plugin(bb: BbPluginApi) {
   });
 
   bb.rpc.register(rpcContract, {
-    webPage: async ({ url }) => {
-      const page = await fetchPublic(url);
+    webPage: async ({ url, locale }) => {
+      const page = await fetchPublic(url).catch((error: unknown) => { throw error instanceof WebError ? error.localized(locale) : error; });
       return { base64: Buffer.from(page.bytes).toString("base64"), contentType: page.contentType, finalUrl: page.finalUrl };
     },
-    webFile: async ({ url }) => {
-      const file = await fetchPublic(url);
+    webFile: async ({ url, locale }) => {
+      const file = await fetchPublic(url).catch((error: unknown) => { throw error instanceof WebError ? error.localized(locale) : error; });
       return { base64: Buffer.from(file.bytes).toString("base64"), contentType: file.contentType };
     },
     engine: async () => {
