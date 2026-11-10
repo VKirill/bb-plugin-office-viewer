@@ -74,3 +74,25 @@ The opener holds the PDF.js loading task, document, page sizes, rendered page st
 
 - [Office Viewer architecture](../architecture.md)
 - [Office Viewer overview](../overview.md)
+
+## Remembering your place
+
+The PDF viewer saves its page, position within that page, horizontal scroll and
+zoom in BB's server-side plugin KV store. Reopening the same file in the same
+thread restores that view, including from another client device. Each thread
+keeps its own reading position. The identity is the viewing thread ID, resolved
+host ID and normalized absolute path; moving or
+renaming the file starts a new reading position. Clients viewing the same thread on a BB server
+share its position (last save wins). Files opened outside a thread do not persist
+reading state.
+
+Scroll saves are debounced by 400 ms, with pending saves flushed when the panel
+unmounts or the page becomes hidden. A sudden browser/process termination can
+lose the last unsent position. Hidden panels do not replace the reading anchor
+with a zero-sized layout. Restoration waits for the PDF to load, clamps the
+saved page if the document has become shorter, and uses page-relative coordinates
+so changes in panel width preserve the passage. Storage failures are logged to
+the browser console and do not prevent reading the PDF.
+
+This stores reading state only: PDF bytes are still fetched and parsed when the
+viewer mounts.
