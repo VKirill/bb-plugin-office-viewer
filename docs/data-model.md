@@ -2,7 +2,7 @@
 title: Office Viewer data model
 type: data-model
 created: 2026-10-13
-updated: 2026-10-18
+updated: 2026-11-13
 status: active
 confidence: medium
 tags: [data-model, files, spreadsheets]
@@ -34,7 +34,11 @@ sources:
 
 # Office Viewer data model
 
-TL;DR: The plugin has no application database; durable state lives in BB-hosted source files and thread-scoped Studio documents, while parsers and editor state are held in browser memory or local storage (`server.ts:480-569`; `server.ts:571-611`; `src/studio/session.ts:7-38`).
+TL;DR: The plugin has no application database; durable state lives in BB-hosted source files, thread-scoped Studio documents and PDF reading-position KV rows, while parsers and editor state are held in browser memory or local storage (`server.ts:480-569`; `server.ts:571-611`; `src/studio/session.ts:7-38`).
+
+## PDF reading state
+
+KV keys use `pdf-view:v1:<encoded-thread-id>:<sha256(host-id, normalized-path)>`. Each strict JSON value contains zero-based `page`, relative `fraction` and `horizontal` in 0–1, and `zoom` (`width`, `page` or a factor from 0.075 to 4.5). Invalid stored values fall back to the default view. The thread must exist for RPC reads/writes. Rows are removed on `thread.deleted`; active-thread rows do not expire. PDF contents, passwords and preview URLs are never stored. See [PDF behavior and limits](features/pdf.md#reading-position).
 
 ## Schema overview
 
@@ -192,7 +196,7 @@ The tool workflows and editor behavior are described in [Studio tools](features/
 - Workspace and thread-storage paths are constrained to their roots; host paths must be absolute (`src/server/locate.ts:48-56`; `src/server/locate.ts:91-133`).
 - XLSX sheet index and name must still identify the same sheet at patch time (`src/spreadsheet/xlsx-patch.ts:258-261`).
 - CSV and TSV source formatting details are held in a parsed in-memory representation and used by serialization (`src/spreadsheet/csv.ts:4-19`; `src/spreadsheet/csv.ts:97-131`).
-- Media editor canvas, annotation history and PDF/Word viewer state are runtime UI state, not durable plugin records (`src/media/image-editor.tsx:52-68`; `src/media/image-editor.tsx:433-442`).
+- Media editor canvas, annotation history and Word viewer state are runtime UI state, not durable plugin records (`src/media/image-editor.tsx:52-68`; `src/media/image-editor.tsx:433-442`).
 - Studio copies in browser local storage are restoration state; BB thread-storage files remain the durable saved documents (`src/studio/session.ts:109-129`; `server.ts:571-611`).
 
 ## Lifecycle, retention and cleanup

@@ -40,6 +40,8 @@ import { freePaintStem, listedPaintStem, paintDir, paintJsonPath, paintPngPath, 
 import { parseSlidesDeck } from "./src/studio/slides/model.ts";
 import { freeSlidesStem, listedSlidesStem, slidesDir, slidesJsonPath, slidesPngPath, sanitizeSlidesStem } from "./src/server/slides.ts";
 import { loadHugeiconsByNames } from "./src/server/hugeicons.ts";
+import { pdfViewStateSchema } from "./src/pdf/view-state.ts";
+import { deletePdfViewStates, readPdfViewState, writePdfViewState } from "./src/server/pdf-view-state.ts";
 
 const say = (lang: Lang, en: string, ru: string) => (lang === "ru" ? ru : en);
 
@@ -71,6 +73,15 @@ export const rpcContract = defineRpcContract({
   open: {
     input: fileSchema,
     output: z.object({ url: z.string(), hostName: z.string(), absPath: z.string() }).strict(),
+  },
+  /** PDF reading position, stored in BB's server-side plugin KV. */
+  getPdfViewState: {
+    input: fileSchema.extend({ threadId: z.string().min(1).max(256) }).strict(),
+    output: pdfViewStateSchema.nullable(),
+  },
+  savePdfViewState: {
+    input: fileSchema.extend({ threadId: z.string().min(1).max(256), state: pdfViewStateSchema }).strict(),
+    output: z.object({}).strict(),
   },
   /** Text of a legacy Word .doc: browsers have no renderer for the binary format. */
   docText: {
@@ -355,6 +366,7 @@ function describe(error: unknown, hostName: string, absPath: string, lang: Lang)
 
 export default function plugin(bb: BbPluginApi) {
   const sdk = bb.sdk as unknown as LocateSdk;
+  bb.events.on("thread.deleted", ({ thread }) => deletePdfViewStates(bb.storage.kv, thread.id));
   let engine: Promise<string> | null = null;
 
   // PDF.js for the PDF opener, fetched by the browser on the first PDF instead of riding in every app bundle.
@@ -500,6 +512,17 @@ export default function plugin(bb: BbPluginApi) {
         footnotes: text.getFootnotes(raw),
         endnotes: text.getEndnotes(raw),
       };
+    },
+    getPdfViewState: async ({ threadId, source, path, locale = "en" }) => {
+      await bb.sdk.threads.get({ threadId });
+      const where = await locate(sdk, source, path, locale);
+      return readPdfViewState(bb.storage.kv, threadId, where);
+    },
+    savePdfViewState: async ({ threadId, source, path, state, locale = "en" }) => {
+      await bb.sdk.threads.get({ threadId });
+      const where = await locate(sdk, source, path, locale);
+      await writePdfViewState(bb.storage.kv, threadId, where, state);
+      return {};
     },
     open: async ({ source, path, locale = "en" }) => {
       const where = await locate(sdk, source, path, locale);

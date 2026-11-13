@@ -16,6 +16,10 @@ Requires BB 0.43 or later. Choose Office Viewer in BB Settings → File openers 
 
 Version 0.8.16 pins each request to validated public IP addresses, including redirects, with fallback among the checked addresses. DNS, connections, redirects and decoded response bodies share a 20-second deadline; decoded responses are limited to 20 MB. Internal and special-purpose ranges are blocked conservatively, so some special-purpose globally reachable addresses are intentionally unavailable. Web errors support English and Russian.
 
+## PDF reading position
+
+PDFs remember the page, position within the page, horizontal scroll and zoom per viewing thread in BB’s server-side plugin storage. Reopening that thread on another device restores its place. Refreshing keeps the current passage, and rapid close/reopen shares pending saves. Files opened outside a thread do not persist a reading position.
+
 ## Documentation
 
 - [Project overview](docs/overview.md)

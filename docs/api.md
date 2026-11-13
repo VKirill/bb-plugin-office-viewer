@@ -2,7 +2,7 @@
 title: Office Viewer API
 type: component
 created: 2026-10-13
-updated: 2026-10-18
+updated: 2026-11-13
 status: active
 confidence: high
 tags: [api, rpc, routes]
@@ -61,6 +61,8 @@ Invalid RPC payloads fail schema validation; location, missing-file, host-unavai
 | Method | Caller | Purpose |
 |---|---|---|
 | `open` | File openers | Resolves file source and requests a short-lived preview URL (`server.ts:69-74`; `server.ts:505-516`). |
+| `getPdfViewState` | PDF opener | Validates the viewing thread and resolves the file; returns its stored reading state or null. |
+| `savePdfViewState` | PDF opener | Validates page/fraction/horizontal/zoom and writes per-thread, host/path state to plugin KV. |
 | `docText` | Legacy `.doc`/`.dot` Word opener | Reads and extracts body, headers, footnotes and endnotes; rejects files larger than `MAX_BYTES` (30 MiB) (`server.ts:46`; `server.ts:480-503`). |
 | `siblings` | Image opener | Lists visible file names in the image's containing directory (`server.ts:84-88`; `server.ts:517-525`). |
 

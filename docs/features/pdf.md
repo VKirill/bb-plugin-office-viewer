@@ -2,7 +2,7 @@
 title: PDF viewing
 type: component
 created: 2026-10-13
-updated: 2026-10-18
+updated: 2026-11-13
 status: active
 confidence: medium
 tags: [pdf, search, documents]
@@ -41,6 +41,14 @@ Render PDF pages in a continuous viewer, with search and selection features that
 - Download requests the original preview URL and triggers a browser download (`src/pdf/pdf.tsx:493-505`).
 - PDF.js runtime and worker are separate GET routes (`server.ts:360-370`).
 
+## Reading position
+
+Page index, position within the page, horizontal scroll and zoom are saved in BB’s server-side plugin KV, scoped to the viewing thread and resolved file host/path. A fresh client restores the position independently of preview tokens; different threads keep separate positions. Outside a thread the view remains temporary.
+
+Scroll saves are debounced by 400 ms and serialized across panel instances in the same browser. Refresh keeps the live anchor, and reopening during a pending save restores the latest local state. Restoration waits at most 1.5 seconds; a missing, invalid, failed or late response cannot prevent reading. Hidden panels retain their anchor and apply it on becoming visible.
+
+A normal panel close and a hidden document flush pending state. Browser/page termination is best effort: an abrupt process or network failure may lose the last unsaved movement. Concurrent independent clients use the last server write. Replacing a PDF at the same path inherits its position, with the page clamped to the new document length. Thread deletion removes its reading-state rows; active threads have no expiry. No PDF bytes, passwords or preview URLs are stored.
+
 ## Public API
 
 | Import or call | File | Purpose |
@@ -58,7 +66,7 @@ Render PDF pages in a continuous viewer, with search and selection features that
 
 ## Internal model
 
-The opener holds the PDF.js loading task, document, page sizes, rendered page state, current page, zoom and search state in React (`src/pdf/pdf.tsx:239-330`). It renders visible pages and maintains generation guards so stale asynchronous loads do not replace the current viewer (`src/pdf/pdf.tsx:299-330`).
+Reading position is durable in plugin KV; the opener holds the PDF.js loading task, document, page sizes, rendered page state and search state in React (`src/pdf/pdf.tsx:239-330`). It renders visible pages and maintains generation guards so stale asynchronous loads do not replace the current viewer (`src/pdf/pdf.tsx:299-330`).
 
 ## Dependencies
 

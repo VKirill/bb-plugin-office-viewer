@@ -3,7 +3,7 @@
 // viewport. PDF.js and its worker come from the plugin server's HTTP route.
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode, RefObject } from "react";
-import { useComposer, useRpc, type PluginFileOpenerProps } from "@get-bb/plugin-sdk/app";
+import { useBbContext, useComposer, useRpc, type PluginFileOpenerProps } from "@get-bb/plugin-sdk/app";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask, TextLayer } from "pdfjs-dist";
 import { toast } from "sonner";
 import type { rpcContract } from "../../server";
@@ -12,6 +12,7 @@ import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { detectLocale, t } from "../shared/i18n";
+import { acquireViewStateSaver } from "./view-state.ts";
 import { formatSize } from "../shared/format";
 
 export const PDF_EXTENSIONS = ["pdf"];
@@ -236,7 +237,15 @@ function ToolButton({ label, onClick, disabled, pressed, children }: { label: st
   );
 }
 
-export function PdfOpener({ path, source }: PluginFileOpenerProps) {
+export function PdfOpener(props: PluginFileOpenerProps) {
+  const { path, source } = props;
+  const { threadId } = useBbContext();
+  // A different file gets a fresh load and saver; late work cannot update its replacement.
+  const key = JSON.stringify([threadId, path, source.kind, source.threadId, source.environmentId, source.projectId, source.experimental_hostId]);
+  return <PdfViewer key={key} {...props} readingThreadId={threadId} stateKey={key} />;
+}
+
+function PdfViewer({ path, source, readingThreadId, stateKey }: PluginFileOpenerProps & { readingThreadId: string | null; stateKey: string }) {
   const rpc = useRpc<typeof rpcContract>();
   const composer = useComposer();
   const locale = detectLocale();
@@ -279,10 +288,32 @@ export function PdfOpener({ path, source }: PluginFileOpenerProps) {
   const opening = useRef<PDFDocumentLoadingTask | null>(null);
   /** The page in view and how far down it the top of the viewport is, so zooming and late page sizes keep the place. */
   const anchor = useRef({ page: 0, fraction: 0 });
+  const horizontal = useRef(0.5);
+  const ready = useRef(false);
+  const zoomValue = useRef(zoom);
+  zoomValue.current = zoom;
+  const saver = useRef<ReturnType<typeof acquireViewStateSaver> | null>(null);
+  useEffect(() => {
+    if (!readingThreadId) return;
+    const session = acquireViewStateSaver(stateKey,
+      (state) => rpc.call("savePdfViewState", { ...request, threadId: readingThreadId, state }),
+      (error) => console.warn("Could not persist PDF reading position", error),
+    );
+    saver.current = session;
+    return () => {
+      saver.current = null;
+      void session.release();
+    };
+  }, [rpc, request, readingThreadId, stateKey]);
   const selection = useRef<{ text: string; from: number; to: number } | null>(null);
 
   const load = useCallback(async () => {
     const run = ++generation.current;
+    // Refresh keeps the current passage, including scrolls not yet written to KV.
+    const saved = ready.current
+      ? Promise.resolve({ ...anchor.current, horizontal: horizontal.current, zoom: zoomValue.current })
+      : saver.current?.restore(() => rpc.call("getPdfViewState", { ...request, threadId: readingThreadId! })) ?? Promise.resolve(null);
+    ready.current = false;
     setLoading(true);
     setError(null);
     setPassword(null);
@@ -303,9 +334,19 @@ export function PdfOpener({ path, source }: PluginFileOpenerProps) {
       const doc = await task.promise;
       if (run !== generation.current) return;
       const first = (await doc.getPage(1)).getViewport({ scale: 1 });
+      const restored = await saved;
+      if (run !== generation.current) return;
       void opened.current?.destroy();
       opened.current = task;
       setPassword(null);
+      if (restored) {
+        anchor.current = { page: Math.min(restored.page, doc.numPages - 1), fraction: restored.fraction };
+        horizontal.current = restored.horizontal;
+        setZoom(restored.zoom);
+      }
+      anchor.current.page = Math.min(anchor.current.page, doc.numPages - 1);
+      setCurrent(anchor.current.page);
+      ready.current = true;
       setSizes(Array.from({ length: doc.numPages }, () => ({ w: first.width, h: first.height })));
       setPdf({ lib, doc });
       setInfo({ hostName: file.hostName, absPath: file.absPath, sizeBytes });
@@ -331,7 +372,7 @@ export function PdfOpener({ path, source }: PluginFileOpenerProps) {
     } finally {
       if (run === generation.current) setLoading(false);
     }
-  }, [rpc, request]);
+  }, [rpc, request, readingThreadId]);
 
   useEffect(() => {
     void load();
@@ -345,7 +386,10 @@ export function PdfOpener({ path, source }: PluginFileOpenerProps) {
 
   useLayoutEffect(() => {
     const element = viewport.current!;
-    const measure = () => setView({ w: element.clientWidth, h: element.clientHeight });
+    const measure = () => {
+      // Hidden panels can measure zero: keep the last visible layout and reading anchor.
+      if (element.clientWidth && element.clientHeight) setView({ w: element.clientWidth, h: element.clientHeight });
+    };
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     measure();
@@ -370,12 +414,12 @@ export function PdfOpener({ path, source }: PluginFileOpenerProps) {
 
   useLayoutEffect(() => {
     const element = viewport.current!;
-    if (!scale || !offsets.length) return;
+    if (!scale || !offsets.length || !element.clientWidth || !element.clientHeight) return;
     const page = Math.min(anchor.current.page, offsets.length - 1);
     element.scrollTop = offsets[page] - PAD + anchor.current.fraction * sizes[page].h * scale;
     // A page wider than the rest widens the content: keep the narrower ones in view.
-    element.scrollLeft = (element.scrollWidth - element.clientWidth) / 2;
-  }, [offsets]);
+    element.scrollLeft = (element.scrollWidth - element.clientWidth) * horizontal.current;
+  }, [offsets, view]);
 
   const goTo = (page: number) => {
     const index = Math.min(Math.max(page, 0), offsets.length - 1);
@@ -384,7 +428,7 @@ export function PdfOpener({ path, source }: PluginFileOpenerProps) {
 
   const onScroll = () => {
     const element = viewport.current!;
-    if (!offsets.length) return;
+    if (!ready.current || !scale || !offsets.length || !element.clientWidth || !element.clientHeight) return;
     const { scrollTop, clientHeight } = element;
     let low = 0;
     let high = offsets.length - 1;
@@ -404,9 +448,29 @@ export function PdfOpener({ path, source }: PluginFileOpenerProps) {
       }
     }
     if (scrollTop + clientHeight >= element.scrollHeight - 2) page = offsets.length - 1;
-    anchor.current = { page, fraction: (scrollTop - (offsets[page] - PAD)) / (sizes[page].h * scale) };
+    // Persist the page at the top, rather than the most-visible page (which can have a negative fraction).
+    anchor.current = { page: low, fraction: Math.min(1, Math.max(0, (scrollTop - (offsets[low] - PAD)) / (sizes[low].h * scale))) };
+    const overflow = element.scrollWidth - element.clientWidth;
+    if (overflow > 0) horizontal.current = Math.min(1, Math.max(0, element.scrollLeft / overflow));
+    saver.current?.update({ ...anchor.current, horizontal: horizontal.current, zoom });
     setCurrent(page);
   };
+
+  useEffect(() => {
+    if (ready.current) saver.current?.update({ ...anchor.current, horizontal: horizontal.current, zoom });
+  }, [zoom]);
+
+  useEffect(() => {
+    const flush = () => { void saver.current?.flush(); };
+    const onVisibility = () => { if (document.visibilityState === "hidden") flush(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, []);
 
   const zoomBy = (direction: 1 | -1) => {
     const next = direction > 0 ? ZOOM_STEPS.find((step) => step > factor + 0.01) : [...ZOOM_STEPS].reverse().find((step) => step < factor - 0.01);
