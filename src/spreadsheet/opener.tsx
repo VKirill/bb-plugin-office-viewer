@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { cn } from "@/lib/utils";
 import { detectLocale, t } from "../shared/i18n";
 import { formatSize } from "../shared/format";
+import { fetchCached } from "../shared/file-cache";
 import { EXTENSIONS, cellAddress, editMode, extensionOf, findCells, parseWorkbook, type Cell, type Sheet } from "./sheet";
 import { cellKey, editorText, formatQuote, parseTsv, rangeLabel, rangeTsv, toRange, type Position, type Range } from "./edits";
 import { ENGINE_VERSION, applyInput, buildWorkbook, editsForSave, engineCell, initEngine, selectionStats, type Workbook } from "./engine";
@@ -79,8 +80,8 @@ async function engineBytes(fetchModule: () => Promise<Uint8Array>): Promise<Uint
 }
 
 /** Downloads the file from its preview URL and hashes it like the server does. */
-async function fetchFile(url: string, absPath: string): Promise<{ bytes: Uint8Array; sha256: string }> {
-  const response = await fetch(`${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`, { cache: "no-store" });
+async function fetchFile(url: string, absPath: string, hostName: string): Promise<{ bytes: Uint8Array; sha256: string }> {
+  const response = await fetchCached(url, `${hostName}\0${absPath}`);
   if (!response.ok) throw new Error(response.status === 404 ? t("fileMissing", { path: absPath }) : `HTTP ${response.status}`);
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (bytes.byteLength > MAX_BYTES) throw new Error(t("tooLarge"));
@@ -172,7 +173,7 @@ export function SpreadsheetOpener({ path, source }: PluginFileOpenerProps) {
           throw new Error(`${t("engineFailed")}: ${errorText(cause)}`);
         }),
       ]);
-      const { bytes, sha256 } = await fetchFile(result.url, result.absPath);
+      const { bytes, sha256 } = await fetchFile(result.url, result.absPath, result.hostName);
       const extension = extensionOf(result.absPath);
       let next: Workbook;
       try {
@@ -552,7 +553,7 @@ export function SpreadsheetOpener({ path, source }: PluginFileOpenerProps) {
   const overwrite = async () => {
     try {
       const fresh = await rpc.call("open", request);
-      await save((await fetchFile(fresh.url, fresh.absPath)).sha256);
+      await save((await fetchFile(fresh.url, fresh.absPath, fresh.hostName)).sha256);
     } catch (cause) {
       setSaveError(errorText(cause));
       setSaveState("error");

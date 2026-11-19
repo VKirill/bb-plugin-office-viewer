@@ -14,6 +14,7 @@ import { formatSize } from "../shared/format";
 import { extensionOf } from "../spreadsheet/sheet";
 import { parsePptx, slideMarkdown, type Deck } from "./pptx";
 import { formatBlockquote } from "../shared/quote";
+import { fetchCached } from "../shared/file-cache";
 import { ScaledSlide } from "./slide-view";
 
 export const SLIDES_EXTENSIONS = ["pptx", "ppsx", "potx"];
@@ -127,7 +128,7 @@ export function SlidesOpener({ path, source }: PluginFileOpenerProps) {
         if (run === generation.current) setInfo({ hostName: opened.hostName, absPath: opened.absPath, sizeBytes: null });
         return;
       }
-      const response = await fetch(`${opened.url}${opened.url.includes("?") ? "&" : "?"}v=${Date.now()}`, { cache: "no-store" });
+      const response = await fetchCached(opened.url, `${opened.hostName}\0${opened.absPath}`);
       if (!response.ok) throw new Error(response.status === 404 ? t("fileMissing", { path: opened.absPath }) : `HTTP ${response.status}`);
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (run !== generation.current) return;

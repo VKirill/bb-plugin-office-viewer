@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { detectLocale, t } from "../shared/i18n";
 import { acquireViewStateSaver } from "./view-state.ts";
 import { formatSize } from "../shared/format";
+import { fetchCached } from "../shared/file-cache";
 
 export const PDF_EXTENSIONS = ["pdf"];
 
@@ -320,7 +321,7 @@ function PdfViewer({ path, source, readingThreadId, stateKey }: PluginFileOpener
     void opening.current?.destroy();
     try {
       const file = await rpc.call("open", request);
-      const response = await fetch(`${file.url}${file.url.includes("?") ? "&" : "?"}v=${Date.now()}`, { cache: "no-store" });
+      const response = await fetchCached(file.url, `${file.hostName}\0${file.absPath}`);
       if (!response.ok) throw new Error(response.status === 404 ? t("fileMissing", { path: file.absPath }) : `HTTP ${response.status}`);
       const bytes = new Uint8Array(await response.arrayBuffer());
       const sizeBytes = bytes.byteLength;

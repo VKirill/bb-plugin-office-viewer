@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { detectLocale, t } from "../shared/i18n";
 import { formatSize } from "../shared/format";
 import { formatBlockquote } from "../shared/quote";
+import { fetchCached } from "../shared/file-cache";
 import { extensionOf } from "../spreadsheet/sheet";
 
 const LEGACY_EXTENSIONS = ["doc", "dot"];
@@ -158,7 +159,7 @@ export function DocumentOpener({ path, source }: PluginFileOpenerProps) {
         return;
       }
       const opened = await rpc.call("open", request);
-      const response = await fetch(`${opened.url}${opened.url.includes("?") ? "&" : "?"}v=${Date.now()}`, { cache: "no-store" });
+      const response = await fetchCached(opened.url, `${opened.hostName}\0${opened.absPath}`);
       if (!response.ok) throw new Error(response.status === 404 ? t("fileMissing", { path: opened.absPath }) : `HTTP ${response.status}`);
       const bytes = await response.arrayBuffer();
       if (current !== generation.current || !pages.current || !styles.current) return;
