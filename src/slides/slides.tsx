@@ -15,6 +15,7 @@ import { extensionOf } from "../spreadsheet/sheet";
 import { parsePptx, slideMarkdown, type Deck } from "./pptx";
 import { formatBlockquote } from "../shared/quote";
 import { fetchCached } from "../shared/file-cache";
+import { useFileTabReady } from "../shared/file-tab";
 import { ScaledSlide } from "./slide-view";
 
 export const SLIDES_EXTENSIONS = ["pptx", "ppsx", "potx"];
@@ -82,6 +83,7 @@ function Thumbnail({ deck, index, width, active, onSelect }: { deck: Deck; index
 }
 
 export function SlidesOpener({ path, source }: PluginFileOpenerProps) {
+  const tabReady = useFileTabReady();
   const rpc = useRpc<typeof rpcContract>();
   const composer = useComposer();
   const locale = detectLocale();
@@ -128,7 +130,7 @@ export function SlidesOpener({ path, source }: PluginFileOpenerProps) {
         if (run === generation.current) setInfo({ hostName: opened.hostName, absPath: opened.absPath, sizeBytes: null });
         return;
       }
-      const response = await fetchCached(opened.url, `${opened.hostName}\0${opened.absPath}`);
+      const response = await fetchCached(opened.url, `${opened.hostId}\0${opened.absPath}`);
       if (!response.ok) throw new Error(response.status === 404 ? t("fileMissing", { path: opened.absPath }) : `HTTP ${response.status}`);
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (run !== generation.current) return;
@@ -150,8 +152,8 @@ export function SlidesOpener({ path, source }: PluginFileOpenerProps) {
   }, [rpc, request, legacy]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (tabReady) void load();
+  }, [load, tabReady]);
 
   useEffect(() => () => void generation.current++, []);
   useEffect(() => () => deck?.dispose(), [deck]);

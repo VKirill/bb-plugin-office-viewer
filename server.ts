@@ -72,7 +72,7 @@ export const rpcContract = defineRpcContract({
   /** A short-lived URL the browser downloads the file from, so large files don't travel as JSON. */
   open: {
     input: fileSchema,
-    output: z.object({ url: z.string(), hostName: z.string(), absPath: z.string() }).strict(),
+    output: z.object({ url: z.string(), hostId: z.string(), hostName: z.string(), absPath: z.string() }).strict(),
   },
   /** PDF reading position, stored in BB's server-side plugin KV. */
   getPdfViewState: {
@@ -534,7 +534,7 @@ export default function plugin(bb: BbPluginApi) {
         .createPreview({ hostId: where.hostId, rootPath: where.absPath.slice(0, slash) || "/", ttlMs: 10 * 60 * 1000 })
         .catch((error: unknown) => { throw describe(error, hostName, where.absPath, locale); });
       const url = `${preview.baseUrl.replace(/\/?$/, "/")}${encodeURIComponent(where.absPath.slice(slash + 1))}`;
-      return { url, hostName, absPath: where.absPath };
+      return { url, hostId: where.hostId, hostName, absPath: where.absPath };
     },
     siblings: async ({ source, path, locale = "en" }) => {
       const where = await locate(sdk, source, path, locale);

@@ -2,7 +2,7 @@
 title: Office Viewer data model
 type: data-model
 created: 2026-10-13
-updated: 2026-11-13
+updated: 2026-11-20
 status: active
 confidence: medium
 tags: [data-model, files, spreadsheets]
@@ -36,9 +36,13 @@ sources:
 
 TL;DR: The plugin has no application database; durable state lives in BB-hosted source files, thread-scoped Studio documents and PDF reading-position KV rows, while parsers and editor state are held in browser memory or local storage (`server.ts:480-569`; `server.ts:571-611`; `src/studio/session.ts:7-38`).
 
+## Browser document download cache
+
+IndexedDB `office-viewer-file-cache` has separate `meta` (key, ETag, byte size, last-use time) and `blobs` stores. Keys combine the resolved stable host ID and absolute file path. After a server 304, metadata and bytes are read in one transaction and must match the requested ETag; a race or unreadable copy triggers an unconditional download. Storage operations, including Blob conversion, are bounded by two seconds. Downloads without an ETag or over 100 MiB bypass storage. Writes atomically update both stores and prune expired/least-recently-used entries to 500 MiB. Entries idle over 30 days are also removed on access. No cleanup runs while BB is closed; thread deletion and logout do not clear this browser database. [Removal instructions](../README.md#document-download-cache).
+
 ## PDF reading state
 
-KV keys use `pdf-view:v1:<encoded-thread-id>:<sha256(host-id, normalized-path)>`. Each strict JSON value contains zero-based `page`, relative `fraction` and `horizontal` in 0–1, and `zoom` (`width`, `page` or a factor from 0.075 to 4.5). Invalid stored values fall back to the default view. The thread must exist for RPC reads/writes. Rows are removed on `thread.deleted`; active-thread rows do not expire. PDF contents, passwords and preview URLs are never stored. See [PDF behavior and limits](features/pdf.md#reading-position).
+KV keys use `pdf-view:v1:<encoded-thread-id>:<sha256(host-id, normalized-path)>`. Each strict JSON value contains zero-based `page`, relative `fraction` and `horizontal` in 0–1, and `zoom` (`width`, `page` or a factor from 0.075 to 4.5). Invalid stored values fall back to the default view. The thread must exist for RPC reads/writes. Rows are removed on `thread.deleted`; active-thread rows do not expire. PDF contents, passwords and preview URLs are never stored in these server-side reading-state rows. Original document bytes are stored separately in the browser download cache. See [PDF behavior and limits](features/pdf.md#reading-position).
 
 ## Schema overview
 

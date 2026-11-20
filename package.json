@@ -1,6 +1,6 @@
 {
   "name": "bb-plugin-office-viewer",
-  "version": "0.8.17",
+  "version": "0.8.18",
   "type": "module",
   "engines": {
     "bb": ">=0.43",
@@ -28,7 +28,7 @@
     "pptxgenjs": "^4.0.1",
     "word-extractor": "^1.0.4",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^4.3.6"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@get-bb/plugin-sdk": "0.4.87",
@@ -51,7 +51,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "fake-indexeddb": "6.2.8",
-    "hono": "^4.11.9",
+    "hono": "^4.13.19",
     "sonner": "^1.7.4",
     "tailwind-merge": "^3.4.0",
     "typescript": "^5.7.0",
@@ -82,5 +82,10 @@
     "build": "bb plugin build ."
   },
   "license": "MIT",
-  "author": "Kirill Vechkasov (https://github.com/VKirill)"
+  "author": "Kirill Vechkasov (https://github.com/VKirill)",
+  "overrides": {
+    "pptxgenjs": {
+      "image-size": "^2.1.0"
+    }
+  }
 }

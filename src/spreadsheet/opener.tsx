@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { detectLocale, t } from "../shared/i18n";
 import { formatSize } from "../shared/format";
 import { fetchCached } from "../shared/file-cache";
+import { useFileTabReady } from "../shared/file-tab";
 import { EXTENSIONS, cellAddress, editMode, extensionOf, findCells, parseWorkbook, type Cell, type Sheet } from "./sheet";
 import { cellKey, editorText, formatQuote, parseTsv, rangeLabel, rangeTsv, toRange, type Position, type Range } from "./edits";
 import { ENGINE_VERSION, applyInput, buildWorkbook, editsForSave, engineCell, initEngine, selectionStats, type Workbook } from "./engine";
@@ -80,8 +81,8 @@ async function engineBytes(fetchModule: () => Promise<Uint8Array>): Promise<Uint
 }
 
 /** Downloads the file from its preview URL and hashes it like the server does; `fresh` skips the stored copy. */
-async function fetchFile(url: string, absPath: string, hostName: string, fresh = false): Promise<{ bytes: Uint8Array; sha256: string }> {
-  const response = await (fresh ? fetch(url, { cache: "no-store" }) : fetchCached(url, `${hostName}\0${absPath}`));
+async function fetchFile(url: string, absPath: string, hostId: string, fresh = false): Promise<{ bytes: Uint8Array; sha256: string }> {
+  const response = await (fresh ? fetch(url, { cache: "no-store" }) : fetchCached(url, `${hostId}\0${absPath}`));
   if (!response.ok) throw new Error(response.status === 404 ? t("fileMissing", { path: absPath }) : `HTTP ${response.status}`);
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (bytes.byteLength > MAX_BYTES) throw new Error(t("tooLarge"));
@@ -102,6 +103,7 @@ function Status({ children }: { children: ReactNode }) {
 }
 
 export function SpreadsheetOpener({ path, source }: PluginFileOpenerProps) {
+  const tabReady = useFileTabReady();
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const composer = useComposer();
@@ -173,7 +175,7 @@ export function SpreadsheetOpener({ path, source }: PluginFileOpenerProps) {
           throw new Error(`${t("engineFailed")}: ${errorText(cause)}`);
         }),
       ]);
-      const { bytes, sha256 } = await fetchFile(result.url, result.absPath, result.hostName);
+      const { bytes, sha256 } = await fetchFile(result.url, result.absPath, result.hostId);
       const extension = extensionOf(result.absPath);
       let next: Workbook;
       try {
@@ -202,8 +204,8 @@ export function SpreadsheetOpener({ path, source }: PluginFileOpenerProps) {
     setActive(0);
     setAnchor(null);
     setFocus(null);
-    void load();
-  }, [load]);
+    if (tabReady) void load();
+  }, [load, tabReady]);
 
   useEffect(() => () => workbook?.model.free(), [workbook]);
 
@@ -553,7 +555,7 @@ export function SpreadsheetOpener({ path, source }: PluginFileOpenerProps) {
   const overwrite = async () => {
     try {
       const fresh = await rpc.call("open", request);
-      await save((await fetchFile(fresh.url, fresh.absPath, fresh.hostName, true)).sha256);
+      await save((await fetchFile(fresh.url, fresh.absPath, fresh.hostId, true)).sha256);
     } catch (cause) {
       setSaveError(errorText(cause));
       setSaveState("error");

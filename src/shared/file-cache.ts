@@ -1,6 +1,6 @@
 // Office Viewer — downloads a file from its preview link, keeping a copy in
-// IndexedDB. BB's preview route tags each file with an ETag built from its
-// inode, size and change times. The next open sends that tag back; an
+// IndexedDB. BB's preview route tags each file with an opaque ETag.
+// The next open sends that tag back; an
 // unchanged file answers 304 with no body and the stored copy is used, so
 // reopening a document does not move it over the network again.
 
@@ -31,9 +31,16 @@ function open(): Promise<IDBDatabase> {
       db.createObjectStore(META, { keyPath: "key" }).createIndex("usedAt", "usedAt");
       db.createObjectStore(BLOBS);
     };
-    request.onsuccess = () => resolve(request.result);
+    let blocked = false;
+    request.onsuccess = () => {
+      const db = request.result;
+      if (blocked) { db.close(); return; }
+      db.onversionchange = () => { db.close(); database = null; };
+      db.onclose = () => { database = null; };
+      resolve(db);
+    };
     request.onerror = () => reject(request.error);
-    request.onblocked = () => reject(new Error("File cache upgrade blocked by another tab"));
+    request.onblocked = () => { blocked = true; reject(new Error("File cache upgrade blocked by another tab")); };
   });
   database.catch(() => { database = null; });
   return database;
@@ -54,25 +61,47 @@ function committed(transaction: IDBTransaction): Promise<void> {
   });
 }
 
-function timed<T>(work: Promise<T>): Promise<T> {
-  return Promise.race([work, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("File cache timed out")), TIMEOUT_MS))]);
+async function timed<T>(work: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([work, new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("File cache timed out")), TIMEOUT_MS);
+    })]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function readMeta(key: string): Promise<Meta | undefined> {
   const db = await open();
-  return done<Meta | undefined>(db.transaction(META).objectStore(META).get(key));
+  const transaction = db.transaction([META, BLOBS], "readwrite");
+  const reading = done<Meta | undefined>(transaction.objectStore(META).get(key)).then((meta) => {
+    if (meta && (meta.key !== key || typeof meta.etag !== "string" || !meta.etag || /[\u0000-\u001f\u007f]/.test(meta.etag)
+      || !Number.isSafeInteger(meta.size) || meta.size < 0 || meta.size > MAX_ENTRY_BYTES
+      || !Number.isFinite(meta.usedAt) || meta.usedAt < Date.now() - MAX_AGE_MS)) {
+      transaction.objectStore(META).delete(key);
+      transaction.objectStore(BLOBS).delete(key);
+      return undefined;
+    }
+    return meta;
+  });
+  const [meta] = await Promise.all([reading, committed(transaction)]);
+  return meta;
 }
 
-async function readBlob(key: string): Promise<Blob | undefined> {
+async function readBlob(meta: Meta): Promise<ArrayBuffer | undefined> {
   const db = await open();
-  return done<Blob | undefined>(db.transaction(BLOBS).objectStore(BLOBS).get(key));
-}
-
-async function touch(meta: Meta): Promise<void> {
-  const db = await open();
-  const transaction = db.transaction(META, "readwrite");
-  transaction.objectStore(META).put({ ...meta, usedAt: Date.now() });
-  await committed(transaction);
+  const transaction = db.transaction([META, BLOBS], "readwrite");
+  const reading = Promise.all([
+    done<Meta | undefined>(transaction.objectStore(META).get(meta.key)),
+    done<Blob | undefined>(transaction.objectStore(BLOBS).get(meta.key)),
+  ]).then(([current, blob]) => {
+    if (current?.etag !== meta.etag || blob?.size !== meta.size) return undefined;
+    transaction.objectStore(META).put({ ...current, usedAt: Date.now() });
+    return blob;
+  });
+  const [blob] = await Promise.all([reading, committed(transaction)]);
+  return blob?.arrayBuffer();
 }
 
 async function remove(key: string): Promise<void> {
@@ -97,11 +126,10 @@ async function store(meta: Meta, blob: Blob): Promise<void> {
     const at = cursor.result;
     if (!at) return;
     const entry = at.value as Meta;
-    total += entry.size;
-    if (total > MAX_TOTAL_BYTES || entry.usedAt < meta.usedAt - MAX_AGE_MS) {
+    if (total + entry.size > MAX_TOTAL_BYTES || entry.usedAt < meta.usedAt - MAX_AGE_MS) {
       at.delete();
       blobs.delete(entry.key);
-    }
+    } else total += entry.size;
     at.continue();
   };
   await committed(transaction);
@@ -116,11 +144,8 @@ export async function fetchCached(url: string, key: string, useStored = true): P
   const response = await fetch(url, { cache: "no-store", headers: meta ? { "If-None-Match": meta.etag } : {} });
   if (response.status === 304 && meta) {
     // A stored copy can become unreadable (lost or corrupted browser storage): drop it and download again.
-    const bytes = await timed(readBlob(key))
-      .then((blob) => blob?.arrayBuffer())
-      .catch(() => undefined);
+    const bytes = await timed(readBlob(meta)).catch(() => undefined);
     if (bytes) {
-      void touch(meta).catch(() => undefined);
       return new Response(bytes, { status: 200, headers: { "content-length": String(bytes.byteLength) } });
     }
     await timed(remove(key)).catch(() => undefined);
@@ -128,6 +153,10 @@ export async function fetchCached(url: string, key: string, useStored = true): P
   }
   const etag = response.headers.get("etag");
   if (!response.ok) return response;
+  if (!etag || Number(response.headers.get("content-length")) > MAX_ENTRY_BYTES) {
+    if (meta) void remove(key).catch(() => undefined);
+    return response;
+  }
   const blob = await response.blob();
   const keep = etag && blob.size <= MAX_ENTRY_BYTES;
   void (keep ? store({ key, etag, size: blob.size, usedAt: Date.now() }, blob) : meta ? remove(key) : Promise.resolve()).catch(() => undefined);

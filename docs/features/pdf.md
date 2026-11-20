@@ -47,7 +47,7 @@ Page index, position within the page, horizontal scroll and zoom are saved in BB
 
 Scroll saves are debounced by 400 ms and serialized across panel instances in the same browser. Refresh keeps the live anchor, and reopening during a pending save restores the latest local state. Restoration waits at most 1.5 seconds; a missing, invalid, failed or late response cannot prevent reading. Hidden panels retain their anchor and apply it on becoming visible.
 
-A normal panel close and a hidden document flush pending state. Browser/page termination is best effort: an abrupt process or network failure may lose the last unsaved movement. Concurrent independent clients use the last server write. Replacing a PDF at the same path inherits its position, with the page clamped to the new document length. Thread deletion removes its reading-state rows; active threads have no expiry. No PDF bytes, passwords or preview URLs are stored.
+A normal panel close and a hidden document flush pending state. Browser/page termination is best effort: an abrupt process or network failure may lose the last unsaved movement. Concurrent independent clients use the last server write. Replacing a PDF at the same path inherits its position, with the page clamped to the new document length. Thread deletion removes its reading-state rows; active threads have no expiry. These server-side reading-state rows contain no PDF bytes, passwords or preview URLs. The separate browser download cache keeps original PDF bytes locally; see [Document download cache](../../README.md#document-download-cache).
 
 ## Public API
 

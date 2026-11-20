@@ -15,6 +15,7 @@ import { detectLocale, t } from "../shared/i18n";
 import { acquireViewStateSaver } from "./view-state.ts";
 import { formatSize } from "../shared/format";
 import { fetchCached } from "../shared/file-cache";
+import { useFileTabReady } from "../shared/file-tab";
 
 export const PDF_EXTENSIONS = ["pdf"];
 
@@ -247,6 +248,7 @@ export function PdfOpener(props: PluginFileOpenerProps) {
 }
 
 function PdfViewer({ path, source, readingThreadId, stateKey }: PluginFileOpenerProps & { readingThreadId: string | null; stateKey: string }) {
+  const tabReady = useFileTabReady();
   const rpc = useRpc<typeof rpcContract>();
   const composer = useComposer();
   const locale = detectLocale();
@@ -321,7 +323,7 @@ function PdfViewer({ path, source, readingThreadId, stateKey }: PluginFileOpener
     void opening.current?.destroy();
     try {
       const file = await rpc.call("open", request);
-      const response = await fetchCached(file.url, `${file.hostName}\0${file.absPath}`);
+      const response = await fetchCached(file.url, `${file.hostId}\0${file.absPath}`);
       if (!response.ok) throw new Error(response.status === 404 ? t("fileMissing", { path: file.absPath }) : `HTTP ${response.status}`);
       const bytes = new Uint8Array(await response.arrayBuffer());
       const sizeBytes = bytes.byteLength;
@@ -376,8 +378,8 @@ function PdfViewer({ path, source, readingThreadId, stateKey }: PluginFileOpener
   }, [rpc, request, readingThreadId]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (tabReady) void load();
+  }, [load, tabReady]);
 
   useEffect(() => () => {
     generation.current++;

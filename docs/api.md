@@ -2,7 +2,7 @@
 title: Office Viewer API
 type: component
 created: 2026-10-13
-updated: 2026-11-13
+updated: 2026-11-20
 status: active
 confidence: high
 tags: [api, rpc, routes]
@@ -36,6 +36,8 @@ The server declares request/response schemas with Zod in `rpcContract`, then reg
 ## Modes
 
 RPC calls use BB's plugin SDK. HTTP routes serve versioned PDF.js/screenshot assets, prototype schema and icon data, and published prototype HTML/JSON (`server.ts:363-460`).
+
+The `open` result includes `url`, stable `hostId`, display `hostName`, and resolved `absPath`. Document cache keys use `hostId`, never the editable display name.
 
 ## Failures and compensation
 

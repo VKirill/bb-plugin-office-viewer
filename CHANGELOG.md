@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.18 — 2026-11-20
+
+- Reuse unchanged PDF, Word Open XML, PowerPoint Open XML and spreadsheet downloads using ETag revalidation and a bounded local IndexedDB cache. Thanks @frrad for PR #3.
+- Keep cached ETags and bytes consistent across concurrent opens; reject expired entries and recover from blocked, failed or slow browser storage. Use stable host IDs for cache keys and keep spreadsheet Overwrite on fresh bytes.
+- Defer initial downloads in hidden tabs when the BB SDK supports visibility, with the existing eager behavior on older hosts. Document local retention and removal.
+- Update Zod and Hono and override PptxGenJS’s browser-excluded image-size dependency to a patched version.
+
 ## 0.8.15 — 2026-10-18
 
 ### Added
